@@ -1,0 +1,10 @@
+ticket_id,customer,plan,date,issue,priority,status
+4821,TechFlow Corp,Enterprise,2026-05-03,"Cannot export reports to CSV or Excel. Only PDF available and formatting is broken. Need raw data exports for BI tools. Critical.",critical,open
+4892,DataDriven Co,Growth,2026-05-05,"Dashboard loading times are 30-60 seconds for any report with 90+ days of data. Completely unusable for weekly reviews.",high,open
+5021,Nexus Global,Enterprise,2026-05-08,"Need to restrict which users see which dashboards. 500-person company, everyone sees everything. Security and compliance issue. Asking for RBAC for 6 months.",critical,escalated
+5088,Startup Hub,Starter,2026-05-10,"New team member can't figure out how to set up first dashboard. Getting started docs are sparse. Need better onboarding guide.",medium,resolved
+5102,FinTech Partners,Enterprise,2026-05-12,"Need audit logs showing who viewed or exported which reports. Required for SOC 2 compliance. No audit trail at all. Blocking contract renewal.",critical,escalated
+5134,GrowthCo,Growth,2026-05-14,"Is there a way to schedule automatic report emails? Want to send weekly summary to executive team every Monday at 9am. Currently doing this manually.",medium,open
+5201,Retail Analytics,Enterprise,2026-05-15,"Export to CSV not available in our plan. Need to connect data to Tableau. Please add CSV export. Willing to pay more.",high,open
+5244,MediaCorp,Enterprise,2026-05-16,"Cannot give different permission levels to team members. Finance should be read-only, operations should have edit access. No way to set this up.",high,open
+5289,Agency Pro,Growth,2026-05-17,"No way to share a read-only dashboard link with clients. Having to screenshot and email PDFs. Need shareable client-facing dashboard links.",high,open
