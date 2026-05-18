@@ -1,0 +1,22 @@
+Customer Interview — Acme Corp
+Date: May 15, 2026
+Customer: Sarah Chen, Head of Operations
+Plan: Enterprise ($50k/year)
+
+INTERVIEWER: Tell me about your biggest frustrations with the current analytics tool.
+
+SARAH: The number one issue is that I can't export my reports. Every time I need to share data with the exec team, I have to ask IT to run a custom export. It takes days. We're paying $50k/year and I can't download a CSV. This is blocking our workflows multiple times a week.
+
+My team of 8 people all hit this issue. We've actually started using a competitor's tool just for the export functionality.
+
+INTERVIEWER: What about permissions?
+
+SARAH: That's the second issue. Our dashboards are accessible to our entire 200-person company, which is a compliance risk. Legal flagged it last quarter. We need role-based access control before we can expand the contract.
+
+INTERVIEWER: Performance?
+
+SARAH: 30-40 seconds to load a report. My team makes jokes about it. It's embarrassing to demo to my executives.
+
+INTERVIEWER: Anything on your wish list?
+
+SARAH: Scheduled report emails. Right now I manually export and email a report every Monday. If I could automate this, that would save me hours every week.
