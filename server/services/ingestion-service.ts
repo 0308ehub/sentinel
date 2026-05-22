@@ -66,9 +66,16 @@ export async function processDocument(documentId: string): Promise<void> {
       `;
     }
 
-    // EXTRACTING
+    // EXTRACTING — non-fatal: if AI extraction times out or fails, still complete
     await updateDocumentStatus(documentId, "EXTRACTING");
-    await extractDocumentInsights(documentId);
+    try {
+      const extractionTimeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Extraction timeout after 90s")), 90_000)
+      );
+      await Promise.race([extractDocumentInsights(documentId), extractionTimeout]);
+    } catch (extractErr) {
+      console.error(`[ingestion] Extraction failed for ${documentId} (non-fatal):`, extractErr);
+    }
 
     // COMPLETED
     await updateDocumentStatus(documentId, "COMPLETED");

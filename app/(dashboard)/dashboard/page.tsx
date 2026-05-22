@@ -56,11 +56,12 @@ export default async function DashboardPage() {
   };
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-8">
+    <div className="h-full overflow-auto">
+      {/* Page header */}
+      <div className="flex items-center justify-between px-8 py-5 border-b bg-white">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-500 text-sm mt-1">Welcome back, {user.name ?? user.email}</p>
+          <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-gray-500 text-sm mt-0.5">Welcome back, {user.name ?? user.email}</p>
         </div>
         <Link href="/workspaces/new">
           <Button className="bg-violet-600 hover:bg-violet-700 text-white gap-2">
@@ -69,10 +70,11 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
+      <div className="p-8">
       {/* Workspaces */}
       <section className="mb-10">
-        <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-          <FolderKanban className="h-4 w-4 text-violet-600" /> Your Workspaces
+        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+          <FolderKanban className="h-3.5 w-3.5" /> Your Workspaces
         </h2>
         {workspaces.length === 0 ? (
           <Card className="border-dashed">
@@ -108,11 +110,11 @@ export default async function DashboardPage() {
         )}
       </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="border-t border-gray-200 pt-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Recent Documents */}
         <section>
-          <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-            <FileText className="h-4 w-4 text-violet-600" /> Recent Evidence
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+            <FileText className="h-3.5 w-3.5" /> Recent Evidence
           </h2>
           <div className="space-y-2">
             {recentDocuments.length === 0 ? (
@@ -137,8 +139,8 @@ export default async function DashboardPage() {
 
         {/* Top Opportunities */}
         <section>
-          <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-            <Target className="h-4 w-4 text-violet-600" /> Top Opportunities
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+            <Target className="h-3.5 w-3.5" /> Top Opportunities
           </h2>
           <div className="space-y-2">
             {topOpportunities.length === 0 ? (
@@ -157,6 +159,7 @@ export default async function DashboardPage() {
             )}
           </div>
         </section>
+      </div>
       </div>
     </div>
   );

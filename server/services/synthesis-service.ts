@@ -5,20 +5,46 @@ import {
   ClusterLabelSchema,
 } from "@/prompts/label-pain-point-cluster";
 import { generateOpportunities } from "./opportunity-service";
+import { repopulateInsightsFromExtractions } from "./extraction-service";
 import type { PainPointCluster } from "@/types";
 
 const SIMILARITY_THRESHOLD = 0.82;
 
-export async function synthesizeWorkspace(workspaceId: string) {
+export interface StreamingPainPoint {
+  title: string;
+  description: string;
+  severity: number;
+  urgency: number;
+  frequency: number;
+  affectedSegments: string[];
+}
+
+export async function synthesizeWorkspace(
+  workspaceId: string,
+  onProgress?: (step: string) => void,
+  onPainPoint?: (pp: StreamingPainPoint) => void
+) {
+  onProgress?.("Loading pain points...");
   // Fetch all pain points for this workspace
-  const painPoints = await prisma.painPoint.findMany({
+  let painPoints = await prisma.painPoint.findMany({
     where: { workspaceId, status: "ACTIVE" },
   });
+
+  // If synthesis was cleared but documents still have stored extractions, restore from them.
+  if (painPoints.length === 0) {
+    const docCount = await prisma.document.count({ where: { workspaceId, status: "COMPLETED" } });
+    if (docCount > 0) {
+      onProgress?.("Restoring insights from stored extractions...");
+      await repopulateInsightsFromExtractions(workspaceId);
+      painPoints = await prisma.painPoint.findMany({ where: { workspaceId, status: "ACTIVE" } });
+    }
+  }
 
   if (painPoints.length === 0) {
     return { painPoints: [], opportunities: [] };
   }
 
+  onProgress?.(`Embedding ${painPoints.length} pain point${painPoints.length === 1 ? "" : "s"}...`);
   // Embed all pain points
   const texts = painPoints.map((p) => `${p.title}: ${p.description}`);
   const embeddings = await ai.embedTexts(texts);
@@ -48,6 +74,7 @@ export async function synthesizeWorkspace(workspaceId: string) {
     }
   }
 
+  onProgress?.(`Grouped into ${clusters.length} cluster${clusters.length === 1 ? "" : "s"}, labeling...`);
   // Label each cluster with LLM
   const labeledClusters: PainPointCluster[] = [];
 
@@ -76,17 +103,19 @@ export async function synthesizeWorkspace(workspaceId: string) {
     const avgUrgency =
       clusterPainPoints.reduce((s, p) => s + p.urgency, 0) / clusterPainPoints.length;
 
+    const resolvedSegments = label.affectedSegments.length > 0 ? label.affectedSegments : affectedSegments;
     labeledClusters.push({
       id: `cluster-${Math.random().toString(36).slice(2, 9)}`,
       title: label.title,
       description: label.description,
       evidenceQuotes,
-      affectedSegments: label.affectedSegments.length > 0 ? label.affectedSegments : affectedSegments,
+      affectedSegments: resolvedSegments,
       frequency: clusterPainPoints.length,
       avgSeverity,
       avgUrgency,
       sourceDocumentIds: [...new Set(clusterPainPoints.flatMap((p) => p.evidenceIds))],
     });
+    onPainPoint?.({ title: label.title, description: label.description, severity: avgSeverity, urgency: avgUrgency, frequency: clusterPainPoints.length, affectedSegments: resolvedSegments });
   }
 
   // Update existing PainPoints with cluster info (deduplicate)
@@ -106,8 +135,9 @@ export async function synthesizeWorkspace(workspaceId: string) {
     })
   );
 
+  onProgress?.("Updating pain point clusters...");
   // Generate opportunities
-  const opportunities = await generateOpportunities(workspaceId, labeledClusters);
+  const opportunities = await generateOpportunities(workspaceId, labeledClusters, onProgress);
 
   // Track event
   await prisma.productEvent.create({

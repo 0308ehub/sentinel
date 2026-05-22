@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
+import { jsonrepair } from "jsonrepair";
 import type { AIProvider, GenerateTextInput, GenerateObjectInput } from "./types";
 import { MODELS } from "./types";
 
@@ -7,6 +8,10 @@ let _client: Anthropic | null = null;
 function getClient() {
   if (!_client) _client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   return _client;
+}
+
+export function getAnthropicClient() {
+  return getClient();
 }
 
 export const anthropicProvider: Pick<AIProvider, "generateText" | "generateObject"> = {
@@ -44,8 +49,15 @@ export const anthropicProvider: Pick<AIProvider, "generateText" | "generateObjec
     const block = response.content[0];
     if (block.type !== "text") throw new Error("Unexpected response type");
 
-    const text = block.text.trim().replace(/^```json\n?/, "").replace(/\n?```$/, "");
-    const parsed = JSON.parse(text);
+    let text = block.text.trim().replace(/^```json\n?/, "").replace(/\n?```$/, "");
+
+    // Extract the first complete JSON object in case the model added trailing commentary
+    const jsonStart = text.indexOf("{");
+    const jsonEnd = text.lastIndexOf("}");
+    if (jsonStart !== -1 && jsonEnd > jsonStart) text = text.slice(jsonStart, jsonEnd + 1);
+
+    // jsonrepair handles unescaped quotes, control characters, trailing commas, etc.
+    const parsed = JSON.parse(jsonrepair(text));
     return schema.parse(parsed) as T;
   },
 };

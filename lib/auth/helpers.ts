@@ -1,11 +1,28 @@
-import { auth } from "@clerk/nextjs/server";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/db/prisma";
 import { apiError } from "@/types";
 
 export async function getCurrentUser() {
   const { userId: clerkId } = await auth();
   if (!clerkId) return null;
-  return prisma.user.findUnique({ where: { clerkId } });
+
+  const existing = await prisma.user.findUnique({ where: { clerkId } });
+  if (existing) return existing;
+
+  // First visit after Clerk sign-up — webhook may not have fired yet, so upsert now.
+  const clerkUser = await currentUser();
+  if (!clerkUser) return null;
+
+  return prisma.user.upsert({
+    where: { clerkId },
+    update: {},
+    create: {
+      clerkId,
+      email: clerkUser.emailAddresses[0]?.emailAddress ?? "",
+      name: [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") || null,
+      imageUrl: clerkUser.imageUrl ?? null,
+    },
+  });
 }
 
 export async function requireUser() {

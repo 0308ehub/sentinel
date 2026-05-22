@@ -5,8 +5,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { WorkspaceNav } from "@/components/nav/workspace-nav";
 import { FileText, Lightbulb, Target, Upload, MessageSquare, ChevronRight } from "lucide-react";
+import { WorkspaceNameEditor } from "./workspace-name-editor";
 import { formatDate, scoreToColor } from "@/lib/utils";
 
 export default async function WorkspacePage({
@@ -56,34 +56,32 @@ export default async function WorkspacePage({
   };
 
   return (
-    <div>
-      <WorkspaceNav workspaceId={workspaceId} />
-
-      <div className="p-8">
+    <div className="h-full overflow-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between px-8 py-5 border-b bg-white">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{workspace.name}</h1>
+            <WorkspaceNameEditor workspaceId={workspaceId} initialName={workspace.name} />
             {workspace.description && (
-              <p className="text-gray-500 text-sm mt-1">{workspace.description}</p>
+              <p className="text-gray-500 text-sm mt-0.5">{workspace.description}</p>
             )}
           </div>
           <div className="flex gap-3">
             <Link href={`/workspaces/${workspaceId}/documents/upload`}>
-              <Button variant="outline" className="gap-2">
-                <Upload className="h-4 w-4" /> Upload Evidence
+              <Button variant="outline" size="sm" className="gap-2">
+                <Upload className="h-3.5 w-3.5" /> Upload Evidence
               </Button>
             </Link>
             <Link href={`/workspaces/${workspaceId}/chat`}>
-              <Button className="gap-2 bg-violet-600 hover:bg-violet-700 text-white">
-                <MessageSquare className="h-4 w-4" /> Ask Sentinel
+              <Button size="sm" className="gap-2 bg-violet-600 hover:bg-violet-700 text-white">
+                <MessageSquare className="h-3.5 w-3.5" /> Ask Sentinel
               </Button>
             </Link>
           </div>
         </div>
 
+        <div className="p-8">
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {[
             { label: "Documents", value: documents, icon: FileText, href: `documents` },
             { label: "Pain Points", value: painPoints, icon: Lightbulb, href: `insights` },
@@ -108,8 +106,8 @@ export default async function WorkspacePage({
           {/* Top Pain Points */}
           <section>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-gray-800 flex items-center gap-2">
-                <Lightbulb className="h-4 w-4 text-violet-600" /> Top Pain Points
+              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                <Lightbulb className="h-3.5 w-3.5" /> Top Pain Points
               </h2>
               <Link href={`/workspaces/${workspaceId}/insights`} className="text-xs text-violet-600 hover:underline flex items-center gap-1">
                 View all <ChevronRight className="h-3 w-3" />
@@ -143,8 +141,8 @@ export default async function WorkspacePage({
           {/* Recommended Opportunities */}
           <section>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-gray-800 flex items-center gap-2">
-                <Target className="h-4 w-4 text-violet-600" /> Opportunities
+              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                <Target className="h-3.5 w-3.5" /> Opportunities
               </h2>
               <Link href={`/workspaces/${workspaceId}/opportunities`} className="text-xs text-violet-600 hover:underline flex items-center gap-1">
                 View all <ChevronRight className="h-3 w-3" />
@@ -174,10 +172,10 @@ export default async function WorkspacePage({
           </section>
 
           {/* Recent Evidence */}
-          <section className="lg:col-span-2">
+          <section className="lg:col-span-2 border-t border-gray-200 pt-8">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-gray-800 flex items-center gap-2">
-                <FileText className="h-4 w-4 text-violet-600" /> Recent Evidence
+              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                <FileText className="h-3.5 w-3.5" /> Recent Evidence
               </h2>
               <Link href={`/workspaces/${workspaceId}/documents`} className="text-xs text-violet-600 hover:underline flex items-center gap-1">
                 View all <ChevronRight className="h-3 w-3" />
@@ -220,7 +218,7 @@ export default async function WorkspacePage({
             </div>
           </section>
         </div>
-      </div>
+        </div>
     </div>
   );
 }

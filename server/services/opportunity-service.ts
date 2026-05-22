@@ -9,11 +9,13 @@ import type { PainPointCluster } from "@/types";
 
 export async function generateOpportunities(
   workspaceId: string,
-  clusters?: PainPointCluster[]
+  clusters?: PainPointCluster[],
+  onProgress?: (step: string) => void
 ) {
   // Fetch clusters from DB if not provided
   let painPointClusters = clusters;
   if (!painPointClusters) {
+    onProgress?.("Loading pain points...");
     const painPoints = await prisma.painPoint.findMany({
       where: { workspaceId, status: "ACTIVE" },
       orderBy: { severity: "desc" },
@@ -34,6 +36,8 @@ export async function generateOpportunities(
 
   if (painPointClusters.length === 0) return [];
 
+  onProgress?.(`Analyzing ${painPointClusters.length} pain point cluster${painPointClusters.length === 1 ? "" : "s"}...`);
+
   const prompt = `Workspace pain point clusters:\n\n${painPointClusters
     .map(
       (c) =>
@@ -41,6 +45,7 @@ export async function generateOpportunities(
     )
     .join("\n\n")}`;
 
+  onProgress?.("Generating opportunities with AI...");
   const result = await ai.generateObject({
     system: GENERATE_OPPORTUNITIES_PROMPT,
     prompt,
@@ -49,6 +54,7 @@ export async function generateOpportunities(
     maxTokens: 8192,
   });
 
+  onProgress?.(`Saving ${result.opportunities.length} opportunit${result.opportunities.length === 1 ? "y" : "ies"}...`);
   // Delete existing opportunities for fresh synthesis
   await prisma.opportunity.deleteMany({ where: { workspaceId } });
 

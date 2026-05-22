@@ -74,6 +74,7 @@ model Workspace {
   prds          PRD[]
   tickets       EngineeringTicket[]
   events        ProductEvent[]
+  connectors    Connector[]
 }
 
 // ─── Documents ────────────────────────────────────────────────────────────────
@@ -90,6 +91,8 @@ model Document {
   rawText      String?
   status       DocumentStatus     @default(PENDING)
   metadata     Json?
+  connectorId  String?
+  externalId   String?
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
 
@@ -97,6 +100,7 @@ model Document {
   uploadedBy  User                 @relation(fields: [uploadedById], references: [id])
   chunks      DocumentChunk[]
   extractions DocumentExtraction[]
+  connector   Connector?           @relation(fields: [connectorId], references: [id])
 }
 
 enum DocumentSourceType {
@@ -110,6 +114,13 @@ enum DocumentSourceType {
   USER_FEEDBACK
   INTERNAL_DOC
   MARKET_RESEARCH
+  EMAIL
+  SLACK
+  LINEAR
+  JIRA
+  INTERCOM
+  ZENDESK
+  HUBSPOT
 }
 
 enum DocumentStatus {
@@ -149,6 +160,56 @@ model DocumentExtraction {
   updatedAt     DateTime @updatedAt
 
   document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+}
+
+// ─── Connectors ───────────────────────────────────────────────────────────────
+
+model Connector {
+  id           String          @id @default(cuid())
+  workspaceId  String
+  type         ConnectorType
+  name         String
+  config       Json
+  status       ConnectorStatus @default(PENDING)
+  lastSyncedAt DateTime?
+  errorMessage String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  workspace Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  syncLogs  ConnectorSyncLog[]
+  documents Document[]
+}
+
+model ConnectorSyncLog {
+  id                String    @id @default(cuid())
+  connectorId       String
+  status            String
+  documentsImported Int       @default(0)
+  error             String?
+  startedAt         DateTime  @default(now())
+  completedAt       DateTime?
+
+  connector Connector @relation(fields: [connectorId], references: [id], onDelete: Cascade)
+}
+
+enum ConnectorType {
+  GMAIL
+  SLACK
+  LINEAR
+  JIRA
+  INTERCOM
+  ZENDESK
+  HUBSPOT
+  NOTION
+}
+
+enum ConnectorStatus {
+  PENDING
+  ACTIVE
+  PAUSED
+  ERROR
+  NEEDS_REAUTH
 }
 
 // ─── Insights ─────────────────────────────────────────────────────────────────
@@ -244,14 +305,14 @@ enum OpportunityStatus {
 // ─── Generated Artifacts ──────────────────────────────────────────────────────
 
 model PRD {
-  id            String   @id @default(cuid())
-  workspaceId   String
-  opportunityId String?
-  title         String
-  content       String
+  id             String   @id @default(cuid())
+  workspaceId    String
+  opportunityId  String?
+  title          String
+  content        String
   structuredJson Json?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   opportunity Opportunity? @relation(fields: [opportunityId], references: [id])

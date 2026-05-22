@@ -2,7 +2,7 @@ import { z } from "zod";
 import { requireWorkspaceAccess } from "@/lib/auth/helpers";
 import { createDocument } from "@/server/services/document-service";
 import { apiSuccess, apiError } from "@/types";
-import { documentIngestionQueue } from "@/server/jobs/queues";
+import { dispatchIngestion } from "@/server/jobs/dispatch";
 import type { DocumentSourceType } from "@prisma/client";
 
 const PasteSchema = z.object({
@@ -42,12 +42,7 @@ export async function POST(
       metadata,
     });
 
-    try {
-      await documentIngestionQueue.add("process-document", { documentId: document.id });
-    } catch {
-      const { processDocument } = await import("@/server/services/ingestion-service");
-      processDocument(document.id).catch(console.error);
-    }
+    await dispatchIngestion(document.id);
 
     return Response.json(apiSuccess({ documentId: document.id, status: "PENDING" }), { status: 201 });
   } catch (error) {
