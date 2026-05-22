@@ -3,11 +3,8 @@ import { requireWorkspaceAccess } from "@/lib/auth/helpers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { WorkspaceNav } from "@/components/nav/workspace-nav";
 import { Upload, FileText } from "lucide-react";
-import { formatDate } from "@/lib/utils";
-import { ReprocessButton } from "@/components/document/reprocess-button";
+import { DocumentRow } from "@/components/document/document-row";
 
 export default async function DocumentsPage({
   params,
@@ -26,29 +23,30 @@ export default async function DocumentsPage({
     where: { workspaceId },
     orderBy: { createdAt: "desc" },
     include: {
-      _count: { select: { extractions: true, chunks: true } },
+      _count: { select: { chunks: true } },
       uploadedBy: { select: { name: true } },
     },
   });
 
-  const statusStyles: Record<string, string> = {
-    COMPLETED: "bg-green-100 text-green-700",
-    PENDING: "bg-yellow-100 text-yellow-700",
-    FAILED: "bg-red-100 text-red-700",
-    PARSING: "bg-blue-100 text-blue-700",
-    CHUNKING: "bg-blue-100 text-blue-700",
-    EMBEDDING: "bg-blue-100 text-blue-700",
-    EXTRACTING: "bg-blue-100 text-blue-700",
-  };
+  // Extract stored error message from metadata for FAILED docs
+  type DocWithError = (typeof documents)[number] & { errorMessage?: string };
+  const docsWithErrors: DocWithError[] = documents.map((d) => ({
+    ...d,
+    errorMessage: d.status === "FAILED"
+      ? ((d.metadata as Record<string, unknown> | null)?.error as string | undefined)
+      : undefined,
+  }));
 
   return (
-    <div>
-      <WorkspaceNav workspaceId={workspaceId} />
-      <div className="p-8">
-        <div className="flex items-center justify-between mb-8">
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Header */}
+      <div className="px-8 pt-8 pb-4 shrink-0">
+        <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Documents</h1>
-            <p className="text-sm text-gray-500 mt-1">{documents.length} evidence sources uploaded</p>
+            <p className="text-sm text-gray-400 mt-0.5">
+              {documents.length} evidence source{documents.length !== 1 ? "s" : ""}
+            </p>
           </div>
           <Link href={`/workspaces/${workspaceId}/documents/upload`}>
             <Button className="gap-2 bg-violet-600 hover:bg-violet-700 text-white">
@@ -56,70 +54,57 @@ export default async function DocumentsPage({
             </Button>
           </Link>
         </div>
+      </div>
 
-        {documents.length === 0 ? (
-          <div className="bg-white rounded-xl border border-dashed p-16 text-center">
-            <FileText className="h-12 w-12 text-gray-200 mx-auto mb-4" />
-            <h3 className="font-semibold text-gray-900 mb-2">No documents yet</h3>
-            <p className="text-sm text-gray-500 mb-6 max-w-sm mx-auto">
+      {/* File list */}
+      {documents.length === 0 ? (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
+              <FileText className="h-8 w-8 text-gray-300" />
+            </div>
+            <h3 className="font-semibold text-gray-900 mb-1">No documents yet</h3>
+            <p className="text-sm text-gray-400 mb-6 max-w-xs mx-auto">
               Upload customer interviews, support tickets, feedback exports, or paste text directly.
             </p>
             <Link href={`/workspaces/${workspaceId}/documents/upload`}>
               <Button className="bg-violet-600 hover:bg-violet-700 text-white">Upload first document</Button>
             </Link>
           </div>
-        ) : (
-          <div className="bg-white rounded-xl border overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="border-b bg-gray-50">
-                <tr>
-                  <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Title</th>
-                  <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Source</th>
-                  <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
-                  <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Chunks</th>
-                  <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Uploaded</th>
-                  <th className="text-right px-5 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {documents.map((doc) => (
-                  <tr key={doc.id} className="hover:bg-gray-50">
-                    <td className="px-5 py-4">
-                      <p className="font-medium text-gray-900">{doc.title}</p>
-                      {doc.uploadedBy?.name && (
-                        <p className="text-xs text-gray-400">{doc.uploadedBy.name}</p>
-                      )}
-                    </td>
-                    <td className="px-5 py-4">
-                      <Badge variant="outline" className="text-xs">
-                        {doc.sourceType.replace(/_/g, " ")}
-                      </Badge>
-                    </td>
-                    <td className="px-5 py-4">
-                      <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${statusStyles[doc.status] ?? "bg-gray-100 text-gray-600"}`}>
-                        {doc.status}
-                      </span>
-                    </td>
-                    <td className="px-5 py-4 text-gray-500">
-                      {doc._count.chunks}
-                    </td>
-                    <td className="px-5 py-4 text-gray-400 text-xs">
-                      {formatDate(doc.createdAt)}
-                    </td>
-                    <td className="px-5 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {(doc.status === "FAILED" || doc.status === "COMPLETED") && (
-                          <ReprocessButton documentId={doc.id} />
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        </div>
+      ) : (
+        <div className="flex-1 overflow-y-auto px-8 pb-8">
+          {/* Column headers */}
+          <div className="grid grid-cols-[1fr_160px_120px_80px_160px_100px] gap-4 px-3 py-2 text-xs font-medium text-gray-400 uppercase tracking-wide border-b border-gray-200 mb-1">
+            <span>Name</span>
+            <span>Source</span>
+            <span>Status</span>
+            <span>Chunks</span>
+            <span>Uploaded</span>
+            <span className="text-right">Actions</span>
           </div>
-        )}
-      </div>
+
+          {/* Rows */}
+          <div>
+            {docsWithErrors.map((doc) => (
+              <DocumentRow
+                key={doc.id}
+                doc={{
+                  id: doc.id,
+                  title: doc.title,
+                  status: doc.status,
+                  sourceType: doc.sourceType,
+                  fileType: doc.fileType,
+                  chunkCount: doc._count.chunks,
+                  createdAt: doc.createdAt,
+                  uploaderName: doc.uploadedBy?.name,
+                  errorMessage: doc.errorMessage,
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

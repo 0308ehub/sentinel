@@ -13,7 +13,18 @@ export interface GenerateTicketsInput {
   opportunityId?: string;
 }
 
-export async function generateEngineeringTickets(input: GenerateTicketsInput) {
+export interface StreamingTicket {
+  id: string;
+  title: string;
+  priority: string;
+  ticketType: string | null;
+  estimate: string | null;
+}
+
+export async function generateEngineeringTickets(
+  input: GenerateTicketsInput,
+  onTicket?: (ticket: StreamingTicket) => void
+) {
   const { workspaceId, prdId, opportunityId } = input;
 
   let context = "";
@@ -51,25 +62,27 @@ export async function generateEngineeringTickets(input: GenerateTicketsInput) {
     critical: "CRITICAL",
   };
 
-  const tickets = await Promise.all(
-    result.tickets.map((t) =>
-      prisma.engineeringTicket.create({
-        data: {
-          workspaceId,
-          prdId: prdId ?? null,
-          opportunityId: opportunityId ?? null,
-          title: t.title,
-          description: t.description,
-          acceptanceCriteria: t.acceptanceCriteria,
-          priority: priorityMap[t.priority] ?? "MEDIUM",
-          dependencies: t.dependencies,
-          ticketType: t.type,
-          estimate: t.estimatedComplexity,
-          metadata: { implementationNotes: t.implementationNotes },
-        },
-      })
-    )
-  );
+  // Save sequentially so we can emit each ticket as it lands
+  const tickets = [];
+  for (const t of result.tickets) {
+    const ticket = await prisma.engineeringTicket.create({
+      data: {
+        workspaceId,
+        prdId: prdId ?? null,
+        opportunityId: opportunityId ?? null,
+        title: t.title,
+        description: t.description,
+        acceptanceCriteria: t.acceptanceCriteria,
+        priority: priorityMap[t.priority] ?? "MEDIUM",
+        dependencies: t.dependencies,
+        ticketType: t.type,
+        estimate: t.estimatedComplexity,
+        metadata: { implementationNotes: t.implementationNotes },
+      },
+    });
+    onTicket?.({ id: ticket.id, title: ticket.title, priority: ticket.priority, ticketType: ticket.ticketType, estimate: ticket.estimate });
+    tickets.push(ticket);
+  }
 
   await prisma.productEvent.create({
     data: {

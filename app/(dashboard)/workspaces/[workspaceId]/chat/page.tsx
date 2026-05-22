@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef, use, useCallback } from "react";
-import { WorkspaceNav } from "@/components/nav/workspace-nav";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -161,7 +160,6 @@ export default function ChatPage({ params }: { params: Promise<{ workspaceId: st
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
-      <WorkspaceNav workspaceId={workspaceId} />
 
       <div className="flex flex-1 overflow-hidden">
         {/* ── LEFT PANEL: conversation list ── */}

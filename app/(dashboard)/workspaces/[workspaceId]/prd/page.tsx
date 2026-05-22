@@ -2,7 +2,6 @@ import { prisma } from "@/lib/db/prisma";
 import { requireWorkspaceAccess } from "@/lib/auth/helpers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { WorkspaceNav } from "@/components/nav/workspace-nav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { FileText, Ticket } from "lucide-react";
@@ -43,7 +42,6 @@ export default async function PRDListPage({
 
   return (
     <div>
-      <WorkspaceNav workspaceId={workspaceId} />
 
       <div className="p-8">
         <div className="flex items-center justify-between mb-8">

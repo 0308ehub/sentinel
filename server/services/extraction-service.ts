@@ -7,6 +7,14 @@ import {
 } from "@/prompts/extract-document";
 import type { InsightType } from "@prisma/client";
 
+// Evidence-weighted confidence: caps no-quote items and meaningfully rewards quotes.
+// Prevents LLM from clustering everything at 0.7.
+function weightedConfidence(llmScore: number, quoteCount: number): number {
+  if (quoteCount === 0) return Math.min(llmScore, 0.62);
+  const boost = Math.min(0.28, quoteCount * 0.09);
+  return Math.min(0.97, llmScore + boost);
+}
+
 export async function extractDocumentInsights(documentId: string) {
   const document = await prisma.document.findUniqueOrThrow({
     where: { id: documentId },
@@ -43,6 +51,7 @@ export async function extractDocumentInsights(documentId: string) {
 
   // Feature requests → Insights
   for (const fr of extraction.featureRequests) {
+    const confidence = weightedConfidence(fr.confidence, fr.evidenceQuotes.length);
     insightCreates.push(
       prisma.insight.create({
         data: {
@@ -50,7 +59,7 @@ export async function extractDocumentInsights(documentId: string) {
           type: "FEATURE_REQUEST" as InsightType,
           title: fr.title,
           description: fr.description,
-          confidence: 0.7,
+          confidence,
           evidenceIds: [documentId],
           metadata: { quotes: fr.evidenceQuotes, requesterType: fr.requesterType },
         },
@@ -60,6 +69,7 @@ export async function extractDocumentInsights(documentId: string) {
 
   // Workflow issues → Insights
   for (const wi of extraction.workflowIssues) {
+    const confidence = weightedConfidence(wi.confidence, wi.evidenceQuotes.length);
     insightCreates.push(
       prisma.insight.create({
         data: {
@@ -67,7 +77,7 @@ export async function extractDocumentInsights(documentId: string) {
           type: "WORKFLOW_ISSUE" as InsightType,
           title: wi.title,
           description: `Current: ${wi.currentWorkflow}. Breakdown: ${wi.breakdownPoint}`,
-          confidence: 0.75,
+          confidence,
           evidenceIds: [documentId],
           metadata: { quotes: wi.evidenceQuotes },
         },
@@ -77,6 +87,7 @@ export async function extractDocumentInsights(documentId: string) {
 
   // Competitor mentions → Insights
   for (const cm of extraction.competitorMentions) {
+    const confidence = weightedConfidence(cm.confidence, cm.evidenceQuotes.length);
     insightCreates.push(
       prisma.insight.create({
         data: {
@@ -84,7 +95,7 @@ export async function extractDocumentInsights(documentId: string) {
           type: "COMPETITIVE_MENTION" as InsightType,
           title: `${cm.competitor} mention`,
           description: cm.context,
-          confidence: 0.8,
+          confidence,
           evidenceIds: [documentId],
           metadata: { sentiment: cm.sentiment, quotes: cm.evidenceQuotes },
         },
@@ -92,8 +103,9 @@ export async function extractDocumentInsights(documentId: string) {
     );
   }
 
-  // User segments → Insights
+  // User segments → Insights (no LLM confidence field — derive from evidence count)
   for (const seg of extraction.userSegments) {
+    const confidence = Math.min(0.92, 0.5 + seg.evidence.length * 0.08);
     insightCreates.push(
       prisma.insight.create({
         data: {
@@ -101,7 +113,7 @@ export async function extractDocumentInsights(documentId: string) {
           type: "USER_SEGMENT" as InsightType,
           title: seg.name,
           description: seg.description,
-          confidence: 0.65,
+          confidence,
           evidenceIds: [documentId],
           metadata: { evidence: seg.evidence },
         },
@@ -109,8 +121,28 @@ export async function extractDocumentInsights(documentId: string) {
     );
   }
 
+  // Objections → Insights
+  for (const obj of extraction.objections) {
+    const confidence = weightedConfidence(obj.confidence, obj.evidenceQuotes.length);
+    insightCreates.push(
+      prisma.insight.create({
+        data: {
+          workspaceId,
+          type: "OBJECTION" as InsightType,
+          title: obj.title,
+          description: obj.description,
+          confidence,
+          evidenceIds: [documentId],
+          metadata: { quotes: obj.evidenceQuotes },
+        },
+      })
+    );
+  }
+
   // Pain points → PainPoints
+  // frequency = number of evidence quotes (proxy for how often this was mentioned)
   for (const pp of extraction.painPoints) {
+    const frequency = Math.max(1, pp.evidenceQuotes.length);
     insightCreates.push(
       prisma.painPoint.create({
         data: {
@@ -118,7 +150,7 @@ export async function extractDocumentInsights(documentId: string) {
           title: pp.title,
           description: pp.description,
           severity: pp.severity,
-          frequency: 1,
+          frequency,
           urgency: pp.urgency,
           affectedSegments: pp.affectedSegments,
           evidenceIds: [documentId],
@@ -130,4 +162,51 @@ export async function extractDocumentInsights(documentId: string) {
 
   await Promise.all(insightCreates);
   return savedExtraction;
+}
+
+// Re-creates PainPoint and Insight records from stored DocumentExtraction JSON.
+// Used by synthesis when records were cleared but documents were not re-uploaded.
+// Older extractions may be missing `confidence` on individual items — fall back to
+// a quote-count-derived estimate so we never write NaN to the DB.
+export async function repopulateInsightsFromExtractions(workspaceId: string): Promise<void> {
+  const documents = await prisma.document.findMany({
+    where: { workspaceId, status: "COMPLETED" },
+    include: { extractions: { orderBy: { createdAt: "desc" }, take: 1 } },
+  });
+
+  // Safely coerce a potentially-missing confidence value before passing to weightedConfidence.
+  function safeConf(raw: unknown, quoteCount: number): number {
+    const n = typeof raw === "number" && isFinite(raw) ? raw : 0.5 + Math.min(quoteCount * 0.04, 0.2);
+    return weightedConfidence(n, quoteCount);
+  }
+
+  const creates: Promise<unknown>[] = [];
+
+  for (const doc of documents) {
+    const raw = doc.extractions[0];
+    if (!raw) continue;
+    const data = raw.extractedJson as unknown as DocumentExtractionOutput;
+    const documentId = doc.id;
+
+    for (const fr of (data.featureRequests ?? [])) {
+      creates.push(prisma.insight.create({ data: { workspaceId, type: "FEATURE_REQUEST" as InsightType, title: fr.title, description: fr.description, confidence: safeConf(fr.confidence, fr.evidenceQuotes.length), evidenceIds: [documentId], metadata: { quotes: fr.evidenceQuotes, requesterType: fr.requesterType } } }));
+    }
+    for (const wi of (data.workflowIssues ?? [])) {
+      creates.push(prisma.insight.create({ data: { workspaceId, type: "WORKFLOW_ISSUE" as InsightType, title: wi.title, description: `Current: ${wi.currentWorkflow}. Breakdown: ${wi.breakdownPoint}`, confidence: safeConf(wi.confidence, wi.evidenceQuotes.length), evidenceIds: [documentId], metadata: { quotes: wi.evidenceQuotes } } }));
+    }
+    for (const cm of (data.competitorMentions ?? [])) {
+      creates.push(prisma.insight.create({ data: { workspaceId, type: "COMPETITIVE_MENTION" as InsightType, title: `${cm.competitor} mention`, description: cm.context, confidence: safeConf(cm.confidence, cm.evidenceQuotes.length), evidenceIds: [documentId], metadata: { sentiment: cm.sentiment, quotes: cm.evidenceQuotes } } }));
+    }
+    for (const seg of (data.userSegments ?? [])) {
+      creates.push(prisma.insight.create({ data: { workspaceId, type: "USER_SEGMENT" as InsightType, title: seg.name, description: seg.description, confidence: Math.min(0.92, 0.5 + seg.evidence.length * 0.08), evidenceIds: [documentId], metadata: { evidence: seg.evidence } } }));
+    }
+    for (const obj of (data.objections ?? [])) {
+      creates.push(prisma.insight.create({ data: { workspaceId, type: "OBJECTION" as InsightType, title: obj.title, description: obj.description, confidence: safeConf(obj.confidence, obj.evidenceQuotes.length), evidenceIds: [documentId], metadata: { quotes: obj.evidenceQuotes } } }));
+    }
+    for (const pp of (data.painPoints ?? [])) {
+      creates.push(prisma.painPoint.create({ data: { workspaceId, title: pp.title, description: pp.description, severity: pp.severity, frequency: Math.max(1, pp.evidenceQuotes.length), urgency: pp.urgency, affectedSegments: pp.affectedSegments, evidenceIds: [documentId], status: "ACTIVE" } }));
+    }
+  }
+
+  await Promise.all(creates);
 }

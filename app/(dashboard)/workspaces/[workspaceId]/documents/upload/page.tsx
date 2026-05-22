@@ -9,10 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Upload, FileText } from "lucide-react";
+import { Upload, FileText, X, CheckCircle2, Loader2, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const pasteSchema = z.object({
@@ -40,16 +40,25 @@ const SOURCE_TYPES = [
   { value: "UPLOAD", label: "File Upload" },
 ];
 
+type FileStatus = "pending" | "uploading" | "done" | "error";
+
+interface FileEntry {
+  file: File;
+  status: FileStatus;
+  error?: string;
+}
+
 export default function UploadPage() {
   const router = useRouter();
   const params = useParams<{ workspaceId: string }>();
   const workspaceId = params.workspaceId;
 
   const [tab, setTab] = useState<"paste" | "upload">("paste");
-  const [loading, setLoading] = useState(false);
+  const [pasteLoading, setPasteLoading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
-  const [sourceType, setSourceType] = useState("PASTE");
+  const [files, setFiles] = useState<FileEntry[]>([]);
+  const [uploadSourceType, setUploadSourceType] = useState("UPLOAD");
+  const [uploading, setUploading] = useState(false);
 
   const { register, handleSubmit, setValue, formState: { errors } } = useForm<PasteForm>({
     resolver: zodResolver(pasteSchema),
@@ -57,7 +66,7 @@ export default function UploadPage() {
   });
 
   const onPasteSubmit = async (data: PasteForm) => {
-    setLoading(true);
+    setPasteLoading(true);
     try {
       const res = await fetch(`/api/workspaces/${workspaceId}/documents/paste`, {
         method: "POST",
@@ -76,40 +85,73 @@ export default function UploadPage() {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Upload failed");
     } finally {
-      setLoading(false);
+      setPasteLoading(false);
     }
   };
 
-  const handleFileUpload = async (title: string, uploadSourceType: string) => {
-    if (!file) return toast.error("Please select a file");
-    setLoading(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("title", title || file.name);
-      formData.append("sourceType", uploadSourceType);
-
-      const res = await fetch(`/api/workspaces/${workspaceId}/documents/upload`, {
-        method: "POST",
-        body: formData,
-      });
-      const json = await res.json();
-      if (!json.ok) throw new Error(json.error?.message);
-      toast.success("File uploaded and processing started");
-      router.push(`/workspaces/${workspaceId}/documents`);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Upload failed");
-    } finally {
-      setLoading(false);
+  const addFiles = useCallback((incoming: File[]) => {
+    const valid = incoming.filter((f) => /\.(txt|md|pdf|csv)$/i.test(f.name));
+    if (valid.length < incoming.length) {
+      toast.error("Some files skipped — only .txt, .md, .pdf, .csv are supported");
     }
-  };
+    setFiles((prev) => {
+      const existing = new Set(prev.map((e) => e.file.name + e.file.size));
+      const fresh = valid.filter((f) => !existing.has(f.name + f.size));
+      return [...prev, ...fresh.map((f) => ({ file: f, status: "pending" as FileStatus }))];
+    });
+  }, []);
 
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
-    const f = e.dataTransfer.files[0];
-    if (f) setFile(f);
-  }, []);
+    addFiles(Array.from(e.dataTransfer.files));
+  }, [addFiles]);
+
+  const removeFile = (idx: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const uploadAll = async () => {
+    if (files.length === 0) return toast.error("Please select at least one file");
+    setUploading(true);
+
+    let anyFailed = false;
+    for (let i = 0; i < files.length; i++) {
+      if (files[i].status === "done") continue;
+
+      setFiles((prev) => prev.map((e, idx) => idx === i ? { ...e, status: "uploading" } : e));
+
+      try {
+        const formData = new FormData();
+        formData.append("file", files[i].file);
+        formData.append("title", files[i].file.name.replace(/\.[^.]+$/, ""));
+        formData.append("sourceType", uploadSourceType);
+
+        const res = await fetch(`/api/workspaces/${workspaceId}/documents/upload`, {
+          method: "POST",
+          body: formData,
+        });
+        const json = await res.json();
+        if (!json.ok) throw new Error(json.error?.message ?? "Upload failed");
+
+        setFiles((prev) => prev.map((e, idx) => idx === i ? { ...e, status: "done" } : e));
+      } catch (err) {
+        anyFailed = true;
+        setFiles((prev) => prev.map((e, idx) => idx === i ? { ...e, status: "error", error: err instanceof Error ? err.message : "Failed" } : e));
+      }
+    }
+
+    setUploading(false);
+
+    if (!anyFailed) {
+      toast.success(`${files.length} file${files.length > 1 ? "s" : ""} uploaded successfully`);
+      router.push(`/workspaces/${workspaceId}/documents`);
+    } else {
+      toast.error("Some files failed to upload — check the list");
+    }
+  };
+
+  const allDone = files.length > 0 && files.every((f) => f.status === "done");
 
   return (
     <div className="p-8 max-w-2xl">
@@ -121,7 +163,7 @@ export default function UploadPage() {
       <Tabs value={tab} onValueChange={(v) => setTab(v as "paste" | "upload")}>
         <TabsList className="mb-6">
           <TabsTrigger value="paste" className="gap-2"><FileText className="h-4 w-4" /> Paste Text</TabsTrigger>
-          <TabsTrigger value="upload" className="gap-2"><Upload className="h-4 w-4" /> Upload File</TabsTrigger>
+          <TabsTrigger value="upload" className="gap-2"><Upload className="h-4 w-4" /> Upload Files</TabsTrigger>
         </TabsList>
 
         {/* Paste Tab */}
@@ -137,7 +179,7 @@ export default function UploadPage() {
 
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium text-gray-700">Source type</label>
-                  <Select onValueChange={(v) => { setSourceType(v ?? "PASTE"); setValue("sourceType", v ?? "PASTE"); }} defaultValue="PASTE">
+                  <Select onValueChange={(v) => { setValue("sourceType", v ?? "PASTE"); }} defaultValue="PASTE">
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -184,8 +226,8 @@ export default function UploadPage() {
                   </div>
                 </details>
 
-                <Button type="submit" disabled={loading} className="w-full bg-violet-600 hover:bg-violet-700 text-white">
-                  {loading ? "Uploading…" : "Upload & Process"}
+                <Button type="submit" disabled={pasteLoading} className="w-full bg-violet-600 hover:bg-violet-700 text-white">
+                  {pasteLoading ? "Uploading…" : "Upload & Process"}
                 </Button>
               </form>
             </CardContent>
@@ -196,13 +238,14 @@ export default function UploadPage() {
         <TabsContent value="upload">
           <Card>
             <CardContent className="pt-6 space-y-5">
+              {/* Drop zone */}
               <div
                 onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
                 onDragLeave={() => setDragOver(false)}
                 onDrop={onDrop}
                 onClick={() => document.getElementById("file-input")?.click()}
                 className={cn(
-                  "border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-colors",
+                  "border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-colors",
                   dragOver ? "border-violet-400 bg-violet-50" : "border-gray-200 hover:border-violet-300"
                 )}
               >
@@ -211,73 +254,83 @@ export default function UploadPage() {
                   type="file"
                   className="hidden"
                   accept=".txt,.md,.pdf,.csv"
-                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                  multiple
+                  onChange={(e) => {
+                    if (e.target.files) addFiles(Array.from(e.target.files));
+                    e.target.value = "";
+                  }}
                 />
-                <Upload className="h-10 w-10 text-gray-300 mx-auto mb-3" />
-                {file ? (
-                  <p className="font-medium text-gray-700">{file.name}</p>
-                ) : (
-                  <>
-                    <p className="font-medium text-gray-600">Drop a file or click to browse</p>
-                    <p className="text-xs text-gray-400 mt-1">.txt, .md, .pdf, .csv — max 20MB</p>
-                  </>
-                )}
+                <Upload className="h-9 w-9 text-gray-300 mx-auto mb-3" />
+                <p className="font-medium text-gray-600">Drop files or click to browse</p>
+                <p className="text-xs text-gray-400 mt-1">.txt, .md, .pdf, .csv — select multiple at once — max 20MB each</p>
               </div>
 
-              {file && (
-                <UploadFileForm
-                  file={file}
-                  sourceTypes={SOURCE_TYPES}
-                  onSubmit={handleFileUpload}
-                  loading={loading}
-                />
+              {/* File list */}
+              {files.length > 0 && (
+                <div className="space-y-2">
+                  {files.map((entry, i) => (
+                    <div
+                      key={`${entry.file.name}-${entry.file.size}-${i}`}
+                      className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5"
+                    >
+                      <FileText className="h-4 w-4 text-gray-400 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-gray-800 truncate">{entry.file.name}</p>
+                        <p className="text-xs text-gray-400">{(entry.file.size / 1024).toFixed(0)} KB</p>
+                      </div>
+                      {entry.status === "uploading" && <Loader2 className="h-4 w-4 text-violet-500 animate-spin shrink-0" />}
+                      {entry.status === "done" && <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />}
+                      {entry.status === "error" && (
+                        <div className="flex items-center gap-1">
+                          <AlertCircle className="h-4 w-4 text-red-500 shrink-0" />
+                          <span className="text-xs text-red-500 truncate max-w-[100px]">{entry.error}</span>
+                        </div>
+                      )}
+                      {entry.status === "pending" && !uploading && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); removeFile(i); }}
+                          className="text-gray-400 hover:text-red-500 transition-colors"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Source type + Upload button */}
+              {files.length > 0 && (
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-gray-700">Source type for all files</label>
+                    <Select onValueChange={(v) => setUploadSourceType(v ?? "UPLOAD")} defaultValue="UPLOAD">
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {SOURCE_TYPES.map((s) => (
+                          <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <Button
+                    onClick={uploadAll}
+                    disabled={uploading || allDone}
+                    className="w-full bg-violet-600 hover:bg-violet-700 text-white"
+                  >
+                    {uploading
+                      ? "Uploading…"
+                      : allDone
+                      ? "All uploaded"
+                      : `Upload ${files.length} file${files.length > 1 ? "s" : ""}`}
+                  </Button>
+                </div>
               )}
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
-  );
-}
-
-function UploadFileForm({
-  file,
-  sourceTypes,
-  onSubmit,
-  loading,
-}: {
-  file: File;
-  sourceTypes: typeof SOURCE_TYPES;
-  onSubmit: (title: string, sourceType: string) => void;
-  loading: boolean;
-}) {
-  const [title, setTitle] = useState(file.name.replace(/\.[^.]+$/, ""));
-  const [sourceType, setSourceType] = useState("UPLOAD");
-
-  return (
-    <div className="space-y-4">
-      <div className="space-y-1.5">
-        <label className="text-sm font-medium text-gray-700">Title</label>
-        <Input value={title} onChange={(e) => setTitle(e.target.value)} />
-      </div>
-      <div className="space-y-1.5">
-        <label className="text-sm font-medium text-gray-700">Source type</label>
-        <Select onValueChange={(v) => setSourceType(v ?? "UPLOAD")} defaultValue="UPLOAD">
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {sourceTypes.map((s) => (
-              <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <Button
-        onClick={() => onSubmit(title, sourceType)}
-        disabled={loading}
-        className="w-full bg-violet-600 hover:bg-violet-700 text-white"
-      >
-        {loading ? "Uploading…" : "Upload & Process"}
-      </Button>
     </div>
   );
 }

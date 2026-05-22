@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db/prisma";
 import { requireUser } from "@/lib/auth/helpers";
 import { apiSuccess, apiError } from "@/types";
-import { documentIngestionQueue } from "@/server/jobs/queues";
+import { dispatchIngestion } from "@/server/jobs/dispatch";
 
 export async function POST(
   _req: Request,
@@ -21,13 +21,7 @@ export async function POST(
     }
 
     await prisma.document.update({ where: { id: documentId }, data: { status: "PENDING" } });
-
-    try {
-      await documentIngestionQueue.add("process-document", { documentId });
-    } catch {
-      const { processDocument } = await import("@/server/services/ingestion-service");
-      processDocument(documentId).catch(console.error);
-    }
+    await dispatchIngestion(documentId);
 
     return Response.json(apiSuccess({ documentId, status: "PENDING" }));
   } catch {
