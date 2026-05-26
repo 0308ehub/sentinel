@@ -5,12 +5,23 @@ import {
   OpportunityGenerationSchema,
 } from "@/prompts/generate-opportunities";
 import { calculateTotalScore } from "@/lib/scoring/opportunity-scorer";
+import { repopulateInsightsFromExtractions } from "./extraction-service";
 import type { PainPointCluster } from "@/types";
+
+export interface StreamingOpportunity {
+  title: string;
+  description: string;
+  totalScore: number;
+  impactScore: number;
+  urgencyScore: number;
+  targetSegments: string[];
+}
 
 export async function generateOpportunities(
   workspaceId: string,
   clusters?: PainPointCluster[],
-  onProgress?: (step: string) => void
+  onProgress?: (step: string) => void,
+  onOpportunity?: (opp: StreamingOpportunity) => void
 ) {
   // Fetch clusters from DB if not provided
   let painPointClusters = clusters;
@@ -34,7 +45,45 @@ export async function generateOpportunities(
     }));
   }
 
-  if (painPointClusters.length === 0) return [];
+  if (painPointClusters.length === 0) {
+    // No pain points in DB — try restoring from stored document extractions so
+    // the user doesn't have to visit Insights first.
+    const docCount = await prisma.document.count({
+      where: { workspaceId, status: "COMPLETED" },
+    });
+
+    if (docCount === 0) {
+      throw new Error(
+        "No processed documents found. Upload and process documents before generating opportunities."
+      );
+    }
+
+    onProgress?.("Restoring pain points from your documents…");
+    await repopulateInsightsFromExtractions(workspaceId);
+
+    const restored = await prisma.painPoint.findMany({
+      where: { workspaceId, status: "ACTIVE" },
+      orderBy: { severity: "desc" },
+    });
+
+    if (restored.length === 0) {
+      throw new Error(
+        "No pain points could be extracted from your documents. Try re-processing them on the Documents page."
+      );
+    }
+
+    painPointClusters = restored.map((p) => ({
+      id: p.id,
+      title: p.title,
+      description: p.description,
+      evidenceQuotes: [],
+      affectedSegments: p.affectedSegments,
+      frequency: p.frequency,
+      avgSeverity: p.severity,
+      avgUrgency: p.urgency,
+      sourceDocumentIds: p.evidenceIds,
+    }));
+  }
 
   onProgress?.(`Analyzing ${painPointClusters.length} pain point cluster${painPointClusters.length === 1 ? "" : "s"}...`);
 
@@ -58,36 +107,46 @@ export async function generateOpportunities(
   // Delete existing opportunities for fresh synthesis
   await prisma.opportunity.deleteMany({ where: { workspaceId } });
 
-  const created = await Promise.all(
-    result.opportunities.map(async (opp) => {
-      const totalScore = calculateTotalScore({
-        impact: opp.scores.impact.value,
-        confidence: opp.scores.confidence.value,
-        urgency: opp.scores.urgency.value,
-        effort: opp.scores.effort.value,
-        risk: opp.scores.risk.value,
-      });
+  // Save sequentially so each opportunity can be streamed to the client as it lands.
+  const created = [];
+  for (const opp of result.opportunities) {
+    const totalScore = calculateTotalScore({
+      impact: opp.scores.impact.value,
+      confidence: opp.scores.confidence.value,
+      urgency: opp.scores.urgency.value,
+      effort: opp.scores.effort.value,
+      risk: opp.scores.risk.value,
+    });
 
-      return prisma.opportunity.create({
-        data: {
-          workspaceId,
-          title: opp.title,
-          description: opp.description,
-          problemStatement: opp.problemStatement,
-          proposedSolution: opp.proposedSolution,
-          targetSegments: opp.targetSegments,
-          evidenceIds: opp.supportingEvidence.map((e) => e.quote).slice(0, 10),
-          impactScore: opp.scores.impact.value,
-          confidenceScore: opp.scores.confidence.value,
-          urgencyScore: opp.scores.urgency.value,
-          effortScore: opp.scores.effort.value,
-          riskScore: opp.scores.risk.value,
-          totalScore,
-          status: "PROPOSED",
-        },
-      });
-    })
-  );
+    const record = await prisma.opportunity.create({
+      data: {
+        workspaceId,
+        title: opp.title,
+        description: opp.description,
+        problemStatement: opp.problemStatement,
+        proposedSolution: opp.proposedSolution,
+        targetSegments: opp.targetSegments,
+        evidenceIds: opp.supportingEvidence.map((e) => e.quote).slice(0, 10),
+        impactScore: opp.scores.impact.value,
+        confidenceScore: opp.scores.confidence.value,
+        urgencyScore: opp.scores.urgency.value,
+        effortScore: opp.scores.effort.value,
+        riskScore: opp.scores.risk.value,
+        totalScore,
+        status: "PROPOSED",
+      },
+    });
+
+    onOpportunity?.({
+      title: record.title,
+      description: record.description,
+      totalScore: record.totalScore,
+      impactScore: record.impactScore,
+      urgencyScore: record.urgencyScore,
+      targetSegments: record.targetSegments,
+    });
+    created.push(record);
+  }
 
   await prisma.productEvent.create({
     data: {

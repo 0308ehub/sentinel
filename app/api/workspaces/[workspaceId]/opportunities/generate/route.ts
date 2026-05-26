@@ -27,8 +27,11 @@ export async function POST(
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
 
       try {
-        const opportunities = await generateOpportunities(workspaceId, undefined, (step) =>
-          emit({ type: "step", step })
+        const opportunities = await generateOpportunities(
+          workspaceId,
+          undefined,
+          (step) => emit({ type: "step", step }),
+          (opp) => emit({ type: "opportunity", data: opp })
         );
         emit({ type: "done", count: opportunities.length });
       } catch (err) {

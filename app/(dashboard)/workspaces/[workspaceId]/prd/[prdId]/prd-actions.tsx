@@ -1,17 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Copy, Check, Ticket, Loader2, Pencil, X, Save } from "lucide-react";
+import { Copy, Check, Ticket, Loader2, Pencil, X, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import type { StreamingTicket } from "@/server/services/ticket-service";
 
 interface PRDActionsProps {
   prd: { id: string; content: string; title: string };
-  workspaceId: string;
-  onStreamingTickets?: (tickets: StreamingTicket[]) => void;
-  onGeneratingChange?: (generating: boolean) => void;
+  // Ticket generation — controlled by parent (state lives in workspace context)
+  generatingTickets?: boolean;
+  hasTickets?: boolean;
+  onGenerateTickets?: () => void;
+  onClearTickets?: () => void;
+  clearingTickets?: boolean;
   // Edit lifecycle — controlled by parent
   editing?: boolean;
   saving?: boolean;
@@ -22,9 +23,11 @@ interface PRDActionsProps {
 
 export function PRDActions({
   prd,
-  workspaceId,
-  onStreamingTickets,
-  onGeneratingChange,
+  generatingTickets,
+  hasTickets,
+  onGenerateTickets,
+  onClearTickets,
+  clearingTickets,
   editing,
   saving,
   onEdit,
@@ -32,79 +35,12 @@ export function PRDActions({
   onSave,
 }: PRDActionsProps) {
   const [copied, setCopied] = useState(false);
-  const [generatingTickets, setGeneratingTickets] = useState(false);
-  const router = useRouter();
 
   async function handleCopy() {
     await navigator.clipboard.writeText(prd.content);
     setCopied(true);
     toast.success("Markdown copied to clipboard");
     setTimeout(() => setCopied(false), 2000);
-  }
-
-  async function handleGenerateTickets() {
-    setGeneratingTickets(true);
-    onGeneratingChange?.(true);
-    onStreamingTickets?.([]);
-
-    try {
-      const res = await fetch(
-        `/api/workspaces/${workspaceId}/tickets/generate`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prdId: prd.id }),
-        }
-      );
-
-      if (!res.ok || !res.body) throw new Error("Request failed");
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      const collected: StreamingTicket[] = [];
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          try {
-            const event = JSON.parse(line.slice(6)) as Record<string, unknown>;
-            if (event.type === "ticket" && event.data) {
-              collected.push(event.data as StreamingTicket);
-              onStreamingTickets?.([...collected]);
-            } else if (event.type === "done") {
-              toast.success(
-                `Generated ${collected.length} engineering ticket${collected.length !== 1 ? "s" : ""}!`
-              );
-              router.refresh();
-            } else if (event.type === "error") {
-              throw new Error(
-                typeof event.message === "string"
-                  ? event.message
-                  : "Failed to generate tickets"
-              );
-            }
-          } catch (parseErr) {
-            if (parseErr instanceof SyntaxError) continue;
-            throw parseErr;
-          }
-        }
-      }
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to generate tickets"
-      );
-      onStreamingTickets?.([]);
-    } finally {
-      setGeneratingTickets(false);
-      onGeneratingChange?.(false);
-    }
   }
 
   return (
@@ -164,9 +100,25 @@ export function PRDActions({
             <Pencil className="h-3.5 w-3.5" />
             Edit
           </Button>
+          {hasTickets && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onClearTickets}
+              disabled={clearingTickets || generatingTickets}
+              className="gap-1.5 text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300"
+            >
+              {clearingTickets ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Trash2 className="h-3.5 w-3.5" />
+              )}
+              {clearingTickets ? "Clearing…" : "Clear Tickets"}
+            </Button>
+          )}
           <Button
             size="sm"
-            onClick={handleGenerateTickets}
+            onClick={onGenerateTickets}
             disabled={generatingTickets}
             className="gap-1.5 bg-violet-600 hover:bg-violet-700 text-white"
           >

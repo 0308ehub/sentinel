@@ -30,7 +30,10 @@ export async function POST(
         const result = await synthesizeWorkspace(
           workspaceId,
           (step) => emit({ type: "step", step }),
-          (pp) => emit({ type: "pain_point", data: pp })
+          (pp) => emit({ type: "pain_point", data: pp }),
+          (insight) => emit({ type: "insight", data: insight }),
+          (opp) => emit({ type: "opportunity", data: opp }),
+          () => emit({ type: "insights_done" })
         );
         emit({
           type: "done",

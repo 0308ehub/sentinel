@@ -86,6 +86,9 @@ function zodTypeToJsonSchema(schema: any): object {
   if (schema instanceof z.ZodNumber) return { type: "number" };
   if (schema instanceof z.ZodBoolean) return { type: "boolean" };
   if (schema instanceof z.ZodOptional) return zodTypeToJsonSchema(schema.unwrap());
+  // Zod v4: ZodDefault wraps innerType, ZodPreprocess exposes output schema via _def.out
+  if (schema instanceof z.ZodDefault) return zodTypeToJsonSchema(schema._def.innerType);
+  if (schema instanceof z.ZodPreprocess) return zodTypeToJsonSchema(schema._def.out);
   if (schema instanceof z.ZodArray)
     return { type: "array", items: zodTypeToJsonSchema(schema.element) };
   if (schema instanceof z.ZodEnum) return { type: "string", enum: schema.options };

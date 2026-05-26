@@ -6,7 +6,8 @@ import type { InsightType } from "@prisma/client";
 import { SynthesizeButton } from "./synthesize-button";
 import { PainPointsTabContent } from "./pain-points-tab-content";
 import { PainPointsCountBadge } from "./pain-points-count-badge";
-import { InsightCard } from "./insight-card";
+import { InsightCountBadge } from "./insight-count-badge";
+import { InsightTabContent } from "./insight-tab-content";
 import { Lightbulb, AlertTriangle, Users, Workflow, Swords, Quote } from "lucide-react";
 
 export default async function InsightsPage({
@@ -56,48 +57,41 @@ export default async function InsightsPage({
         </div>
 
         <Tabs defaultValue="pain-points">
-          <TabsList variant="line" className="mb-6 border-b border-gray-200 rounded-none w-full justify-start gap-0 h-auto pb-0">
-            <TabsTrigger value="pain-points" className="rounded-none px-4 py-2.5 text-sm">
-              <AlertTriangle className="h-3.5 w-3.5" />
-              Pain Points
-              <PainPointsCountBadge initialCount={painPoints.length} />
-            </TabsTrigger>
-            <TabsTrigger value="features" className="rounded-none px-4 py-2.5 text-sm">
-              <Lightbulb className="h-3.5 w-3.5" />
-              Feature Requests
-              <span className="ml-1.5 text-xs bg-gray-100 text-gray-600 rounded-full px-1.5 py-0.5 font-medium">
-                {featureRequests.length}
-              </span>
-            </TabsTrigger>
-            <TabsTrigger value="segments" className="rounded-none px-4 py-2.5 text-sm">
-              <Users className="h-3.5 w-3.5" />
-              Segments
-              <span className="ml-1.5 text-xs bg-gray-100 text-gray-600 rounded-full px-1.5 py-0.5 font-medium">
-                {segments.length}
-              </span>
-            </TabsTrigger>
-            <TabsTrigger value="workflow" className="rounded-none px-4 py-2.5 text-sm">
-              <Workflow className="h-3.5 w-3.5" />
-              Workflow Issues
-              <span className="ml-1.5 text-xs bg-gray-100 text-gray-600 rounded-full px-1.5 py-0.5 font-medium">
-                {workflowIssues.length}
-              </span>
-            </TabsTrigger>
-            <TabsTrigger value="competitors" className="rounded-none px-4 py-2.5 text-sm">
-              <Swords className="h-3.5 w-3.5" />
-              Competitors
-              <span className="ml-1.5 text-xs bg-gray-100 text-gray-600 rounded-full px-1.5 py-0.5 font-medium">
-                {competitors.length}
-              </span>
-            </TabsTrigger>
-            <TabsTrigger value="quotes" className="rounded-none px-4 py-2.5 text-sm">
-              <Quote className="h-3.5 w-3.5" />
-              Quotes &amp; Signals
-              <span className="ml-1.5 text-xs bg-gray-100 text-gray-600 rounded-full px-1.5 py-0.5 font-medium">
-                {quotes.length}
-              </span>
-            </TabsTrigger>
-          </TabsList>
+          {/* Scrollable wrapper prevents the tab bar from overhanging the viewport */}
+          <div className="mb-6 overflow-x-auto overflow-y-hidden border-b border-gray-200 -mx-8 px-8 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            <TabsList variant="line" className="rounded-none min-w-max border-b-0 justify-start gap-0 h-auto pb-0">
+              <TabsTrigger value="pain-points" className="rounded-none px-3 py-1.5 text-xs shrink-0">
+                <AlertTriangle className="h-3 w-3" />
+                Pain Points
+                <PainPointsCountBadge initialCount={painPoints.length} />
+              </TabsTrigger>
+              <TabsTrigger value="features" className="rounded-none px-3 py-1.5 text-xs shrink-0">
+                <Lightbulb className="h-3 w-3" />
+                Feature Requests
+                <InsightCountBadge initialCount={featureRequests.length} insightTypes={["FEATURE_REQUEST"]} />
+              </TabsTrigger>
+              <TabsTrigger value="segments" className="rounded-none px-3 py-1.5 text-xs shrink-0">
+                <Users className="h-3 w-3" />
+                Segments
+                <InsightCountBadge initialCount={segments.length} insightTypes={["USER_SEGMENT"]} />
+              </TabsTrigger>
+              <TabsTrigger value="workflow" className="rounded-none px-3 py-1.5 text-xs shrink-0">
+                <Workflow className="h-3 w-3" />
+                Workflow Issues
+                <InsightCountBadge initialCount={workflowIssues.length} insightTypes={["WORKFLOW_ISSUE"]} />
+              </TabsTrigger>
+              <TabsTrigger value="competitors" className="rounded-none px-3 py-1.5 text-xs shrink-0">
+                <Swords className="h-3 w-3" />
+                Competitors
+                <InsightCountBadge initialCount={competitors.length} insightTypes={["COMPETITIVE_MENTION"]} />
+              </TabsTrigger>
+              <TabsTrigger value="quotes" className="rounded-none px-3 py-1.5 text-xs shrink-0">
+                <Quote className="h-3 w-3" />
+                Quotes &amp; Signals
+                <InsightCountBadge initialCount={quotes.length} insightTypes={["CHURN_REASON", "PRICING_FEEDBACK", "OBJECTION"]} />
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* Pain Points Tab */}
           <TabsContent value="pain-points">
@@ -106,35 +100,53 @@ export default async function InsightsPage({
 
           {/* Feature Requests */}
           <TabsContent value="features">
-            <InsightGrid insights={featureRequests} workspaceId={workspaceId} />
+            <InsightTabContent
+              initialInsights={featureRequests}
+              insightTypes={["FEATURE_REQUEST"]}
+              workspaceId={workspaceId}
+              layout="grid"
+            />
           </TabsContent>
 
           {/* Segments */}
           <TabsContent value="segments">
-            <InsightGrid insights={segments} workspaceId={workspaceId} />
+            <InsightTabContent
+              initialInsights={segments}
+              insightTypes={["USER_SEGMENT"]}
+              workspaceId={workspaceId}
+              layout="grid"
+            />
           </TabsContent>
 
           {/* Workflow Issues */}
           <TabsContent value="workflow">
-            <InsightGrid insights={workflowIssues} workspaceId={workspaceId} />
+            <InsightTabContent
+              initialInsights={workflowIssues}
+              insightTypes={["WORKFLOW_ISSUE"]}
+              workspaceId={workspaceId}
+              layout="grid"
+            />
           </TabsContent>
 
           {/* Competitors */}
           <TabsContent value="competitors">
-            <InsightGrid insights={competitors} workspaceId={workspaceId} />
+            <InsightTabContent
+              initialInsights={competitors}
+              insightTypes={["COMPETITIVE_MENTION"]}
+              workspaceId={workspaceId}
+              layout="grid"
+            />
           </TabsContent>
 
           {/* Quotes & Signals */}
           <TabsContent value="quotes">
-            {quotes.length === 0 ? (
-              <EmptyState message="No signals extracted yet. Synthesize your workspace to surface churn reasons, pricing feedback, and objections." />
-            ) : (
-              <div className="space-y-4">
-                {quotes.map((insight) => (
-                  <InsightCard key={insight.id} insight={insight} workspaceId={workspaceId} />
-                ))}
-              </div>
-            )}
+            <InsightTabContent
+              initialInsights={quotes}
+              insightTypes={["CHURN_REASON", "PRICING_FEEDBACK", "OBJECTION"]}
+              workspaceId={workspaceId}
+              layout="list"
+              emptyMessage="No signals extracted yet. Synthesize your workspace to surface churn reasons, pricing feedback, and objections."
+            />
           </TabsContent>
         </Tabs>
       </div>
@@ -142,41 +154,3 @@ export default async function InsightsPage({
   );
 }
 
-function InsightGrid({
-  insights,
-  workspaceId,
-}: {
-  insights: {
-    id: string;
-    title: string;
-    description: string;
-    confidence: number;
-    evidenceIds: string[];
-    type: InsightType;
-    metadata: unknown;
-  }[];
-  workspaceId: string;
-}) {
-  if (insights.length === 0) {
-    return (
-      <EmptyState message="No insights in this category yet. Synthesize your workspace to extract insights from uploaded documents." />
-    );
-  }
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {insights.map((insight) => (
-        <InsightCard key={insight.id} insight={insight} workspaceId={workspaceId} />
-      ))}
-    </div>
-  );
-}
-
-function EmptyState({ message }: { message: string }) {
-  return (
-    <div className="bg-white rounded-xl border border-dashed p-16 text-center">
-      <Lightbulb className="h-10 w-10 text-gray-200 mx-auto mb-3" />
-      <p className="text-sm text-gray-500 max-w-sm mx-auto">{message}</p>
-    </div>
-  );
-}

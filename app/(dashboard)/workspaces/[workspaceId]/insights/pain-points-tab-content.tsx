@@ -2,9 +2,27 @@
 
 import { useJob, type StreamingPainPoint } from "../workspace-jobs-context";
 import { FilteredPainPoints } from "./filtered-pain-points";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Lightbulb, Loader2 } from "lucide-react";
+
+function PainPointCardSkeleton() {
+  return (
+    <div className="bg-white rounded-xl border p-5 animate-pulse">
+      <div className="flex items-start justify-between gap-4 mb-3">
+        <Skeleton className="h-5 w-2/3" />
+        <div className="flex gap-2 shrink-0">
+          <Skeleton className="h-6 w-24 rounded-full" />
+          <Skeleton className="h-6 w-24 rounded-full" />
+          <Skeleton className="h-6 w-20 rounded-full" />
+        </div>
+      </div>
+      <Skeleton className="h-3 w-full mb-1.5" />
+      <Skeleton className="h-3 w-4/5" />
+    </div>
+  );
+}
 
 interface PainPoint {
   id: string;
@@ -84,9 +102,8 @@ export function PainPointsTabContent({
             </div>
           </>
         ) : (
-          <div className="bg-white rounded-xl border border-dashed p-16 text-center">
-            <Loader2 className="h-10 w-10 text-violet-300 mx-auto mb-3 animate-spin" />
-            <p className="text-sm text-gray-500 max-w-sm mx-auto">Extracting and clustering pain points…</p>
+          <div className="space-y-4">
+            {[0, 1, 2].map((i) => <PainPointCardSkeleton key={i} />)}
           </div>
         )}
       </div>
