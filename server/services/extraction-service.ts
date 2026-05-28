@@ -7,6 +7,15 @@ import {
 } from "@/prompts/extract-document";
 import type { InsightType } from "@prisma/client";
 
+/** Lightweight insight shape streamed to the client during synthesis. */
+export interface StreamingInsight {
+  /** InsightType string value — safe to serialize over SSE. */
+  type: string;
+  title: string;
+  description: string;
+  confidence: number;
+}
+
 // Evidence-weighted confidence: caps no-quote items and meaningfully rewards quotes.
 // Prevents LLM from clustering everything at 0.7.
 function weightedConfidence(llmScore: number, quoteCount: number): number {
@@ -168,7 +177,10 @@ export async function extractDocumentInsights(documentId: string) {
 // Used by synthesis when records were cleared but documents were not re-uploaded.
 // Older extractions may be missing `confidence` on individual items — fall back to
 // a quote-count-derived estimate so we never write NaN to the DB.
-export async function repopulateInsightsFromExtractions(workspaceId: string): Promise<void> {
+export async function repopulateInsightsFromExtractions(
+  workspaceId: string,
+  onInsight?: (insight: StreamingInsight) => void
+): Promise<void> {
   const documents = await prisma.document.findMany({
     where: { workspaceId, status: "COMPLETED" },
     include: { extractions: { orderBy: { createdAt: "desc" }, take: 1 } },
@@ -180,7 +192,11 @@ export async function repopulateInsightsFromExtractions(workspaceId: string): Pr
     return weightedConfidence(n, quoteCount);
   }
 
-  const creates: Promise<unknown>[] = [];
+  // All DB creates run in parallel (maximum throughput). Each individual promise
+  // calls onInsight only after ITS own write resolves — the natural spread in
+  // completion times causes SSE events to arrive in separate HTTP flushes so the
+  // client sees cards trickle in, not all at once.
+  const perInsightPromises: Promise<void>[] = [];
 
   for (const doc of documents) {
     const raw = doc.extractions[0];
@@ -189,24 +205,49 @@ export async function repopulateInsightsFromExtractions(workspaceId: string): Pr
     const documentId = doc.id;
 
     for (const fr of (data.featureRequests ?? [])) {
-      creates.push(prisma.insight.create({ data: { workspaceId, type: "FEATURE_REQUEST" as InsightType, title: fr.title, description: fr.description, confidence: safeConf(fr.confidence, fr.evidenceQuotes.length), evidenceIds: [documentId], metadata: { quotes: fr.evidenceQuotes, requesterType: fr.requesterType } } }));
+      const confidence = safeConf(fr.confidence, fr.evidenceQuotes.length);
+      perInsightPromises.push(
+        prisma.insight.create({ data: { workspaceId, type: "FEATURE_REQUEST" as InsightType, title: fr.title, description: fr.description, confidence, evidenceIds: [documentId], metadata: { quotes: fr.evidenceQuotes, requesterType: fr.requesterType } } })
+          .then(() => { onInsight?.({ type: "FEATURE_REQUEST", title: fr.title, description: fr.description, confidence }); })
+      );
     }
     for (const wi of (data.workflowIssues ?? [])) {
-      creates.push(prisma.insight.create({ data: { workspaceId, type: "WORKFLOW_ISSUE" as InsightType, title: wi.title, description: `Current: ${wi.currentWorkflow}. Breakdown: ${wi.breakdownPoint}`, confidence: safeConf(wi.confidence, wi.evidenceQuotes.length), evidenceIds: [documentId], metadata: { quotes: wi.evidenceQuotes } } }));
+      const confidence = safeConf(wi.confidence, wi.evidenceQuotes.length);
+      const description = `Current: ${wi.currentWorkflow}. Breakdown: ${wi.breakdownPoint}`;
+      perInsightPromises.push(
+        prisma.insight.create({ data: { workspaceId, type: "WORKFLOW_ISSUE" as InsightType, title: wi.title, description, confidence, evidenceIds: [documentId], metadata: { quotes: wi.evidenceQuotes } } })
+          .then(() => { onInsight?.({ type: "WORKFLOW_ISSUE", title: wi.title, description, confidence }); })
+      );
     }
     for (const cm of (data.competitorMentions ?? [])) {
-      creates.push(prisma.insight.create({ data: { workspaceId, type: "COMPETITIVE_MENTION" as InsightType, title: `${cm.competitor} mention`, description: cm.context, confidence: safeConf(cm.confidence, cm.evidenceQuotes.length), evidenceIds: [documentId], metadata: { sentiment: cm.sentiment, quotes: cm.evidenceQuotes } } }));
+      const confidence = safeConf(cm.confidence, cm.evidenceQuotes.length);
+      const title = `${cm.competitor} mention`;
+      perInsightPromises.push(
+        prisma.insight.create({ data: { workspaceId, type: "COMPETITIVE_MENTION" as InsightType, title, description: cm.context, confidence, evidenceIds: [documentId], metadata: { sentiment: cm.sentiment, quotes: cm.evidenceQuotes } } })
+          .then(() => { onInsight?.({ type: "COMPETITIVE_MENTION", title, description: cm.context, confidence }); })
+      );
     }
     for (const seg of (data.userSegments ?? [])) {
-      creates.push(prisma.insight.create({ data: { workspaceId, type: "USER_SEGMENT" as InsightType, title: seg.name, description: seg.description, confidence: Math.min(0.92, 0.5 + seg.evidence.length * 0.08), evidenceIds: [documentId], metadata: { evidence: seg.evidence } } }));
+      const confidence = Math.min(0.92, 0.5 + seg.evidence.length * 0.08);
+      perInsightPromises.push(
+        prisma.insight.create({ data: { workspaceId, type: "USER_SEGMENT" as InsightType, title: seg.name, description: seg.description, confidence, evidenceIds: [documentId], metadata: { evidence: seg.evidence } } })
+          .then(() => { onInsight?.({ type: "USER_SEGMENT", title: seg.name, description: seg.description, confidence }); })
+      );
     }
     for (const obj of (data.objections ?? [])) {
-      creates.push(prisma.insight.create({ data: { workspaceId, type: "OBJECTION" as InsightType, title: obj.title, description: obj.description, confidence: safeConf(obj.confidence, obj.evidenceQuotes.length), evidenceIds: [documentId], metadata: { quotes: obj.evidenceQuotes } } }));
+      const confidence = safeConf(obj.confidence, obj.evidenceQuotes.length);
+      perInsightPromises.push(
+        prisma.insight.create({ data: { workspaceId, type: "OBJECTION" as InsightType, title: obj.title, description: obj.description, confidence, evidenceIds: [documentId], metadata: { quotes: obj.evidenceQuotes } } })
+          .then(() => { onInsight?.({ type: "OBJECTION", title: obj.title, description: obj.description, confidence }); })
+      );
     }
     for (const pp of (data.painPoints ?? [])) {
-      creates.push(prisma.painPoint.create({ data: { workspaceId, title: pp.title, description: pp.description, severity: pp.severity, frequency: Math.max(1, pp.evidenceQuotes.length), urgency: pp.urgency, affectedSegments: pp.affectedSegments, evidenceIds: [documentId], status: "ACTIVE" } }));
+      perInsightPromises.push(
+        prisma.painPoint.create({ data: { workspaceId, title: pp.title, description: pp.description, severity: pp.severity, frequency: Math.max(1, pp.evidenceQuotes.length), urgency: pp.urgency, affectedSegments: pp.affectedSegments, evidenceIds: [documentId], status: "ACTIVE" } })
+          .then(() => {})
+      );
     }
   }
 
-  await Promise.all(creates);
+  await Promise.all(perInsightPromises);
 }

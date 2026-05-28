@@ -3,8 +3,7 @@ import { requireWorkspaceAccess } from "@/lib/auth/helpers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { GenerateOpportunitiesButton } from "./generate-button";
-import { OpportunityCard } from "./opportunity-card";
-import { Target } from "lucide-react";
+import { OpportunitiesClient } from "./opportunities-client";
 import { cn } from "@/lib/utils";
 
 type SortKey = "totalScore" | "impactScore" | "urgencyScore";
@@ -81,22 +80,10 @@ export default async function OpportunitiesPage({
           ))}
         </div>
 
-        {opportunities.length === 0 ? (
-          <div className="bg-white rounded-xl border border-dashed p-16 text-center">
-            <Target className="h-12 w-12 text-gray-200 mx-auto mb-4" />
-            <h3 className="font-semibold text-gray-900 mb-2">No opportunities yet</h3>
-            <p className="text-sm text-gray-500 mb-6 max-w-sm mx-auto">
-              Generate opportunities from your synthesized pain points and insights.
-            </p>
-            <GenerateOpportunitiesButton workspaceId={workspaceId} />
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {opportunities.map((opp, index) => (
-              <OpportunityCard key={opp.id} opp={opp} workspaceId={workspaceId} index={index} />
-            ))}
-          </div>
-        )}
+        <OpportunitiesClient
+          initialOpportunities={opportunities}
+          workspaceId={workspaceId}
+        />
       </div>
     </div>
   );

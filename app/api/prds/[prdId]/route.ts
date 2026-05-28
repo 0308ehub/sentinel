@@ -32,6 +32,25 @@ export async function GET(
   }
 }
 
+export async function DELETE(
+  _req: Request,
+  { params }: { params: Promise<{ prdId: string }> }
+) {
+  try {
+    const { prdId } = await params;
+    const user = await requireUser();
+    const prd = await verifyPRDAccess(prdId, user.id);
+    if (!prd) return Response.json(apiError("NOT_FOUND", "PRD not found"), { status: 404 });
+
+    // Delete tickets first (prdId is nullable so no automatic cascade)
+    await prisma.engineeringTicket.deleteMany({ where: { prdId } });
+    await prisma.pRD.delete({ where: { id: prdId } });
+    return Response.json(apiSuccess({ deleted: prdId }));
+  } catch {
+    return Response.json(apiError("INTERNAL_ERROR", "Failed to delete PRD"), { status: 500 });
+  }
+}
+
 const PatchSchema = z.object({ content: z.string().min(1) });
 
 export async function PATCH(

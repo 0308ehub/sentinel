@@ -6,6 +6,8 @@ import {
 } from "@/prompts/label-pain-point-cluster";
 import { generateOpportunities } from "./opportunity-service";
 import { repopulateInsightsFromExtractions } from "./extraction-service";
+import type { StreamingInsight } from "./extraction-service";
+import type { StreamingOpportunity } from "./opportunity-service";
 import type { PainPointCluster } from "@/types";
 
 const SIMILARITY_THRESHOLD = 0.82;
@@ -22,7 +24,10 @@ export interface StreamingPainPoint {
 export async function synthesizeWorkspace(
   workspaceId: string,
   onProgress?: (step: string) => void,
-  onPainPoint?: (pp: StreamingPainPoint) => void
+  onPainPoint?: (pp: StreamingPainPoint) => void,
+  onInsight?: (insight: StreamingInsight) => void,
+  onOpportunity?: (opp: StreamingOpportunity) => void,
+  onInsightsDone?: () => void
 ) {
   onProgress?.("Loading pain points...");
   // Fetch all pain points for this workspace
@@ -35,7 +40,8 @@ export async function synthesizeWorkspace(
     const docCount = await prisma.document.count({ where: { workspaceId, status: "COMPLETED" } });
     if (docCount > 0) {
       onProgress?.("Restoring insights from stored extractions...");
-      await repopulateInsightsFromExtractions(workspaceId);
+      await repopulateInsightsFromExtractions(workspaceId, onInsight);
+      onInsightsDone?.(); // signal: extraction phase is complete, no more insight events
       painPoints = await prisma.painPoint.findMany({ where: { workspaceId, status: "ACTIVE" } });
     }
   }
@@ -137,7 +143,7 @@ export async function synthesizeWorkspace(
 
   onProgress?.("Updating pain point clusters...");
   // Generate opportunities
-  const opportunities = await generateOpportunities(workspaceId, labeledClusters, onProgress);
+  const opportunities = await generateOpportunities(workspaceId, labeledClusters, onProgress, onOpportunity);
 
   // Track event
   await prisma.productEvent.create({

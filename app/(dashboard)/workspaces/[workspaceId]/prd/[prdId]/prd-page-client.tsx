@@ -9,7 +9,7 @@ import { Ticket, Loader2, Pencil } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
 import { PRDActions } from "./prd-actions";
-import type { StreamingTicket } from "@/server/services/ticket-service";
+import { useJob, type StreamingTicket } from "../../workspace-jobs-context";
 
 interface CommittedTicket {
   id: string;
@@ -80,17 +80,54 @@ interface PRDPageClientProps {
 }
 
 export function PRDPageClient({ prd, workspaceId }: PRDPageClientProps) {
-  const [streamingTickets, setStreamingTickets] = useState<StreamingTicket[]>(
-    []
-  );
-  const [generating, setGenerating] = useState(false);
+  // Ticket-generation state lives in the workspace-level context so it
+  // survives tab navigation while the stream is in flight.
+  const jobKey = `tickets:${prd.id}`;
+  const {
+    running: generatingTickets,
+    streamingTickets,
+    startJob,
+  } = useJob(jobKey);
+
+  // Edit / save / clear state is local — no need to persist across navigation.
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(prd.content);
   const [saving, setSaving] = useState(false);
+  const [clearingTickets, setClearingTickets] = useState(false);
   const router = useRouter();
 
-  const showStreaming = generating || streamingTickets.length > 0;
+  const showStreaming = generatingTickets || streamingTickets.length > 0;
   const tickets = showStreaming ? streamingTickets : prd.tickets;
+
+  function handleGenerateTickets() {
+    startJob(
+      `/api/workspaces/${workspaceId}/tickets/generate`,
+      (result: Record<string, unknown>) => {
+        const count = typeof result.count === "number" ? result.count : 0;
+        toast.success(
+          `Generated ${count} engineering ticket${count !== 1 ? "s" : ""}!`
+        );
+        router.refresh();
+      },
+      (msg: string) => toast.error(msg),
+      { body: JSON.stringify({ prdId: prd.id }) }
+    );
+  }
+
+  async function handleClearTickets() {
+    setClearingTickets(true);
+    try {
+      const res = await fetch(`/api/prds/${prd.id}/tickets`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error?.message ?? "Failed to clear tickets");
+      toast.success("Tickets cleared");
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to clear tickets");
+    } finally {
+      setClearingTickets(false);
+    }
+  }
 
   async function handleSave() {
     setSaving(true);
@@ -146,9 +183,11 @@ export function PRDPageClient({ prd, workspaceId }: PRDPageClientProps) {
 
         <PRDActions
           prd={{ id: prd.id, content: prd.content, title: prd.title }}
-          workspaceId={workspaceId}
-          onStreamingTickets={setStreamingTickets}
-          onGeneratingChange={setGenerating}
+          generatingTickets={generatingTickets}
+          hasTickets={tickets.length > 0}
+          onGenerateTickets={handleGenerateTickets}
+          onClearTickets={handleClearTickets}
+          clearingTickets={clearingTickets}
           editing={editing}
           saving={saving}
           onEdit={() => setEditing(true)}
@@ -213,7 +252,7 @@ export function PRDPageClient({ prd, workspaceId }: PRDPageClientProps) {
 
             {tickets.length === 0 ? (
               <div className="bg-white rounded-xl border border-dashed p-6 text-center">
-                {generating ? (
+                {generatingTickets ? (
                   <div className="flex flex-col items-center gap-2">
                     <Loader2 className="h-5 w-5 text-violet-400 animate-spin" />
                     <p className="text-xs text-gray-400">Generating tickets…</p>
@@ -226,7 +265,7 @@ export function PRDPageClient({ prd, workspaceId }: PRDPageClientProps) {
               </div>
             ) : (
               <div className="space-y-2">
-                {tickets.map((ticket) => (
+                {tickets.map((ticket: CommittedTicket | StreamingTicket) => (
                   <TicketCard
                     key={ticket.id}
                     ticket={ticket}

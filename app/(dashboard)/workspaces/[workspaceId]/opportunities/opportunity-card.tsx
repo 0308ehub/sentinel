@@ -9,6 +9,12 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Pencil, Trash2, Check, X, Loader2, FileText, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from "@/components/ui/tooltip";
 
 interface Opportunity {
   id: string;
@@ -173,21 +179,27 @@ export function OpportunityCard({
 
               <div className="flex items-center gap-1.5 shrink-0">
                 {/* Action buttons — visible on hover */}
-                <button
-                  onClick={() => setEditing(true)}
-                  className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-all"
-                  title="Edit"
-                >
-                  <Pencil className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  onClick={handleDelete}
-                  disabled={deleting}
-                  className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-600 transition-all"
-                  title="Delete"
-                >
-                  {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                </button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger
+                      onClick={() => setEditing(true)}
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-all"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </TooltipTrigger>
+                    <TooltipContent>Edit opportunity</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger
+                      onClick={handleDelete}
+                      disabled={deleting}
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-600 transition-all"
+                    >
+                      {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                    </TooltipTrigger>
+                    <TooltipContent>Delete opportunity</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
 
                 <div
                   className={cn(

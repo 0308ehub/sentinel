@@ -2,6 +2,11 @@
 
 import { createContext, useContext, useState, useCallback, useRef } from "react";
 import type { ProgressStep } from "@/components/ui/progress-stream";
+import type { StreamingTicket } from "@/server/services/ticket-service";
+import type { StreamingInsight } from "@/server/services/extraction-service";
+import type { StreamingOpportunity } from "@/server/services/opportunity-service";
+
+export type { StreamingTicket, StreamingInsight, StreamingOpportunity };
 
 export interface StreamingPainPoint {
   title: string;
@@ -16,6 +21,17 @@ interface JobState {
   running: boolean;
   steps: ProgressStep[];
   streamingPainPoints: StreamingPainPoint[];
+  streamingTickets: StreamingTicket[];
+  streamingInsights: StreamingInsight[];
+  streamingOpportunities: StreamingOpportunity[];
+  /** True once the insight-extraction phase of synthesis has finished. */
+  insightsDone: boolean;
+}
+
+interface StartJobOptions {
+  /** JSON-serialised body to POST. When provided, Content-Type is set automatically. */
+  body?: string;
+  headers?: Record<string, string>;
 }
 
 interface JobsContextValue {
@@ -24,7 +40,8 @@ interface JobsContextValue {
     key: string,
     url: string,
     onDone: (result: Record<string, unknown>) => void,
-    onError: (msg: string) => void
+    onError: (msg: string) => void,
+    options?: StartJobOptions
   ) => void;
   cancelJob: (key: string) => void;
 }
@@ -39,7 +56,11 @@ export function WorkspaceJobsProvider({ children }: { children: React.ReactNode 
   const setJob = useCallback((key: string, patch: Partial<JobState>) => {
     setJobs((prev) => ({
       ...prev,
-      [key]: { ...{ running: false, steps: [], streamingPainPoints: [] }, ...prev[key], ...patch },
+      [key]: {
+        ...{ running: false, steps: [], streamingPainPoints: [], streamingTickets: [], streamingInsights: [], streamingOpportunities: [], insightsDone: false },
+        ...prev[key],
+        ...patch,
+      },
     }));
   }, []);
 
@@ -62,18 +83,28 @@ export function WorkspaceJobsProvider({ children }: { children: React.ReactNode 
       key: string,
       url: string,
       onDone: (result: Record<string, unknown>) => void,
-      onError: (msg: string) => void
+      onError: (msg: string) => void,
+      options?: StartJobOptions
     ) => {
       // Cancel any previous run for this key
       controllers.current[key]?.abort();
       const ctrl = new AbortController();
       controllers.current[key] = ctrl;
 
-      setJob(key, { running: true, steps: [], streamingPainPoints: [] });
+      setJob(key, { running: true, steps: [], streamingPainPoints: [], streamingTickets: [], streamingInsights: [], streamingOpportunities: [], insightsDone: false });
 
       (async () => {
         try {
-          const res = await fetch(url, { method: "POST", signal: ctrl.signal });
+          const res = await fetch(url, {
+            method: "POST",
+            signal: ctrl.signal,
+            ...(options?.body
+              ? {
+                  body: options.body,
+                  headers: { "Content-Type": "application/json", ...options.headers },
+                }
+              : {}),
+          });
           if (!res.ok || !res.body) throw new Error("Request failed");
 
           const reader = res.body.getReader();
@@ -95,8 +126,28 @@ export function WorkspaceJobsProvider({ children }: { children: React.ReactNode 
                   addStep(key, event.step);
                 } else if (event.type === "pain_point" && event.data) {
                   setJobs((prev) => {
-                    const current = prev[key] ?? { running: true, steps: [], streamingPainPoints: [] };
+                    const current = prev[key] ?? { running: true, steps: [], streamingPainPoints: [], streamingTickets: [], streamingInsights: [], streamingOpportunities: [], insightsDone: false };
                     return { ...prev, [key]: { ...current, streamingPainPoints: [...current.streamingPainPoints, event.data as StreamingPainPoint] } };
+                  });
+                } else if (event.type === "ticket" && event.data) {
+                  setJobs((prev) => {
+                    const current = prev[key] ?? { running: true, steps: [], streamingPainPoints: [], streamingTickets: [], streamingInsights: [], streamingOpportunities: [], insightsDone: false };
+                    return { ...prev, [key]: { ...current, streamingTickets: [...(current.streamingTickets ?? []), event.data as StreamingTicket] } };
+                  });
+                } else if (event.type === "insight" && event.data) {
+                  setJobs((prev) => {
+                    const current = prev[key] ?? { running: true, steps: [], streamingPainPoints: [], streamingTickets: [], streamingInsights: [], streamingOpportunities: [], insightsDone: false };
+                    return { ...prev, [key]: { ...current, streamingInsights: [...(current.streamingInsights ?? []), event.data as StreamingInsight] } };
+                  });
+                } else if (event.type === "opportunity" && event.data) {
+                  setJobs((prev) => {
+                    const current = prev[key] ?? { running: true, steps: [], streamingPainPoints: [], streamingTickets: [], streamingInsights: [], streamingOpportunities: [], insightsDone: false };
+                    return { ...prev, [key]: { ...current, streamingOpportunities: [...(current.streamingOpportunities ?? []), event.data as StreamingOpportunity] } };
+                  });
+                } else if (event.type === "insights_done") {
+                  setJobs((prev) => {
+                    const current = prev[key] ?? { running: true, steps: [], streamingPainPoints: [], streamingTickets: [], streamingInsights: [], streamingOpportunities: [], insightsDone: false };
+                    return { ...prev, [key]: { ...current, insightsDone: true } };
                   });
                 } else if (event.type === "done") {
                   setJobs((prev) => ({
@@ -105,11 +156,15 @@ export function WorkspaceJobsProvider({ children }: { children: React.ReactNode 
                       running: false,
                       steps: (prev[key]?.steps ?? []).map((s) => ({ ...s, done: true })),
                       streamingPainPoints: prev[key]?.streamingPainPoints ?? [],
+                      streamingTickets: prev[key]?.streamingTickets ?? [],
+                      streamingInsights: prev[key]?.streamingInsights ?? [],
+                      streamingOpportunities: prev[key]?.streamingOpportunities ?? [],
+                      insightsDone: prev[key]?.insightsDone ?? false,
                     },
                   }));
                   onDone(event);
-                  // Auto-clear the progress list after 3 s so it doesn't linger
-                  setTimeout(() => setJob(key, { steps: [], streamingPainPoints: [] }), 3000);
+                  // Auto-clear transient state after 3 s (page will have refreshed by then)
+                  setTimeout(() => setJob(key, { steps: [], streamingPainPoints: [], streamingTickets: [], streamingInsights: [], streamingOpportunities: [], insightsDone: false }), 3000);
                 } else if (event.type === "error") {
                   throw new Error(typeof event.message === "string" ? event.message : "Operation failed");
                 }
@@ -121,8 +176,17 @@ export function WorkspaceJobsProvider({ children }: { children: React.ReactNode 
           }
         } catch (err) {
           if ((err as Error).name === "AbortError") return;
-          setJob(key, { running: false });
+          setJobs((prev) => ({
+            ...prev,
+            [key]: {
+              ...{ running: false, steps: [], streamingPainPoints: [], streamingTickets: [], streamingInsights: [], streamingOpportunities: [], insightsDone: false },
+              ...prev[key],
+              running: false,
+              steps: (prev[key]?.steps ?? []).map((s) => ({ ...s, done: true })),
+            },
+          }));
           onError(err instanceof Error ? err.message : String(err));
+          setTimeout(() => setJob(key, { steps: [] }), 3000);
         }
       })();
     },
@@ -133,13 +197,14 @@ export function WorkspaceJobsProvider({ children }: { children: React.ReactNode 
     (key: string) => {
       controllers.current[key]?.abort();
       delete controllers.current[key];
-      setJob(key, { running: false, steps: [], streamingPainPoints: [] });
+      setJob(key, { running: false, steps: [], streamingPainPoints: [], streamingTickets: [], streamingInsights: [], streamingOpportunities: [], insightsDone: false });
     },
     [setJob]
   );
 
   const getJob = useCallback(
-    (key: string): JobState => jobs[key] ?? { running: false, steps: [], streamingPainPoints: [] },
+    (key: string): JobState =>
+      jobs[key] ?? { running: false, steps: [], streamingPainPoints: [], streamingTickets: [], streamingInsights: [], streamingOpportunities: [], insightsDone: false },
     [jobs]
   );
 
@@ -158,8 +223,9 @@ export function useJob(key: string) {
     startJob: (
       url: string,
       onDone: (result: Record<string, unknown>) => void,
-      onError: (msg: string) => void
-    ) => ctx.startJob(key, url, onDone, onError),
+      onError: (msg: string) => void,
+      options?: StartJobOptions
+    ) => ctx.startJob(key, url, onDone, onError, options),
     cancelJob: () => ctx.cancelJob(key),
   };
 }

@@ -21,31 +21,34 @@ Rules:
 Return valid JSON.
 `.trim();
 
+// Single-ticket schema — used for incremental streaming parsing
+export const SingleTicketSchema = z.object({
+  title: z.string(),
+  type: z.enum([
+    "frontend",
+    "backend",
+    "fullstack",
+    "data",
+    "design",
+    "analytics",
+    "qa",
+  ]),
+  priority: z.enum(["low", "medium", "high", "critical"]),
+  description: z.string(),
+  acceptanceCriteria: z.array(z.string()),
+  implementationNotes: z.array(z.string()),
+  dependencies: z.array(z.string()),
+  estimatedComplexity: z.enum(["small", "medium", "large"]),
+});
+
+export type SingleTicketData = z.infer<typeof SingleTicketSchema>;
+
 export const EngineeringTicketsSchema = z.object({
   epic: z.object({
     title: z.string(),
     description: z.string(),
   }),
-  tickets: z.array(
-    z.object({
-      title: z.string(),
-      type: z.enum([
-        "frontend",
-        "backend",
-        "fullstack",
-        "data",
-        "design",
-        "analytics",
-        "qa",
-      ]),
-      priority: z.enum(["low", "medium", "high", "critical"]),
-      description: z.string(),
-      acceptanceCriteria: z.array(z.string()),
-      implementationNotes: z.array(z.string()),
-      dependencies: z.array(z.string()),
-      estimatedComplexity: z.enum(["small", "medium", "large"]),
-    })
-  ),
+  tickets: z.array(SingleTicketSchema),
 });
 
 export type EngineeringTicketsOutput = z.infer<typeof EngineeringTicketsSchema>;
