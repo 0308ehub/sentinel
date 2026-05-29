@@ -39,8 +39,15 @@ export async function GET(req: Request) {
       });
     }
 
+    const connectorId = existing ? existing.id : (
+      await prisma.connector.findFirst({ where: { workspaceId: state.workspaceId, type: "SLACK" } })
+    )?.id ?? "";
+    // Redirect to channel setup so the user can pick which channels to import
     return Response.redirect(
-      new URL(`/workspaces/${state.workspaceId}/integrations?connected=slack`, process.env.NEXT_PUBLIC_APP_URL!)
+      new URL(
+        `/workspaces/${state.workspaceId}/integrations?connected=slack&setup=${connectorId}`,
+        process.env.NEXT_PUBLIC_APP_URL!
+      )
     );
   } catch (err) {
     console.error("Slack OAuth error:", err);

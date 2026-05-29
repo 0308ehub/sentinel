@@ -3,6 +3,7 @@ import { requireWorkspaceAccess } from "@/lib/auth/helpers";
 import { redirect } from "next/navigation";
 import { ConnectorCard } from "./connector-card";
 import { ConnectModal } from "./connect-modal";
+import { SlackChannelSetup } from "./slack-setup";
 import { CheckCircle2, AlertCircle } from "lucide-react";
 
 const CONNECTOR_CATALOG = [
@@ -83,10 +84,10 @@ export default async function IntegrationsPage({
   searchParams,
 }: {
   params: Promise<{ workspaceId: string }>;
-  searchParams: Promise<{ connected?: string; error?: string }>;
+  searchParams: Promise<{ connected?: string; error?: string; setup?: string }>;
 }) {
   const { workspaceId } = await params;
-  const { connected, error } = await searchParams;
+  const { connected, error, setup } = await searchParams;
 
   try {
     await requireWorkspaceAccess(workspaceId);
@@ -112,8 +113,13 @@ export default async function IntegrationsPage({
           </p>
         </div>
 
+        {/* Slack channel picker — shown right after Slack OAuth */}
+        {setup && connected === "slack" && (
+          <SlackChannelSetup connectorId={setup} workspaceId={workspaceId} />
+        )}
+
         {/* Toast-style feedback banners */}
-        {connected && (
+        {connected && !setup && (
           <div className="mb-6 flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg px-4 py-3 text-sm font-medium">
             <CheckCircle2 className="h-4 w-4 shrink-0" />
             Successfully connected {connected.charAt(0).toUpperCase() + connected.slice(1)}! Click &quot;Sync Now&quot; to import your first batch of data.
