@@ -328,9 +328,12 @@ model EngineeringTicket {
   description        String
   acceptanceCriteria String[]
   priority           TicketPriority
+  status             TicketStatus   @default(BACKLOG)
   estimate           String?
   dependencies       String[]
   ticketType         String?
+  externalLinearId   String?
+  externalLinearUrl  String?
   metadata           Json?
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
@@ -345,6 +348,14 @@ enum TicketPriority {
   MEDIUM
   HIGH
   CRITICAL
+}
+
+enum TicketStatus {
+  BACKLOG
+  IN_SPRINT
+  IN_PROGRESS
+  IN_REVIEW
+  DONE
 }
 
 // ─── Chat ─────────────────────────────────────────────────────────────────────

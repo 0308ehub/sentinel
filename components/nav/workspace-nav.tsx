@@ -11,6 +11,7 @@ import {
   BarChart2,
   MessageSquarePlus,
   Plug,
+  Kanban,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -43,6 +44,7 @@ export function WorkspaceNav({ workspaceId }: WorkspaceNavProps) {
     { href: `${base}/insights`,           activeHref: `${base}/insights`,           label: "Insights",       icon: Lightbulb },
     { href: `${base}/opportunities`,      activeHref: `${base}/opportunities`,      label: "Opportunities",  icon: Target },
     { href: prdHref,                      activeHref: `${base}/prd`,                label: "PRDs",           icon: FileText },
+    { href: `${base}/tickets`,            activeHref: `${base}/tickets`,            label: "Tickets",        icon: Kanban },
     { href: `${base}/reports`,            activeHref: `${base}/reports`,            label: "Reports",        icon: BarChart2 },
     { href: `${base}/interview-guide`,    activeHref: `${base}/interview-guide`,    label: "Interview Guide", icon: MessageSquarePlus },
     { href: `${base}/integrations`,       activeHref: `${base}/integrations`,       label: "Integrations",   icon: Plug },

@@ -19,6 +19,62 @@ export async function testLinearConnection(apiKey: string) {
   return viewer.email;
 }
 
+interface CreateLinearIssueInput {
+  title: string;
+  description?: string;
+  priority?: string;
+  estimate?: string;
+}
+
+const PRIORITY_MAP: Record<string, number> = {
+  LOW: 4,
+  MEDIUM: 3,
+  HIGH: 2,
+  CRITICAL: 1,
+};
+
+export async function createLinearIssue(
+  config: LinearConfig,
+  input: CreateLinearIssueInput
+): Promise<{ id: string; url: string }> {
+  // First fetch teams to get the default team id
+  const teamsData = (await linearQuery(config.apiKey, `{ teams { nodes { id name } } }`)) as Record<
+    string,
+    unknown
+  >;
+  const teams = ((teamsData.teams as Record<string, unknown[]>).nodes ?? []) as Array<
+    Record<string, string>
+  >;
+
+  const teamId =
+    (config.teamIds?.length ? config.teamIds[0] : null) ?? teams[0]?.id;
+  if (!teamId) throw new Error("No Linear team available");
+
+  const mutation = `
+    mutation CreateIssue($input: IssueCreateInput!) {
+      issueCreate(input: $input) {
+        success
+        issue { id url }
+      }
+    }
+  `;
+
+  const variables = {
+    input: {
+      teamId,
+      title: input.title,
+      description: input.description ?? "",
+      priority: PRIORITY_MAP[input.priority ?? "MEDIUM"] ?? 3,
+    },
+  };
+
+  const data = (await linearQuery(config.apiKey, mutation, variables)) as Record<string, unknown>;
+  const created = data.issueCreate as Record<string, unknown>;
+  if (!created?.success) throw new Error("Linear issue creation failed");
+  const issue = created.issue as Record<string, string>;
+  return { id: issue.id, url: issue.url };
+}
+
 export async function syncLinear(config: LinearConfig, maxIssues = 100): Promise<ImportedDocument[]> {
   const after = config.lastSyncedAt
     ? `updatedAt: { gt: "${config.lastSyncedAt}" }`
