@@ -9,7 +9,7 @@ export async function MarketingNav() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-md">
-      <nav className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
+      <nav aria-label="Main navigation" className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5">
           <div className="w-6 h-6 rounded-md bg-brand flex items-center justify-center">
@@ -25,18 +25,12 @@ export async function MarketingNav() {
             <>
               <Link
                 href="/dashboard"
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5"
-              >
-                Dashboard
-              </Link>
-              <Link
-                href="/dashboard"
                 className="flex items-center gap-2 text-sm font-medium bg-foreground text-background px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity"
               >
                 {user.imageUrl ? (
                   <Image
                     src={user.imageUrl}
-                    alt={user.firstName ?? 'User'}
+                    alt={user.firstName ? `${user.firstName}${user.lastName ? ' ' + user.lastName : ''}` : (user.emailAddresses[0]?.emailAddress ?? 'User avatar')}
                     width={20}
                     height={20}
                     className="rounded-full"
