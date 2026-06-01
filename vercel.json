@@ -6,5 +6,9 @@
     "app/api/**": {
       "maxDuration": 300
     }
-  }
+  },
+  "crons": [
+    { "path": "/api/cron/scan-connectors", "schedule": "0 * * * *" },
+    { "path": "/api/cron/sync-linear",     "schedule": "*/30 * * * *" }
+  ]
 }

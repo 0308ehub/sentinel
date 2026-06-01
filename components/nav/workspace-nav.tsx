@@ -12,6 +12,7 @@ import {
   MessageSquarePlus,
   Plug,
   Kanban,
+  Inbox,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -47,6 +48,7 @@ export function WorkspaceNav({ workspaceId }: WorkspaceNavProps) {
     { href: `${base}/tickets`,            activeHref: `${base}/tickets`,            label: "Tickets",        icon: Kanban },
     { href: `${base}/reports`,            activeHref: `${base}/reports`,            label: "Reports",        icon: BarChart2 },
     { href: `${base}/interview-guide`,    activeHref: `${base}/interview-guide`,    label: "Interview Guide", icon: MessageSquarePlus },
+    { href: `${base}/inbox`,              activeHref: `${base}/inbox`,              label: "Inbox",          icon: Inbox },
     { href: `${base}/integrations`,       activeHref: `${base}/integrations`,       label: "Integrations",   icon: Plug },
   ];
 

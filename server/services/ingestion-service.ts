@@ -88,6 +88,11 @@ export async function processDocument(documentId: string): Promise<void> {
         properties: { documentId, chunkCount: textChunks.length },
       },
     });
+
+    // Trigger autonomous PM hook
+    import("@/server/services/autonomous-pm").then(({ onDocumentIngested }) =>
+      onDocumentIngested(document.workspaceId).catch(() => {})
+    );
   } catch (error) {
     console.error(`[ingestion] Failed to process document ${documentId}:`, error);
     await updateDocumentStatus(documentId, "FAILED", String(error));

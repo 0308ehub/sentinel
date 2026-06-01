@@ -65,16 +65,18 @@ model Workspace {
   updatedAt      DateTime @updatedAt
 
   organization  Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  documents     Document[]
-  chunks        DocumentChunk[]
-  insights      Insight[]
-  painPoints    PainPoint[]
-  opportunities Opportunity[]
-  conversations Conversation[]
-  prds          PRD[]
-  tickets       EngineeringTicket[]
-  events        ProductEvent[]
-  connectors    Connector[]
+  documents        Document[]
+  chunks           DocumentChunk[]
+  insights         Insight[]
+  painPoints       PainPoint[]
+  opportunities    Opportunity[]
+  conversations    Conversation[]
+  prds             PRD[]
+  tickets          EngineeringTicket[]
+  events           ProductEvent[]
+  connectors       Connector[]
+  sentinelActions  SentinelAction[]
+  settings         WorkspaceSettings?
 }
 
 // ─── Documents ────────────────────────────────────────────────────────────────
@@ -389,6 +391,59 @@ enum MessageRole {
   ASSISTANT
   SYSTEM
   TOOL
+}
+
+// ─── Autonomous PM ────────────────────────────────────────────────────────────
+
+model SentinelAction {
+  id          String               @id @default(cuid())
+  workspaceId String
+  type        SentinelActionType
+  status      SentinelActionStatus @default(PENDING_REVIEW)
+  title       String
+  description String
+  payload     Json
+  result      Json?
+  triggeredBy String               @default("system")
+  reviewedAt  DateTime?
+  executedAt  DateTime?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+enum SentinelActionType {
+  SCAN_CONNECTOR
+  IMPORT_DOCUMENTS
+  SYNTHESIZE_WORKSPACE
+  GENERATE_OPPORTUNITIES
+  GENERATE_TICKETS
+  PUSH_TO_LINEAR
+  SYNC_LINEAR_STATUS
+  GENERATE_DIGEST
+}
+
+enum SentinelActionStatus {
+  PENDING_REVIEW
+  APPROVED
+  EXECUTING
+  COMPLETED
+  REJECTED
+  FAILED
+}
+
+model WorkspaceSettings {
+  id                   String   @id @default(cuid())
+  workspaceId          String   @unique
+  autoSynthesizeOnIngest Boolean @default(false)
+  autoImportHighScore  Boolean  @default(false)
+  autoPushToLinear     Boolean  @default(false)
+  digestFrequency      String   @default("weekly")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
 
 // ─── Analytics ────────────────────────────────────────────────────────────────
