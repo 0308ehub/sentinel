@@ -1,3 +1,5 @@
+export const maxDuration = 300;
+
 import { prisma } from "@/lib/db/prisma";
 import { requireUser } from "@/lib/auth/helpers";
 import { apiSuccess, apiError } from "@/types";

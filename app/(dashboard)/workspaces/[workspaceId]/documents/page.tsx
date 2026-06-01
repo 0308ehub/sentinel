@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Upload, FileText } from "lucide-react";
 import { DocumentRow } from "@/components/document/document-row";
+import { dispatchIngestion } from "@/server/jobs/dispatch";
 
 export default async function DocumentsPage({
   params,
@@ -27,6 +28,28 @@ export default async function DocumentsPage({
       uploadedBy: { select: { name: true } },
     },
   });
+
+  // Auto-heal: reset docs stuck in a processing state for > 5 minutes and re-dispatch
+  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+  const STUCK_STATUSES = ["EXTRACTING", "PARSING", "CHUNKING", "EMBEDDING"];
+  const stuckDocs = documents.filter(
+    (d) => STUCK_STATUSES.includes(d.status) && d.updatedAt < fiveMinutesAgo
+  );
+  if (stuckDocs.length > 0) {
+    await prisma.document.updateMany({
+      where: { id: { in: stuckDocs.map((d) => d.id) } },
+      data: { status: "PENDING" },
+    });
+    for (const doc of stuckDocs) {
+      dispatchIngestion(doc.id).catch(() => {});
+    }
+    // Refresh documents list to reflect reset status
+    documents.splice(0, documents.length, ...(await prisma.document.findMany({
+      where: { workspaceId },
+      orderBy: { createdAt: "desc" },
+      include: { _count: { select: { chunks: true } }, uploadedBy: { select: { name: true } } },
+    })));
+  }
 
   // Extract stored error message from metadata for FAILED docs
   type DocWithError = (typeof documents)[number] & { errorMessage?: string };
