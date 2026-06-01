@@ -1,64 +1,67 @@
-import { auth, currentUser } from '@clerk/nextjs/server'
+import { auth } from '@clerk/nextjs/server'
 import Link from 'next/link'
-import Image from 'next/image'
-import { ThemeToggle } from '@/components/theme-toggle'
+import { SentinelLogo } from './SentinelLogo'
+
+const NAV_LINKS = [
+  { label: 'Product', href: '/product' },
+  { label: 'Customers', href: '/customers' },
+  { label: 'Pricing', href: '/pricing' },
+  { label: 'Contact', href: '/contact' },
+] as const
 
 export async function MarketingNav() {
   const { userId } = await auth()
-  const user = userId ? await currentUser() : null
+  const isLoggedIn = Boolean(userId)
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-md">
-      <nav aria-label="Main navigation" className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
+    <header className="sticky top-0 z-50 h-14 border-b border-white/[0.06] bg-[#0a0a0a]/90 backdrop-blur-md">
+      <nav
+        aria-label="Main navigation"
+        className="max-w-[1200px] mx-auto px-6 h-full flex items-center justify-between"
+      >
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2.5">
-          <div className="w-6 h-6 rounded-md bg-brand flex items-center justify-center">
-            <span className="text-brand-foreground text-xs font-bold">S</span>
-          </div>
-          <span className="font-semibold text-sm tracking-tight text-foreground">Sentinel</span>
+        <Link href="/" aria-label="Sentinel home">
+          <SentinelLogo />
         </Link>
 
-        {/* Right side */}
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
-          {user ? (
-            <>
+        {/* Center nav links */}
+        <ul className="hidden md:flex items-center gap-6 list-none m-0 p-0">
+          {NAV_LINKS.map(({ label, href }) => (
+            <li key={href}>
               <Link
-                href="/dashboard"
-                className="flex items-center gap-2 text-sm font-medium bg-foreground text-background px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity"
+                href={href}
+                className="text-[13px] text-[#888888] hover:text-white transition-colors"
               >
-                {user.imageUrl ? (
-                  <Image
-                    src={user.imageUrl}
-                    alt={user.firstName ? `${user.firstName}${user.lastName ? ' ' + user.lastName : ''}` : (user.emailAddresses[0]?.emailAddress ?? 'User avatar')}
-                    width={20}
-                    height={20}
-                    className="rounded-full"
-                  />
-                ) : (
-                  <div className="w-5 h-5 rounded-full bg-brand flex items-center justify-center">
-                    <span className="text-brand-foreground text-[10px] font-bold">
-                      {(user.firstName?.[0] ?? user.emailAddresses[0]?.emailAddress?.[0] ?? 'U').toUpperCase()}
-                    </span>
-                  </div>
-                )}
-                {user.firstName ?? 'Account'}
+                {label}
               </Link>
-            </>
+            </li>
+          ))}
+        </ul>
+
+        {/* Right side auth actions */}
+        <div className="flex items-center gap-3">
+          <span className="hidden md:block w-px h-4 bg-white/20" aria-hidden="true" />
+          {isLoggedIn ? (
+            <Link
+              href="/dashboard"
+              className="text-[13px] text-[#888888] hover:text-white transition-colors"
+            >
+              Dashboard &rarr;
+            </Link>
           ) : (
             <>
               <Link
                 href="/sign-in"
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5"
+                className="text-[13px] text-[#888888] hover:text-white transition-colors"
               >
-                Sign in
+                Log in
               </Link>
-              <a
-                href="#waitlist"
-                className="text-sm font-medium bg-foreground text-background px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity"
+              <Link
+                href="/sign-up"
+                className="bg-white text-black text-[13px] font-medium px-4 py-1.5 rounded-full hover:bg-white/90 transition-colors"
               >
-                Get early access
-              </a>
+                Sign up
+              </Link>
             </>
           )}
         </div>
