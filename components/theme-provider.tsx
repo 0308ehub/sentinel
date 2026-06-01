@@ -1,21 +1,17 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 
 type Theme = 'light' | 'dark'
 
-const ThemeContext = createContext<{ theme: Theme; toggle: () => void }>({
-  theme: 'light',
-  toggle: () => {},
-})
+const ThemeContext = createContext<{ theme: Theme; toggle: () => void } | null>(null)
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('light')
-
-  useEffect(() => {
-    const stored = localStorage.getItem('sentinel-theme') as Theme | null
-    if (stored === 'dark' || stored === 'light') setTheme(stored)
-  }, [])
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof window === 'undefined') return 'light'
+    const stored = localStorage.getItem('sentinel-theme')
+    return stored === 'dark' ? 'dark' : 'light'
+  })
 
   useEffect(() => {
     const root = document.documentElement
@@ -27,11 +23,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('sentinel-theme', theme)
   }, [theme])
 
+  const toggle = useCallback(() => setTheme(t => t === 'light' ? 'dark' : 'light'), [])
+
   return (
-    <ThemeContext.Provider value={{ theme, toggle: () => setTheme(t => t === 'light' ? 'dark' : 'light') }}>
+    <ThemeContext.Provider value={{ theme, toggle }}>
       {children}
     </ThemeContext.Provider>
   )
 }
 
-export const useTheme = () => useContext(ThemeContext)
+export function useTheme() {
+  const ctx = useContext(ThemeContext)
+  if (!ctx) throw new Error('useTheme must be used within ThemeProvider')
+  return ctx
+}

@@ -19,10 +19,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <ClerkProvider>
       <html lang="en" suppressHydrationWarning className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}>
         <body className="min-h-full bg-background text-foreground">
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `(function(){try{var t=localStorage.getItem('sentinel-theme');if(t==='dark')document.documentElement.classList.add('dark')}catch(e){}})()`,
+            }}
+          />
           <ThemeProvider>
             {children}
+            <Toaster richColors position="top-right" />
           </ThemeProvider>
-          <Toaster richColors position="top-right" />
         </body>
       </html>
     </ClerkProvider>
