@@ -29,7 +29,7 @@ export function ActMockup() {
           </div>
           <span className="text-[12px] font-medium text-white">Sentinel Agent</span>
           <div className="ml-auto flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-500/70 animate-pulse" />
+            <span className="w-1.5 h-1.5 rounded-full bg-green-500/70 motion-safe:animate-pulse" />
             <span className="text-[10px] text-[#444]">running</span>
           </div>
         </div>
@@ -44,7 +44,7 @@ export function ActMockup() {
           {/* Thinking + cursor */}
           <div className="flex items-center gap-1.5 mt-2">
             <span className="text-[12px] text-[#888]">Thinking...</span>
-            <span className="text-[14px] text-[#888] animate-pulse">▍</span>
+            <span className="text-[14px] text-[#888] motion-safe:animate-pulse">▍</span>
           </div>
         </div>
       </div>

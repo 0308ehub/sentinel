@@ -20,7 +20,7 @@ export function FeatureSection({
   return (
     <section className={`py-24 ${border !== false ? 'border-t border-white/[0.06]' : ''}`}>
       <div className="max-w-[1200px] mx-auto px-6">
-        <div className="grid grid-cols-2 gap-16 mb-20 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 mb-12 lg:mb-20 items-start">
           <h2 className="text-[clamp(2.5rem,5vw,4rem)] font-bold tracking-tight leading-[1.05] text-white">
             {headline}
           </h2>

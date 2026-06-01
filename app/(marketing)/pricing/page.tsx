@@ -131,7 +131,7 @@ export default function PricingPage() {
           <h1 className="text-[clamp(2.5rem,5vw,4rem)] font-bold text-white tracking-tight mb-16">
             Pricing
           </h1>
-          <div className="grid grid-cols-4 gap-px bg-white/[0.06] rounded-xl overflow-hidden border border-white/[0.06]">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-px bg-white/[0.06] rounded-xl overflow-hidden border border-white/[0.06]">
             {tiers.map((tier) => (
               <PricingTier key={tier.name} tier={tier} />
             ))}

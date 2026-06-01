@@ -304,7 +304,7 @@ export function FigCards() {
   return (
     <section className="border-t border-white/[0.06]">
       <div className="max-w-[1200px] mx-auto">
-        <div className="grid grid-cols-3 divide-x divide-white/[0.06]">
+        <div className="grid grid-cols-1 md:grid-cols-3 md:divide-x divide-y md:divide-y-0 divide-white/[0.06]">
           {cards.map((card) => (
             <div key={card.fig} className="px-10 py-12 flex flex-col">
               <p className="text-[11px] font-medium text-[#444] tracking-[0.15em] uppercase mb-12">

@@ -7,7 +7,7 @@ export default function ContactPage() {
       <MarketingNav />
       <main className="min-h-screen bg-[#0a0a0a]">
         <div className="max-w-[1200px] mx-auto px-6 pt-20 pb-24">
-          <div className="grid grid-cols-2 gap-16 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-start">
             {/* Left */}
             <div>
               <h1 className="text-[clamp(2.5rem,5vw,4rem)] font-bold text-white tracking-tight leading-[1.05] mb-5">
