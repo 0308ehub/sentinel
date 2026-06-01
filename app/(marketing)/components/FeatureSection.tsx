@@ -33,7 +33,7 @@ export function FeatureSection({
             </div>
           </div>
         </div>
-        <div className="rounded-xl border border-white/[0.06] overflow-hidden bg-[#0f0f0f]">
+        <div className="rounded-xl border border-white/[0.06] overflow-hidden bg-[#161b22]">
           {mockup}
         </div>
       </div>

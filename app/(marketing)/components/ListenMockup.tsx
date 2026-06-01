@@ -2,7 +2,7 @@ export function ListenMockup() {
   return (
     <div className="flex h-[380px]">
       {/* Left panel — Slack thread */}
-      <div className="w-[380px] border-r border-white/[0.06] p-6 bg-[#0a0a0a] flex flex-col">
+      <div className="w-[380px] border-r border-white/[0.06] p-6 bg-[#0d1117] flex flex-col">
         {/* Channel header */}
         <div className="flex items-center gap-2 mb-5 pb-4 border-b border-white/[0.06]">
           <span className="text-[#888] text-[16px] font-semibold">#</span>
@@ -70,7 +70,7 @@ export function ListenMockup() {
       </div>
 
       {/* Right panel — Issue cards */}
-      <div className="flex-1 p-6 bg-[#0f0f0f]">
+      <div className="flex-1 p-6 bg-[#161b22]">
         {/* Column headers */}
         <div className="flex gap-8 mb-4">
           <div className="flex items-center gap-2">

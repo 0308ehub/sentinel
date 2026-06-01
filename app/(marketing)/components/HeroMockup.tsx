@@ -1,8 +1,8 @@
 export function HeroMockup() {
   return (
-    <div className="rounded-xl border border-white/[0.08] bg-[#111111] overflow-hidden shadow-2xl" style={{ height: '340px' }}>
+    <div className="rounded-xl border border-white/[0.08] bg-[#1c2128] overflow-hidden shadow-2xl" style={{ height: '340px' }}>
       {/* Browser chrome bar */}
-      <div className="bg-[#0f0f0f] border-b border-white/[0.06] px-4 py-2.5 flex items-center gap-3">
+      <div className="bg-[#161b22] border-b border-white/[0.06] px-4 py-2.5 flex items-center gap-3">
         {/* Traffic light dots */}
         <div className="flex items-center gap-1.5">
           <span className="w-3 h-3 rounded-full bg-[#333]" />
@@ -18,7 +18,7 @@ export function HeroMockup() {
       {/* Browser body */}
       <div className="flex h-full">
         {/* Left sidebar */}
-        <div className="w-[200px] border-r border-white/[0.06] bg-[#0f0f0f] p-3 flex-shrink-0">
+        <div className="w-[200px] border-r border-white/[0.06] bg-[#161b22] p-3 flex-shrink-0">
           {/* Workspace header */}
           <div className="flex items-center gap-2 mb-3">
             <div className="w-5 h-5 rounded bg-[#5b6af9]/20 border border-[#5b6af9]/30 flex items-center justify-center">
@@ -60,13 +60,13 @@ export function HeroMockup() {
         </div>
 
         {/* Right main panel */}
-        <div className="flex-1 p-5 bg-[#111111] overflow-hidden">
+        <div className="flex-1 p-5 bg-[#1c2128] overflow-hidden">
           <div className="text-[13px] font-medium text-white mb-4">Top Opportunities</div>
 
           {/* Opportunity cards */}
           <div className="space-y-2">
             {/* Card 1 */}
-            <div className="bg-[#0f0f0f] border border-white/[0.06] rounded-lg p-3 flex items-center justify-between gap-3">
+            <div className="bg-[#161b22] border border-white/[0.06] rounded-lg p-3 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="text-[11px] font-bold bg-green-900/40 text-green-400 rounded px-1.5 py-0.5 flex-shrink-0">94</span>
                 <span className="text-[12px] text-white truncate">iOS app performance</span>
@@ -78,7 +78,7 @@ export function HeroMockup() {
             </div>
 
             {/* Card 2 */}
-            <div className="bg-[#0f0f0f] border border-white/[0.06] rounded-lg p-3 flex items-center justify-between gap-3">
+            <div className="bg-[#161b22] border border-white/[0.06] rounded-lg p-3 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="text-[11px] font-bold bg-yellow-900/40 text-yellow-400 rounded px-1.5 py-0.5 flex-shrink-0">87</span>
                 <span className="text-[12px] text-white truncate">Onboarding friction</span>
@@ -90,7 +90,7 @@ export function HeroMockup() {
             </div>
 
             {/* Card 3 */}
-            <div className="bg-[#0f0f0f] border border-white/[0.06] rounded-lg p-3 flex items-center justify-between gap-3">
+            <div className="bg-[#161b22] border border-white/[0.06] rounded-lg p-3 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="text-[11px] font-bold bg-orange-900/40 text-orange-400 rounded px-1.5 py-0.5 flex-shrink-0">73</span>
                 <span className="text-[12px] text-white truncate">Missing bulk actions</span>

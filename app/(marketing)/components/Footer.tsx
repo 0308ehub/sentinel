@@ -58,7 +58,7 @@ const FOOTER_COLUMNS = [
 
 export function Footer() {
   return (
-    <footer className="bg-[#0a0a0a] border-t border-white/[0.06] py-16">
+    <footer className="bg-[#0d1117] border-t border-white/[0.06] py-16">
       <div className="max-w-[1200px] mx-auto px-6">
         {/* Main grid: logo col + 5 link columns */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-10">

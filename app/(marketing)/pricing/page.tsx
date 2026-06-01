@@ -85,7 +85,7 @@ function CheckIcon() {
 
 function PricingTier({ tier }: { tier: (typeof tiers)[number] }) {
   return (
-    <div className="bg-[#0a0a0a] p-8 flex flex-col">
+    <div className="bg-[#0d1117] p-8 flex flex-col">
       <h3 className="text-[18px] font-semibold text-white mb-2">{tier.name}</h3>
       <div className="flex items-baseline gap-1.5 mb-1">
         <span className="text-[32px] font-bold text-white leading-none">{tier.price}</span>
@@ -126,7 +126,7 @@ export default function PricingPage() {
   return (
     <>
       <MarketingNav />
-      <main className="min-h-screen bg-[#0a0a0a]">
+      <main className="min-h-screen bg-[#0d1117]">
         <div className="max-w-[1200px] mx-auto px-6 pt-20 pb-24">
           <h1 className="text-[clamp(2.5rem,5vw,4rem)] font-bold text-white tracking-tight mb-16">
             Pricing

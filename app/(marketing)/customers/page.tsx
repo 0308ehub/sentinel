@@ -10,7 +10,7 @@ const customers = [
   { name: 'Stripe', bg: '#635bff', textColor: '#ffffff', headline: 'Stripe scales product ops with autonomous PM', type: 'Read story' },
   { name: 'OpenAI', bg: '#10a37f', textColor: '#ffffff', headline: 'How OpenAI manages thousands of user requests', type: 'Read story' },
   { name: 'Anthropic', bg: '#c96442', textColor: '#ffffff', headline: "Anthropic's Claude team uses Sentinel for feedback", type: 'Read story' },
-  { name: 'Runway', bg: '#111111', textColor: '#f5f5f5', headline: 'Runway ships creative features 2× faster', type: 'Watch video' },
+  { name: 'Runway', bg: '#1c2128', textColor: '#f5f5f5', headline: 'Runway ships creative features 2× faster', type: 'Watch video' },
 ]
 
 const categories = ['Featured', 'SaaS', 'AI', 'Fintech', 'Consumer', 'Enterprise']
@@ -19,7 +19,7 @@ export default function CustomersPage() {
   return (
     <>
       <MarketingNav />
-      <main className="min-h-screen bg-[#0a0a0a]">
+      <main className="min-h-screen bg-[#0d1117]">
         <div className="max-w-[1200px] mx-auto px-6 pt-20 pb-12">
           <h1 className="text-[clamp(2.5rem,5vw,4rem)] font-bold text-white tracking-tight mb-8">
             Customers

@@ -39,7 +39,7 @@ const actions = [
 
 export function AutomateMockup() {
   return (
-    <div className="p-6 bg-[#0a0a0a]">
+    <div className="p-6 bg-[#0d1117]">
       {/* Top bar */}
       <div className="flex items-center justify-between mb-5 pb-4 border-b border-white/[0.06]">
         <span className="text-[12px] text-[#888] font-medium">

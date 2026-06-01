@@ -5,7 +5,7 @@ export default function ContactPage() {
   return (
     <>
       <MarketingNav />
-      <main className="min-h-screen bg-[#0a0a0a]">
+      <main className="min-h-screen bg-[#0d1117]">
         <div className="max-w-[1200px] mx-auto px-6 pt-20 pb-24">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-start">
             {/* Left */}
@@ -20,7 +20,7 @@ export default function ContactPage() {
 
             {/* Right: contact cards */}
             <div className="space-y-3">
-              <div className="border border-white/[0.06] rounded-xl p-8 flex flex-col gap-12 bg-[#0f0f0f]">
+              <div className="border border-white/[0.06] rounded-xl p-8 flex flex-col gap-12 bg-[#161b22]">
                 <h2 className="text-[15px] font-medium text-white">Sales</h2>
                 <div>
                   <p className="text-[14px] text-[#555] leading-relaxed mb-4">
@@ -35,7 +35,7 @@ export default function ContactPage() {
                 </div>
               </div>
 
-              <div className="border border-white/[0.06] rounded-xl p-8 flex flex-col gap-12 bg-[#0f0f0f]">
+              <div className="border border-white/[0.06] rounded-xl p-8 flex flex-col gap-12 bg-[#161b22]">
                 <h2 className="text-[15px] font-medium text-white">Support</h2>
                 <div>
                   <p className="text-[14px] text-[#555] leading-relaxed mb-4">

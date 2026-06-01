@@ -46,7 +46,7 @@ export function SynthesizeMockup() {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Left initiative list */}
-        <div className="w-[280px] flex-shrink-0 border-r border-white/[0.06] p-4 bg-[#0a0a0a]">
+        <div className="w-[280px] flex-shrink-0 border-r border-white/[0.06] p-4 bg-[#0d1117]">
           <p className="text-[12px] font-medium text-white mb-3">Initiatives</p>
           <div className="space-y-1">
             {/* Core Product */}
@@ -89,7 +89,7 @@ export function SynthesizeMockup() {
         </div>
 
         {/* Right Gantt area */}
-        <div className="flex-1 relative p-4 bg-[#0f0f0f]">
+        <div className="flex-1 relative p-4 bg-[#161b22]">
           {/* Today line */}
           <div
             className="absolute top-0 bottom-0 w-px bg-[#3b82f6]/30"

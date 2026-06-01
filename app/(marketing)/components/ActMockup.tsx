@@ -21,7 +21,7 @@ export function ActMockup() {
   return (
     <div className="flex h-[360px]">
       {/* Left — terminal log */}
-      <div className="flex-1 p-6 bg-[#0a0a0a] border-r border-white/[0.06] flex flex-col">
+      <div className="flex-1 p-6 bg-[#0d1117] border-r border-white/[0.06] flex flex-col">
         {/* Header */}
         <div className="flex items-center gap-2 mb-5 pb-4 border-b border-white/[0.06]">
           <div className="w-6 h-6 rounded bg-[#1a1a1a] border border-white/[0.08] flex items-center justify-center text-[10px] text-[#888] font-medium">
@@ -50,7 +50,7 @@ export function ActMockup() {
       </div>
 
       {/* Right — assign panel */}
-      <div className="w-[280px] flex-shrink-0 p-6 bg-[#0f0f0f] flex flex-col">
+      <div className="w-[280px] flex-shrink-0 p-6 bg-[#161b22] flex flex-col">
         {/* Search input */}
         <div className="border border-white/[0.06] rounded-lg px-3 py-2 mb-4 bg-[#111]">
           <span className="text-[13px] text-[#444]">Assign to...</span>
