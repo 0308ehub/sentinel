@@ -30,7 +30,7 @@ export default async function WorkspacesPage() {
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Workspaces</h1>
+        <h1 className="text-2xl font-bold text-foreground">Workspaces</h1>
         <Link href="/workspaces/new">
           <Button className="bg-violet-600 hover:bg-violet-700 text-white gap-2">
             <Plus className="h-4 w-4" /> New Workspace
@@ -41,9 +41,9 @@ export default async function WorkspacesPage() {
       {workspaces.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="py-20 text-center">
-            <FolderKanban className="h-12 w-12 text-gray-200 mx-auto mb-4" />
-            <h3 className="font-semibold text-gray-900 mb-2">No workspaces yet</h3>
-            <p className="text-sm text-gray-500 mb-6 max-w-sm mx-auto">
+            <FolderKanban className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
+            <h3 className="font-semibold text-foreground mb-2">No workspaces yet</h3>
+            <p className="text-sm text-muted-foreground mb-6 max-w-sm mx-auto">
               Create a workspace for each product or feature area you want to analyze.
             </p>
             <Link href="/workspaces/new">
@@ -57,19 +57,19 @@ export default async function WorkspacesPage() {
             <Link key={ws.id} href={`/workspaces/${ws.id}`}>
               <Card className="hover:border-violet-300 hover:shadow-sm transition-all cursor-pointer h-full">
                 <CardHeader>
-                  <p className="text-xs text-gray-400 font-medium">{ws.organization.name}</p>
+                  <p className="text-xs text-muted-foreground/60 font-medium">{ws.organization.name}</p>
                   <CardTitle className="text-base">{ws.name}</CardTitle>
                   {ws.description && (
-                    <p className="text-sm text-gray-500 line-clamp-2">{ws.description}</p>
+                    <p className="text-sm text-muted-foreground line-clamp-2">{ws.description}</p>
                   )}
                 </CardHeader>
                 <CardContent>
-                  <div className="flex gap-4 text-sm text-gray-500 mb-3">
-                    <span className="font-medium text-gray-700">{ws._count.documents}</span> docs ·{" "}
-                    <span className="font-medium text-gray-700">{ws._count.painPoints}</span> pain points ·{" "}
-                    <span className="font-medium text-gray-700">{ws._count.opportunities}</span> opportunities
+                  <div className="flex gap-4 text-sm text-muted-foreground mb-3">
+                    <span className="font-medium text-foreground/80">{ws._count.documents}</span> docs ·{" "}
+                    <span className="font-medium text-foreground/80">{ws._count.painPoints}</span> pain points ·{" "}
+                    <span className="font-medium text-foreground/80">{ws._count.opportunities}</span> opportunities
                   </div>
-                  <p className="text-xs text-gray-400">Updated {formatDate(ws.updatedAt)}</p>
+                  <p className="text-xs text-muted-foreground/60">Updated {formatDate(ws.updatedAt)}</p>
                 </CardContent>
               </Card>
             </Link>

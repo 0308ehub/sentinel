@@ -82,8 +82,8 @@ function ToolCard({ toolCall }: { toolCall: ToolCallState }) {
       <button
         onClick={() => hasResult ? setExpanded((e) => !e) : undefined}
         className={cn(
-          "flex items-center gap-1.5 text-xs text-gray-400 transition-colors",
-          hasResult && "hover:text-gray-600 cursor-pointer",
+          "flex items-center gap-1.5 text-xs text-muted-foreground transition-colors",
+          hasResult && "hover:text-foreground cursor-pointer",
           !hasResult && "cursor-default"
         )}
       >
@@ -100,7 +100,7 @@ function ToolCard({ toolCall }: { toolCall: ToolCallState }) {
         )}
       </button>
       {expanded && toolCall.result && (
-        <div className="mt-2 ml-5 pl-3 border-l-2 border-gray-100">
+        <div className="mt-2 ml-5 pl-3 border-l-2 border-border/50">
           <ToolResultRenderer result={toolCall.result} />
         </div>
       )}
@@ -119,15 +119,15 @@ function ToolResultRenderer({ result }: { result: ToolResult }) {
         {data.slice(0, 5).map((item: {id?: string; title?: string; content?: string; similarity?: number}, i: number) => (
           <div key={item.id ?? i}>
             <div className="flex items-baseline gap-2 mb-0.5">
-              <span className="font-medium text-gray-700 text-xs">{item.title}</span>
+              <span className="font-medium text-foreground/80 text-xs">{item.title}</span>
               {item.similarity != null && (
-                <span className="text-[10px] text-gray-400">{(item.similarity * 100).toFixed(0)}% match</span>
+                <span className="text-[10px] text-muted-foreground/60">{(item.similarity * 100).toFixed(0)}% match</span>
               )}
             </div>
-            <p className="text-gray-500 line-clamp-2 text-[11px]">{item.content}</p>
+            <p className="text-muted-foreground line-clamp-2 text-[11px]">{item.content}</p>
           </div>
         ))}
-        {data.length > 5 && <p className="text-gray-400 text-[11px]">+{data.length - 5} more results</p>}
+        {data.length > 5 && <p className="text-muted-foreground/60 text-[11px]">+{data.length - 5} more results</p>}
       </div>
     );
   }
@@ -138,13 +138,13 @@ function ToolResultRenderer({ result }: { result: ToolResult }) {
         {data.slice(0, 6).map((pp: {id?: string; title?: string; description?: string; severity?: number; urgency?: number}, i: number) => (
           <div key={pp.id ?? i}>
             <div className="flex items-baseline gap-2 mb-0.5">
-              <span className="font-medium text-gray-700 text-xs">{pp.title}</span>
-              <span className="text-[10px] text-gray-400">S:{pp.severity} U:{pp.urgency}</span>
+              <span className="font-medium text-foreground/80 text-xs">{pp.title}</span>
+              <span className="text-[10px] text-muted-foreground/60">S:{pp.severity} U:{pp.urgency}</span>
             </div>
-            <p className="text-gray-500 line-clamp-1 text-[11px]">{pp.description}</p>
+            <p className="text-muted-foreground line-clamp-1 text-[11px]">{pp.description}</p>
           </div>
         ))}
-        {data.length > 6 && <p className="text-gray-400 text-[11px]">+{data.length - 6} more</p>}
+        {data.length > 6 && <p className="text-muted-foreground/60 text-[11px]">+{data.length - 6} more</p>}
       </div>
     );
   }
@@ -155,13 +155,13 @@ function ToolResultRenderer({ result }: { result: ToolResult }) {
         {data.slice(0, 5).map((opp: {id?: string; title?: string; problemStatement?: string; totalScore?: number}, i: number) => (
           <div key={opp.id ?? i}>
             <div className="flex items-baseline gap-2 mb-0.5">
-              <span className="font-medium text-gray-700 text-xs">{opp.title}</span>
-              <span className="text-[10px] text-gray-400">score {Number(opp.totalScore ?? 0).toFixed(0)}</span>
+              <span className="font-medium text-foreground/80 text-xs">{opp.title}</span>
+              <span className="text-[10px] text-muted-foreground/60">score {Number(opp.totalScore ?? 0).toFixed(0)}</span>
             </div>
-            <p className="text-gray-500 line-clamp-1 text-[11px]">{opp.problemStatement}</p>
+            <p className="text-muted-foreground line-clamp-1 text-[11px]">{opp.problemStatement}</p>
           </div>
         ))}
-        {data.length > 5 && <p className="text-gray-400 text-[11px]">+{data.length - 5} more</p>}
+        {data.length > 5 && <p className="text-muted-foreground/60 text-[11px]">+{data.length - 5} more</p>}
       </div>
     );
   }
@@ -172,10 +172,10 @@ function ToolResultRenderer({ result }: { result: ToolResult }) {
         {data.slice(0, 5).map((ins: {id?: string; title?: string; description?: string; type?: string}, i: number) => (
           <div key={ins.id ?? i}>
             <div className="flex items-baseline gap-2 mb-0.5">
-              <span className="font-medium text-gray-700 text-xs">{ins.title}</span>
-              <span className="text-[10px] text-gray-400">{ins.type}</span>
+              <span className="font-medium text-foreground/80 text-xs">{ins.title}</span>
+              <span className="text-[10px] text-muted-foreground/60">{ins.type}</span>
             </div>
-            <p className="text-gray-500 line-clamp-1 text-[11px]">{ins.description}</p>
+            <p className="text-muted-foreground line-clamp-1 text-[11px]">{ins.description}</p>
           </div>
         ))}
       </div>
@@ -187,12 +187,12 @@ function ToolResultRenderer({ result }: { result: ToolResult }) {
       <div className="space-y-1.5">
         {data.slice(0, 6).map((doc: {id?: string; title?: string; status?: string}, i: number) => (
           <div key={doc.id ?? i} className="flex items-center gap-2">
-            <FileText className="h-3 w-3 text-gray-400 shrink-0" />
-            <span className="text-xs text-gray-700 flex-1 truncate">{doc.title}</span>
-            <span className="text-[10px] text-gray-400">{doc.status}</span>
+            <FileText className="h-3 w-3 text-muted-foreground/60 shrink-0" />
+            <span className="text-xs text-foreground/80 flex-1 truncate">{doc.title}</span>
+            <span className="text-[10px] text-muted-foreground/60">{doc.status}</span>
           </div>
         ))}
-        {data.length > 6 && <p className="text-gray-400 text-[11px]">+{data.length - 6} more</p>}
+        {data.length > 6 && <p className="text-muted-foreground/60 text-[11px]">+{data.length - 6} more</p>}
       </div>
     );
   }
@@ -201,8 +201,8 @@ function ToolResultRenderer({ result }: { result: ToolResult }) {
     const prd = data as {title?: string; executiveSummary?: string};
     return (
       <div>
-        <p className="font-semibold text-gray-700 text-xs mb-1">{prd.title ?? "PRD Generated"}</p>
-        <p className="text-[11px] text-gray-500 line-clamp-3">{prd.executiveSummary}</p>
+        <p className="font-semibold text-foreground/80 text-xs mb-1">{prd.title ?? "PRD Generated"}</p>
+        <p className="text-[11px] text-muted-foreground line-clamp-3">{prd.executiveSummary}</p>
       </div>
     );
   }
@@ -213,10 +213,10 @@ function ToolResultRenderer({ result }: { result: ToolResult }) {
         {data.map((f: {title?: string; description?: string; priority?: string}, i: number) => (
           <div key={i}>
             <div className="flex items-baseline gap-2 mb-0.5">
-              <span className="font-medium text-gray-700 text-xs">{f.title}</span>
-              {f.priority && <span className="text-[10px] text-gray-400">{f.priority}</span>}
+              <span className="font-medium text-foreground/80 text-xs">{f.title}</span>
+              {f.priority && <span className="text-[10px] text-muted-foreground/60">{f.priority}</span>}
             </div>
-            {f.description && <p className="text-[11px] text-gray-500 line-clamp-1">{f.description}</p>}
+            {f.description && <p className="text-[11px] text-muted-foreground line-clamp-1">{f.description}</p>}
           </div>
         ))}
       </div>
@@ -228,13 +228,13 @@ function ToolResultRenderer({ result }: { result: ToolResult }) {
       <div className="space-y-1.5">
         {data.map((step: {step?: number; title?: string; description?: string; actor?: string}, i: number) => (
           <div key={i} className="flex gap-2 items-start">
-            <span className="shrink-0 text-[10px] text-gray-400 font-medium w-4 text-right mt-0.5">
+            <span className="shrink-0 text-[10px] text-muted-foreground/60 font-medium w-4 text-right mt-0.5">
               {step.step ?? i + 1}.
             </span>
             <div>
-              <span className="font-medium text-xs text-gray-700">{step.title}</span>
-              {step.actor && <span className="text-[10px] text-gray-400 ml-1">({step.actor})</span>}
-              {step.description && <p className="text-[11px] text-gray-500">{step.description}</p>}
+              <span className="font-medium text-xs text-foreground/80">{step.title}</span>
+              {step.actor && <span className="text-[10px] text-muted-foreground/60 ml-1">({step.actor})</span>}
+              {step.description && <p className="text-[11px] text-muted-foreground">{step.description}</p>}
             </div>
           </div>
         ))}
@@ -246,9 +246,9 @@ function ToolResultRenderer({ result }: { result: ToolResult }) {
     const s = data as {painPoints?: number; opportunities?: number; message?: string};
     return (
       <div>
-        <p className="text-xs text-gray-700 font-medium">{s.message ?? "Synthesis complete"}</p>
+        <p className="text-xs text-foreground/80 font-medium">{s.message ?? "Synthesis complete"}</p>
         {s.painPoints != null && (
-          <p className="text-[11px] text-gray-500 mt-0.5">
+          <p className="text-[11px] text-muted-foreground mt-0.5">
             Found {s.painPoints} pain points and {s.opportunities ?? 0} opportunities
           </p>
         )}
@@ -257,7 +257,7 @@ function ToolResultRenderer({ result }: { result: ToolResult }) {
   }
 
   return (
-    <pre className="text-[10px] text-gray-600 overflow-auto max-h-32 whitespace-pre-wrap">
+    <pre className="text-[10px] text-muted-foreground overflow-auto max-h-32 whitespace-pre-wrap">
       {typeof data === "string" ? data : JSON.stringify(data, null, 2)}
     </pre>
   );
@@ -279,7 +279,7 @@ function SessionTabs({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="flex items-center border-b border-gray-200 bg-gray-50 overflow-hidden shrink-0 min-h-[34px]">
+    <div className="flex items-center border-b border-border bg-muted/40 overflow-hidden shrink-0 min-h-[34px]">
       {/* Scrollable tab list */}
       <div className="flex items-stretch overflow-x-auto flex-1" style={{ scrollbarWidth: "none" }}>
         {sessions.map((session) => {
@@ -288,23 +288,23 @@ function SessionTabs({ onClose }: { onClose: () => void }) {
             <div
               key={session.id}
               className={cn(
-                "group flex items-center gap-1.5 px-3 min-w-0 max-w-[160px] border-r border-gray-200 cursor-pointer select-none shrink-0 h-[34px]",
+                "group flex items-center gap-1.5 px-3 min-w-0 max-w-[160px] border-r border-border cursor-pointer select-none shrink-0 h-[34px]",
                 "text-xs font-medium transition-colors",
                 active
-                  ? "bg-white text-gray-900 border-t-2 border-t-violet-600 -mt-px"
-                  : "bg-gray-50 text-gray-500 hover:bg-gray-100 hover:text-gray-700 border-t-2 border-t-transparent"
+                  ? "bg-card text-foreground border-t-2 border-t-violet-600 -mt-px"
+                  : "bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground border-t-2 border-t-transparent"
               )}
               onClick={() => setActiveSession(session.id)}
             >
-              <Bot className={cn("h-3 w-3 shrink-0", active ? "text-violet-500" : "text-gray-400")} />
+              <Bot className={cn("h-3 w-3 shrink-0", active ? "text-violet-500" : "text-muted-foreground")} />
               <span className="truncate flex-1">{session.label}</span>
               <button
                 onClick={(e) => handleRemove(e, session.id)}
                 className={cn(
                   "rounded p-0.5 transition-colors shrink-0",
                   active
-                    ? "text-gray-400 hover:text-gray-700 hover:bg-gray-100"
-                    : "text-transparent group-hover:text-gray-400 hover:!text-gray-600 hover:bg-gray-200"
+                    ? "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    : "text-transparent group-hover:text-muted-foreground hover:!text-foreground hover:bg-muted"
                 )}
               >
                 <X className="h-3 w-3" />
@@ -317,7 +317,7 @@ function SessionTabs({ onClose }: { onClose: () => void }) {
       {/* New chat */}
       <button
         onClick={createSession}
-        className="h-[34px] px-2.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors shrink-0 flex items-center border-l border-gray-200"
+        className="h-[34px] px-2.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 flex items-center border-l border-border"
         title="New chat"
       >
         <Plus className="h-4 w-4" />
@@ -496,7 +496,7 @@ function ChatBody({ workspaceId }: { workspaceId: string }) {
   };
 
   return (
-    <div className="flex flex-col flex-1 overflow-hidden bg-white">
+    <div className="flex flex-col flex-1 overflow-hidden bg-card">
       {/* Messages */}
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         {messages.length === 0 && (
@@ -504,8 +504,8 @@ function ChatBody({ workspaceId }: { workspaceId: string }) {
             <div className="w-12 h-12 rounded-full bg-violet-50 flex items-center justify-center mb-3">
               <Bot className="h-6 w-6 text-violet-500" />
             </div>
-            <p className="text-sm font-medium text-gray-700 mb-1">Sentinel Agent</p>
-            <p className="text-xs text-gray-400 mb-6 max-w-[240px]">
+            <p className="text-sm font-medium text-foreground mb-1">Sentinel Agent</p>
+            <p className="text-xs text-muted-foreground mb-6 max-w-[240px]">
               Ask me to analyze evidence, surface pain points, generate PRDs, or suggest features.
             </p>
             <div className="space-y-1.5 w-full">
@@ -513,7 +513,7 @@ function ChatBody({ workspaceId }: { workspaceId: string }) {
                 <button
                   key={prompt}
                   onClick={() => sendMessage(prompt)}
-                  className="w-full text-left text-xs text-gray-600 bg-gray-50 hover:bg-violet-50 hover:text-violet-700 border border-gray-200 hover:border-violet-200 rounded-lg px-3 py-2 transition-colors"
+                  className="w-full text-left text-xs text-muted-foreground bg-muted/50 hover:bg-violet-50 hover:text-violet-700 dark:hover:bg-violet-900/20 dark:hover:text-violet-300 border border-border hover:border-violet-200 rounded-lg px-3 py-2 transition-colors"
                 >
                   {prompt}
                 </button>
@@ -525,11 +525,11 @@ function ChatBody({ workspaceId }: { workspaceId: string }) {
         {messages.map((msg) => (
           <div key={msg.id} className={cn(msg.role === "user" ? "flex justify-end" : "")}>
             {msg.role === "user" ? (
-              <div className="max-w-[85%] bg-gray-100 text-gray-800 rounded-2xl rounded-tr-sm px-3 py-2 text-sm leading-relaxed">
+              <div className="max-w-[85%] bg-muted text-foreground rounded-2xl rounded-tr-sm px-3 py-2 text-sm leading-relaxed">
                 {msg.content}
               </div>
             ) : (
-              <div className="text-sm text-gray-800 leading-relaxed space-y-1">
+              <div className="text-sm text-foreground leading-relaxed space-y-1">
                 {msg.toolCalls.map((tc) => (
                   <ToolCard key={tc.id} toolCall={tc} />
                 ))}
@@ -537,12 +537,12 @@ function ChatBody({ workspaceId }: { workspaceId: string }) {
                   <div className="whitespace-pre-wrap">
                     {msg.content}
                     {msg.isStreaming && (
-                      <span className="inline-block w-0.5 h-[1em] bg-gray-700 ml-0.5 animate-pulse align-text-bottom" />
+                      <span className="inline-block w-0.5 h-[1em] bg-foreground/60 ml-0.5 animate-pulse align-text-bottom" />
                     )}
                   </div>
                 )}
                 {msg.isStreaming && !msg.content && msg.toolCalls.length === 0 && (
-                  <Loader2 className="h-4 w-4 text-gray-400 animate-spin" />
+                  <Loader2 className="h-4 w-4 text-muted-foreground animate-spin" />
                 )}
               </div>
             )}
@@ -552,7 +552,7 @@ function ChatBody({ workspaceId }: { workspaceId: string }) {
       </div>
 
       {/* Input */}
-      <div className="shrink-0 border-t bg-white p-3">
+      <div className="shrink-0 border-t border-border bg-card p-3">
         <div className="flex gap-2 items-end">
           <Textarea
             value={input}
@@ -571,7 +571,7 @@ function ChatBody({ workspaceId }: { workspaceId: string }) {
             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
         </div>
-        <p className="text-[10px] text-gray-400 mt-1.5 text-center">Sentinel has access to all workspace data</p>
+        <p className="text-[10px] text-muted-foreground/60 mt-1.5 text-center">Sentinel has access to all workspace data</p>
       </div>
     </div>
   );
@@ -594,12 +594,12 @@ export function AgentPanelToggle({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="flex flex-col items-center gap-1.5 px-1.5 py-3 h-full border-l border-gray-200 bg-white hover:bg-violet-50 hover:border-violet-200 transition-colors group"
+      className="flex flex-col items-center gap-1.5 px-1.5 py-3 h-full border-l border-border bg-card hover:bg-violet-50 dark:hover:bg-violet-900/10 hover:border-violet-200 transition-colors group"
       title="Open Sentinel Agent"
     >
-      <MessageSquare className="h-4 w-4 text-gray-400 group-hover:text-violet-600 transition-colors" />
+      <MessageSquare className="h-4 w-4 text-muted-foreground group-hover:text-violet-600 transition-colors" />
       <span
-        className="text-[10px] font-medium text-gray-400 group-hover:text-violet-600 transition-colors"
+        className="text-[10px] font-medium text-muted-foreground group-hover:text-violet-600 transition-colors"
         style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}
       >
         Sentinel

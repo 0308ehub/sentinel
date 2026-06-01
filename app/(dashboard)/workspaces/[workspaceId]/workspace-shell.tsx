@@ -59,7 +59,7 @@ export function WorkspaceShell({
   return (
     <WorkspaceJobsProvider>
     <WorkspaceProvider>
-      <div className="flex flex-col h-full overflow-hidden bg-gray-50">
+      <div className="flex flex-col h-full overflow-hidden bg-background">
         <WorkspaceNav workspaceId={workspaceId} />
         <div className="flex flex-1 overflow-hidden">
           {/* Main canvas */}
@@ -70,11 +70,11 @@ export function WorkspaceShell({
               {/* Resize handle */}
               <div
                 onMouseDown={onMouseDown}
-                className="w-1 shrink-0 cursor-col-resize bg-gray-200 hover:bg-violet-400 active:bg-violet-500 transition-colors"
+                className="w-1 shrink-0 cursor-col-resize bg-border hover:bg-violet-400 active:bg-violet-500 transition-colors"
               />
               {/* Agent panel */}
               <div
-                className="shrink-0 flex flex-col overflow-hidden border-l border-gray-200 bg-white"
+                className="shrink-0 flex flex-col overflow-hidden border-l border-border bg-card"
                 style={{ width: panelWidth }}
               >
                 <AgentPanel workspaceId={workspaceId} onClose={() => setPanelOpen(false)} />

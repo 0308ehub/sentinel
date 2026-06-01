@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 
-export function WaitlistForm() {
+export function WaitlistForm({ dark }: { dark?: boolean }) {
   const [email, setEmail] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -44,12 +44,18 @@ export function WaitlistForm() {
         onChange={e => setEmail(e.target.value)}
         placeholder="you@company.com"
         required
-        className="flex-1 px-4 py-2.5 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 transition-all"
+        className={`flex-1 px-4 py-2.5 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 transition-all ${
+          dark
+            ? 'bg-white/10 border-white/20 text-white placeholder:text-white/40'
+            : 'bg-background border-border text-foreground placeholder:text-muted-foreground'
+        }`}
       />
       <button
         type="submit"
         disabled={loading}
-        className="bg-foreground text-background px-5 py-2.5 rounded-lg font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-50 whitespace-nowrap"
+        className={`px-5 py-2.5 rounded-lg font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-50 whitespace-nowrap ${
+          dark ? 'bg-brand text-brand-foreground' : 'bg-foreground text-background'
+        }`}
       >
         {loading ? 'Joining…' : 'Get Early Access'}
       </button>

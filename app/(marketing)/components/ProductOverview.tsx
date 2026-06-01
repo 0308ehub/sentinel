@@ -1,16 +1,23 @@
+import { FadeUp } from './FadeUp'
+
 export function ProductOverview() {
   return (
     <section className="max-w-6xl mx-auto px-6 py-20 border-t border-border">
-      <div className="text-center mb-14">
-        <p className="text-xs font-semibold text-brand uppercase tracking-widest mb-3">Product</p>
-        <h2 className="text-3xl md:text-4xl font-semibold text-foreground tracking-tight">
-          Everything your PM wishes existed
-        </h2>
-      </div>
+      <FadeUp>
+        <div className="text-center mb-14">
+          <p className="text-xs font-semibold text-brand uppercase tracking-widest mb-3">Product</p>
+          <h2 className="text-3xl md:text-4xl font-semibold text-foreground tracking-tight">
+            Everything your PM wishes existed
+          </h2>
+          <p className="text-sm text-muted-foreground mt-3 max-w-lg mx-auto">
+            Sentinel doesn&apos;t just help you manage — it manages for you.
+          </p>
+        </div>
+      </FadeUp>
 
       <div className="grid md:grid-cols-3 gap-6">
         {/* Feature 1: Autonomous inbox */}
-        <div className="rounded-xl border border-border p-5 bg-card flex flex-col gap-4">
+        <FadeUp delay={0}><div className="rounded-xl border border-border p-5 bg-card flex flex-col gap-4 hover:border-brand/30 transition-colors h-full">
           <div>
             <h3 className="text-sm font-semibold text-foreground mb-1.5">Autonomous inbox</h3>
             <p className="text-xs text-muted-foreground leading-relaxed">
@@ -35,10 +42,10 @@ export function ProductOverview() {
               </div>
             ))}
           </div>
-        </div>
+        </div></FadeUp>
 
         {/* Feature 2: Semantic search */}
-        <div className="rounded-xl border border-border p-5 bg-card flex flex-col gap-4">
+        <FadeUp delay={80}><div className="rounded-xl border border-border p-5 bg-card flex flex-col gap-4 hover:border-brand/30 transition-colors h-full">
           <div>
             <h3 className="text-sm font-semibold text-foreground mb-1.5">Semantic search</h3>
             <p className="text-xs text-muted-foreground leading-relaxed">
@@ -56,10 +63,10 @@ export function ProductOverview() {
               </div>
             ))}
           </div>
-        </div>
+        </div></FadeUp>
 
         {/* Feature 3: Linear sync */}
-        <div className="rounded-xl border border-border p-5 bg-card flex flex-col gap-4">
+        <FadeUp delay={160}><div className="rounded-xl border border-border p-5 bg-card flex flex-col gap-4 hover:border-brand/30 transition-colors h-full">
           <div>
             <h3 className="text-sm font-semibold text-foreground mb-1.5">Linear sync</h3>
             <p className="text-xs text-muted-foreground leading-relaxed">
@@ -81,7 +88,7 @@ export function ProductOverview() {
               </div>
             ))}
           </div>
-        </div>
+        </div></FadeUp>
       </div>
     </section>
   )
