@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Pencil, Trash2, Check, X, Loader2, FileText, ExternalLink } from "lucide-react";
+import { Pencil, Trash2, Check, X, Loader2, FileText, ExternalLink, Ticket, ChevronRight, CheckCircle2, Circle, Rocket } from "lucide-react";
 import { toast } from "sonner";
 import {
   Tooltip,
@@ -15,6 +15,64 @@ import {
   TooltipContent,
   TooltipProvider,
 } from "@/components/ui/tooltip";
+
+type OpportunityStatus = "PROPOSED" | "ACCEPTED" | "REJECTED" | "IN_PROGRESS" | "SHIPPED";
+
+const STATUS_CONFIG: Record<OpportunityStatus, {
+  label: string;
+  color: string;
+  bg: string;
+  border: string;
+  nextStatus: OpportunityStatus | null;
+  nextLabel: string | null;
+  nextIcon: React.ElementType | null;
+}> = {
+  PROPOSED: {
+    label: "Proposed",
+    color: "text-slate-600",
+    bg: "bg-slate-50",
+    border: "border-slate-200",
+    nextStatus: "ACCEPTED",
+    nextLabel: "Accept",
+    nextIcon: Check,
+  },
+  ACCEPTED: {
+    label: "Accepted",
+    color: "text-blue-600",
+    bg: "bg-blue-50",
+    border: "border-blue-200",
+    nextStatus: "IN_PROGRESS",
+    nextLabel: "Start",
+    nextIcon: ChevronRight,
+  },
+  IN_PROGRESS: {
+    label: "In Progress",
+    color: "text-amber-600",
+    bg: "bg-amber-50",
+    border: "border-amber-200",
+    nextStatus: "SHIPPED",
+    nextLabel: "Ship it",
+    nextIcon: Rocket,
+  },
+  SHIPPED: {
+    label: "Shipped",
+    color: "text-emerald-600",
+    bg: "bg-emerald-50",
+    border: "border-emerald-200",
+    nextStatus: null,
+    nextLabel: null,
+    nextIcon: null,
+  },
+  REJECTED: {
+    label: "Rejected",
+    color: "text-gray-400",
+    bg: "bg-gray-50",
+    border: "border-gray-200",
+    nextStatus: "PROPOSED" as OpportunityStatus,
+    nextLabel: "Reopen",
+    nextIcon: ChevronRight,
+  },
+};
 
 interface Opportunity {
   id: string;
@@ -29,7 +87,7 @@ interface Opportunity {
   riskScore: number;
   totalScore: number;
   targetSegments: string[];
-  status: string;
+  status: OpportunityStatus;
 }
 
 function scoreColor(score: number) {
@@ -57,6 +115,9 @@ export function OpportunityCard({
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [currentStatus, setCurrentStatus] = useState<OpportunityStatus>(opp.status);
+  const [advancingStatus, setAdvancingStatus] = useState(false);
+  const [generatingTickets, setGeneratingTickets] = useState(false);
 
   const [title, setTitle] = useState(opp.title);
   const [description, setDescription] = useState(opp.description);
@@ -90,6 +151,67 @@ export function OpportunityCard({
       toast.error("Failed to save changes");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleStatusAdvance() {
+    const config = STATUS_CONFIG[currentStatus];
+    if (!config.nextStatus) return;
+    const next = config.nextStatus;
+    setAdvancingStatus(true);
+    const prev = currentStatus;
+    setCurrentStatus(next);
+    try {
+      const res = await fetch(`/api/workspaces/${workspaceId}/opportunities/${opp.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: next }),
+      });
+      if (!res.ok) throw new Error("Update failed");
+      toast.success(`Moved to ${STATUS_CONFIG[next].label}`);
+      router.refresh();
+    } catch {
+      setCurrentStatus(prev);
+      toast.error("Failed to update status");
+    } finally {
+      setAdvancingStatus(false);
+    }
+  }
+
+  async function handleGenerateTickets() {
+    setGeneratingTickets(true);
+    toast.loading("Generating tickets…", { id: "gen-tickets" });
+    try {
+      const res = await fetch(`/api/workspaces/${workspaceId}/tickets/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ opportunityId: opp.id }),
+      });
+      if (!res.ok) throw new Error("Generation failed");
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      let count = 0;
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const text = decoder.decode(value);
+          for (const line of text.split("\n")) {
+            if (!line.startsWith("data: ")) continue;
+            try {
+              const evt = JSON.parse(line.slice(6));
+              if (evt.type === "done") count = evt.count as number;
+            } catch { /* skip */ }
+          }
+        }
+      }
+      toast.success(`Generated ${count} tickets`, { id: "gen-tickets" });
+      router.push(`/workspaces/${workspaceId}/tickets`);
+    } catch {
+      toast.error("Failed to generate tickets", { id: "gen-tickets" });
+    } finally {
+      setGeneratingTickets(false);
     }
   }
 
@@ -240,10 +362,20 @@ export function OpportunityCard({
               </div>
             );
           })}
-          <div className="ml-auto">
-            <Badge variant="outline" className="text-xs capitalize">
-              {opp.status.toLowerCase().replace(/_/g, " ")}
-            </Badge>
+          <div className="ml-auto flex items-center gap-2">
+            <span className={cn(
+              "inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border",
+              STATUS_CONFIG[currentStatus].color,
+              STATUS_CONFIG[currentStatus].bg,
+              STATUS_CONFIG[currentStatus].border
+            )}>
+              {currentStatus === "SHIPPED" ? (
+                <CheckCircle2 className="h-3 w-3" />
+              ) : currentStatus === "IN_PROGRESS" ? (
+                <Circle className="h-3 w-3 fill-current opacity-60" />
+              ) : null}
+              {STATUS_CONFIG[currentStatus].label}
+            </span>
           </div>
         </div>
 
@@ -255,17 +387,80 @@ export function OpportunityCard({
           </div>
         )}
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {STATUS_CONFIG[currentStatus].nextStatus && (
+            <Button
+              size="sm"
+              onClick={handleStatusAdvance}
+              disabled={advancingStatus}
+              className={cn(
+                "gap-1.5 text-white",
+                currentStatus === "IN_PROGRESS"
+                  ? "bg-emerald-600 hover:bg-emerald-700"
+                  : currentStatus === "ACCEPTED"
+                  ? "bg-amber-500 hover:bg-amber-600"
+                  : currentStatus === "REJECTED"
+                  ? "bg-slate-600 hover:bg-slate-700"
+                  : "bg-blue-600 hover:bg-blue-700"
+              )}
+            >
+              {advancingStatus ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : STATUS_CONFIG[currentStatus].nextIcon ? (
+                (() => { const Icon = STATUS_CONFIG[currentStatus].nextIcon!; return <Icon className="h-3.5 w-3.5" />; })()
+              ) : null}
+              {STATUS_CONFIG[currentStatus].nextLabel}
+            </Button>
+          )}
+          {currentStatus === "PROPOSED" && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={async () => {
+                setAdvancingStatus(true);
+                const prev = currentStatus;
+                setCurrentStatus("REJECTED");
+                try {
+                  const res = await fetch(`/api/workspaces/${workspaceId}/opportunities/${opp.id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ status: "REJECTED" }),
+                  });
+                  if (!res.ok) throw new Error();
+                  toast.success("Opportunity rejected");
+                  router.refresh();
+                } catch {
+                  setCurrentStatus(prev);
+                  toast.error("Failed to reject");
+                } finally {
+                  setAdvancingStatus(false);
+                }
+              }}
+              disabled={advancingStatus}
+              className="gap-1.5 text-gray-500 border-gray-200 hover:text-red-600 hover:border-red-200"
+            >
+              <X className="h-3.5 w-3.5" /> Reject
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleGenerateTickets}
+            disabled={generatingTickets}
+            className="gap-1.5"
+          >
+            {generatingTickets ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Ticket className="h-3.5 w-3.5" />}
+            Tickets
+          </Button>
           <Link href={`/workspaces/${workspaceId}/prd?opportunityId=${opp.id}`}>
-            <Button size="sm" className="gap-1.5 bg-violet-600 hover:bg-violet-700 text-white">
+            <Button size="sm" variant="outline" className="gap-1.5">
               <FileText className="h-3.5 w-3.5" />
-              Generate PRD
+              PRD
             </Button>
           </Link>
           <Link href={`/workspaces/${workspaceId}/opportunities/${opp.id}`}>
-            <Button size="sm" variant="outline" className="gap-1.5">
+            <Button size="sm" variant="ghost" className="gap-1.5 text-gray-400 hover:text-gray-700">
               <ExternalLink className="h-3.5 w-3.5" />
-              View Detail
             </Button>
           </Link>
         </div>

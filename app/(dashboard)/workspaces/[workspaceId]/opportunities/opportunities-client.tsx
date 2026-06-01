@@ -122,7 +122,7 @@ interface CommittedOpportunity {
   riskScore: number;
   totalScore: number;
   targetSegments: string[];
-  status: string;
+  status: "PROPOSED" | "ACCEPTED" | "REJECTED" | "IN_PROGRESS" | "SHIPPED";
 }
 
 export function OpportunitiesClient({

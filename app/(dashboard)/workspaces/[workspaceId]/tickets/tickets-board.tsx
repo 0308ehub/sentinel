@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { ExternalLink, Zap, ChevronDown, ChevronRight, MoreHorizontal } from "lucide-react";
+import { ExternalLink, Zap, ChevronDown, ChevronRight, MoreHorizontal, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type TicketStatus = "BACKLOG" | "IN_SPRINT" | "IN_PROGRESS" | "IN_REVIEW" | "DONE";
@@ -212,6 +212,28 @@ export function TicketsBoard({ workspaceId, initialTickets, hasLinearConnector }
     }
   }, [workspaceId, initialTickets]);
 
+  const handleBatchMoveToSprint = useCallback(async (ticketIds: string[]) => {
+    if (ticketIds.length === 0) return;
+    setTickets((prev) =>
+      prev.map((t) => ticketIds.includes(t.id) ? { ...t, status: "IN_SPRINT" } : t)
+    );
+    try {
+      await Promise.all(
+        ticketIds.map((id) =>
+          fetch(`/api/workspaces/${workspaceId}/tickets/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: "IN_SPRINT" }),
+          })
+        )
+      );
+      toast.success(`${ticketIds.length} tickets moved to sprint`);
+    } catch {
+      toast.error("Some tickets failed to move");
+      router.refresh();
+    }
+  }, [workspaceId, router]);
+
   const handleExportToLinear = useCallback(async (ticketId: string) => {
     toast.loading("Exporting to Linear…", { id: ticketId });
     try {
@@ -229,7 +251,13 @@ export function TicketsBoard({ workspaceId, initialTickets, hasLinearConnector }
     }
   }, [workspaceId]);
 
-  const byStatus = (status: TicketStatus) => tickets.filter((t) => t.status === status);
+  const [priorityFilter, setPriorityFilter] = useState<TicketPriority | "ALL">("ALL");
+
+  const filteredTickets = useMemo(
+    () => priorityFilter === "ALL" ? tickets : tickets.filter((t) => t.priority === priorityFilter),
+    [tickets, priorityFilter]
+  );
+  const byStatus = (status: TicketStatus) => filteredTickets.filter((t) => t.status === status);
   const totalCount = tickets.length;
   const doneCount = tickets.filter((t) => t.status === "DONE").length;
 
@@ -248,6 +276,28 @@ export function TicketsBoard({ workspaceId, initialTickets, hasLinearConnector }
             </p>
           </div>
           <div className="flex items-center gap-3">
+            {/* Priority filter */}
+            <div className="flex items-center gap-1">
+              <Filter className="h-3 w-3 text-gray-400" />
+              {(["ALL", "CRITICAL", "HIGH", "MEDIUM", "LOW"] as const).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setPriorityFilter(p)}
+                  className={cn(
+                    "text-[10px] font-semibold px-2 py-0.5 rounded-full border transition-colors",
+                    priorityFilter === p
+                      ? p === "CRITICAL" ? "bg-red-100 text-red-700 border-red-200"
+                        : p === "HIGH" ? "bg-orange-100 text-orange-700 border-orange-200"
+                        : p === "MEDIUM" ? "bg-amber-100 text-amber-700 border-amber-200"
+                        : p === "LOW" ? "bg-gray-100 text-gray-600 border-gray-200"
+                        : "bg-violet-600 text-white border-violet-600"
+                      : "bg-white text-gray-400 border-gray-200 hover:border-gray-300"
+                  )}
+                >
+                  {p === "ALL" ? "All" : p[0] + p.slice(1).toLowerCase()}
+                </button>
+              ))}
+            </div>
             {hasLinearConnector && (
               <span className="text-xs text-gray-400 flex items-center gap-1">
                 <Zap className="h-3 w-3 text-violet-400" /> Linear connected
@@ -297,9 +347,19 @@ export function TicketsBoard({ workspaceId, initialTickets, hasLinearConnector }
                   {/* Column header */}
                   <div className={cn("flex items-center justify-between px-3 py-2 rounded-t-lg border-t border-x text-xs font-semibold", col.bg, col.color)}>
                     <span>{col.label}</span>
-                    <span className="ml-2 px-1.5 py-0.5 rounded-full bg-white/70 text-xs font-bold">
-                      {colTickets.length}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {col.key === "BACKLOG" && colTickets.length > 0 && (
+                        <button
+                          onClick={() => handleBatchMoveToSprint(colTickets.map((t) => t.id))}
+                          className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 font-semibold transition-colors"
+                        >
+                          → Sprint
+                        </button>
+                      )}
+                      <span className="px-1.5 py-0.5 rounded-full bg-white/70 text-xs font-bold">
+                        {colTickets.length}
+                      </span>
+                    </div>
                   </div>
 
                   {/* Cards */}
