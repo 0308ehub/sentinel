@@ -91,6 +91,7 @@ export default async function DocumentsPage({
                 key={doc.id}
                 doc={{
                   id: doc.id,
+                  workspaceId,
                   title: doc.title,
                   status: doc.status,
                   sourceType: doc.sourceType,

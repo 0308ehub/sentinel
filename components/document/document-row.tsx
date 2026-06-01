@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Wand2, FileText, FileType, FileSpreadsheet, FileCode, File } from "lucide-react";
 import { toast } from "sonner";
@@ -34,6 +35,7 @@ function FileIcon({ fileType, sourceType }: { fileType?: string | null; sourceTy
 
 export interface DocumentRowProps {
   id: string;
+  workspaceId: string;
   title: string;
   status: string;
   sourceType: string;
@@ -137,15 +139,17 @@ export function DocumentRow({ doc }: { doc: DocumentRowProps }) {
   return (
     <div className="group grid grid-cols-[1fr_160px_120px_80px_160px_100px] gap-4 px-3 py-3 rounded-lg hover:bg-white hover:shadow-sm border border-transparent hover:border-gray-100 items-center transition-all">
       {/* Name + icon */}
-      <div className="flex items-center gap-3 min-w-0">
+      <Link href={`/workspaces/${doc.workspaceId}/documents/${doc.id}`} className="flex items-center gap-3 min-w-0">
         <FileIcon fileType={doc.fileType} sourceType={doc.sourceType} />
         <div className="min-w-0">
-          <p className="text-sm font-medium text-gray-900 truncate">{doc.title}</p>
+          <p className="text-sm font-medium text-gray-900 group-hover:text-violet-700 transition-colors" title={doc.title}>
+            {doc.title}
+          </p>
           {doc.uploaderName && (
             <p className="text-xs text-gray-400 truncate">{doc.uploaderName}</p>
           )}
         </div>
-      </div>
+      </Link>
 
       {/* Source type */}
       <div>
