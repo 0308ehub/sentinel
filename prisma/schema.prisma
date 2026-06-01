@@ -446,6 +446,14 @@ model WorkspaceSettings {
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
 
+// ─── Waitlist ─────────────────────────────────────────────────────────────────
+
+model WaitlistEntry {
+  id       String   @id @default(cuid())
+  email    String   @unique
+  joinedAt DateTime @default(now())
+}
+
 // ─── Analytics ────────────────────────────────────────────────────────────────
 
 model ProductEvent {
