@@ -2,18 +2,17 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { RefreshCw, Trash2, CheckCircle, AlertCircle, Clock, Loader2 } from "lucide-react";
+import { Trash2, CheckCircle, AlertCircle, Clock, Loader2, ListFilter } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { ConnectorIcon } from "@/components/integrations/ConnectorIcons";
+import { ReviewDrawer } from "@/components/integrations/ReviewDrawer";
 
 interface ConnectorMeta {
   type: string;
   name: string;
   description: string;
-  icon: string;
   color: string;
 }
 
@@ -36,35 +35,13 @@ interface Connector {
   syncLogs: SyncLog[];
 }
 
-export function ConnectorCard({
-  connector,
-  meta,
-  workspaceId,
-}: {
-  connector: Connector;
-  meta: ConnectorMeta;
-  workspaceId: string;
-}) {
+export function ConnectorCard({ connector, meta, workspaceId }: { connector: Connector; meta: ConnectorMeta; workspaceId: string }) {
   const router = useRouter();
-  const [syncing, setSyncing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
   const lastLog = connector.syncLogs[0];
 
-  async function handleSync() {
-    setSyncing(true);
-    try {
-      const res = await fetch(
-        `/api/workspaces/${workspaceId}/connectors/${connector.id}/sync`,
-        { method: "POST" }
-      );
-      const data = await res.json();
-      if (data.ok) {
-        router.refresh();
-      }
-    } finally {
-      setSyncing(false);
-    }
-  }
+  const HAS_REVIEW = connector.type === "GMAIL" || connector.type === "SLACK";
 
   async function handleDelete() {
     if (!confirm(`Disconnect ${meta.name}? Imported documents will remain.`)) return;
@@ -88,67 +65,57 @@ export function ConnectorCard({
   const StatusIcon = s.icon;
 
   return (
-    <Card className={cn("border", meta.color)}>
-      <CardHeader className="pb-2">
+    <>
+      <div className={cn("rounded-2xl border p-5 flex flex-col gap-4", meta.color)}>
+        {/* Header */}
         <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2.5">
-            <span className="text-2xl">{meta.icon}</span>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center p-1.5">
+              <ConnectorIcon type={connector.type} className="w-full h-full" />
+            </div>
             <div>
-              <p className="font-semibold text-gray-900 text-sm">{connector.name}</p>
+              <p className="font-semibold text-gray-900 text-sm leading-tight">{connector.name}</p>
               <div className="flex items-center gap-1 mt-0.5">
                 <StatusIcon className={cn("h-3 w-3", s.color)} />
                 <span className={cn("text-xs font-medium", s.color)}>{s.label}</span>
               </div>
             </div>
           </div>
-          <button
-            onClick={handleDelete}
-            disabled={deleting}
-            className="text-gray-300 hover:text-red-400 transition-colors p-1 rounded"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
+          <button onClick={handleDelete} disabled={deleting} className="text-gray-300 hover:text-red-400 transition-colors p-1 rounded-lg">
+            {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
           </button>
         </div>
-      </CardHeader>
 
-      <CardContent className="pt-0">
         {connector.errorMessage && (
-          <p className="text-xs text-red-600 bg-red-50 rounded p-2 mb-3">{connector.errorMessage}</p>
+          <p className="text-xs text-red-600 bg-red-50 rounded-lg p-2">{connector.errorMessage}</p>
         )}
 
-        {lastLog && (
-          <div className="text-xs text-gray-500 mb-3">
-            Last sync: {formatDate(lastLog.startedAt)} ·{" "}
-            <span className={lastLog.status === "FAILED" ? "text-red-500" : "text-emerald-600"}>
-              {lastLog.status === "COMPLETED"
-                ? `${lastLog.documentsImported} docs imported`
-                : lastLog.status}
-            </span>
-          </div>
-        )}
-
-        {!lastLog && connector.lastSyncedAt && (
-          <p className="text-xs text-gray-500 mb-3">Last synced {formatDate(connector.lastSyncedAt)}</p>
-        )}
-
-        {!lastLog && !connector.lastSyncedAt && (
-          <p className="text-xs text-gray-400 mb-3">Never synced — click Sync to import data</p>
-        )}
-
-        <Button
-          size="sm"
-          onClick={handleSync}
-          disabled={syncing}
-          className="w-full gap-1.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 text-xs"
-          variant="outline"
-        >
-          {syncing ? (
-            <><Loader2 className="h-3 w-3 animate-spin" /> Syncing…</>
+        <div className="text-xs text-gray-500">
+          {lastLog ? (
+            <>Last sync: {formatDate(lastLog.startedAt)} · <span className={lastLog.status === "FAILED" ? "text-red-500" : "text-emerald-600 font-medium"}>{lastLog.status === "COMPLETED" ? `${lastLog.documentsImported} docs imported` : lastLog.status}</span></>
+          ) : connector.lastSyncedAt ? (
+            <>Last synced {formatDate(connector.lastSyncedAt)}</>
           ) : (
-            <><RefreshCw className="h-3 w-3" /> Sync Now</>
+            <span className="text-gray-400">Never synced</span>
           )}
-        </Button>
-      </CardContent>
-    </Card>
+        </div>
+
+        {HAS_REVIEW ? (
+          <Button size="sm" onClick={() => setReviewOpen(true)} className="w-full gap-2 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 text-xs" variant="outline">
+            <ListFilter className="h-3.5 w-3.5" /> Review & Import
+          </Button>
+        ) : null}
+      </div>
+
+      {HAS_REVIEW && (
+        <ReviewDrawer
+          connectorId={connector.id}
+          workspaceId={workspaceId}
+          connectorName={meta.name}
+          open={reviewOpen}
+          onClose={() => setReviewOpen(false)}
+        />
+      )}
+    </>
   );
 }

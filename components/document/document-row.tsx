@@ -133,7 +133,7 @@ export function DocumentRow({ doc }: { doc: DocumentRowProps }) {
     }
   }
 
-  const canReprocess = status === "FAILED" || status === "COMPLETED" || status === "PENDING";
+  const canReprocess = status === "FAILED" || status === "COMPLETED" || status === "PENDING" || status === "EXTRACTING";
   const canReextract = status === "COMPLETED";
 
   return (

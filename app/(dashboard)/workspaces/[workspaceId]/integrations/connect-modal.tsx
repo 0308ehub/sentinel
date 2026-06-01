@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Loader2, Plus, X, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ConnectorIcon } from "@/components/integrations/ConnectorIcons";
 
 interface CatalogEntry {
   type: string;
@@ -114,7 +115,9 @@ export function ConnectModal({
     <Card className={cn("border transition-all", catalog.color, expanded && "ring-2 ring-violet-400")}>
       <CardHeader className="pb-2">
         <div className="flex items-start gap-2.5">
-          <span className="text-2xl">{catalog.icon}</span>
+          <div className="w-9 h-9 rounded-xl bg-white shadow-sm flex items-center justify-center p-1.5 shrink-0">
+              <ConnectorIcon type={catalog.type} className="w-full h-full" />
+            </div>
           <div>
             <p className="font-semibold text-gray-900 text-sm">{catalog.name}</p>
             <p className="text-xs text-gray-500 mt-0.5 leading-snug">{catalog.description}</p>
