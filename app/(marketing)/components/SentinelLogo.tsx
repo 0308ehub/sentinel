@@ -1,23 +1,44 @@
-import Link from 'next/link'
-
 interface SentinelLogoProps {
   className?: string
+  iconOnly?: boolean
+  size?: number
 }
 
-export function SentinelLogo({ className }: SentinelLogoProps) {
+function SentinelMark({ size = 24, className = '' }: { size?: number; className?: string }) {
+  // Aspect ratio: 44w × 60h
+  const height = Math.round(size * 60 / 44)
   return (
-    <div className={`flex items-center gap-2.5 ${className ?? ''}`}>
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-        {/* outer arc */}
-        <path d="M2 18 C2 9 9 2 18 2" stroke="white" strokeWidth="1.75" strokeLinecap="round" />
-        {/* mid arc */}
-        <path d="M2 18 C2 12 8 6 14 6" stroke="white" strokeWidth="1.75" strokeLinecap="round" opacity="0.65" />
-        {/* inner arc */}
-        <path d="M2 18 C2 14.5 5.5 11 9 11" stroke="white" strokeWidth="1.75" strokeLinecap="round" opacity="0.35" />
-        {/* dot */}
-        <circle cx="2" cy="18" r="2" fill="white" />
-      </svg>
-      <span className="font-semibold text-[15px] tracking-tight text-white">Sentinel</span>
+    <svg
+      width={size}
+      height={height}
+      viewBox="0 0 44 60"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+      className={className}
+    >
+      {/* Beacon diamond — the light at the top */}
+      <polygon points="22,1 28,7 22,13 16,7" fill="currentColor" />
+
+      {/* Lantern room */}
+      <rect x="13" y="13" width="18" height="9" fill="currentColor" />
+
+      {/* Tower body — slight outward taper toward base */}
+      <polygon points="13,22 31,22 34,54 10,54" fill="currentColor" />
+
+      {/* Base platform */}
+      <rect x="3" y="54" width="38" height="6" fill="currentColor" />
+    </svg>
+  )
+}
+
+export function SentinelLogo({ className, iconOnly = false, size = 24 }: SentinelLogoProps) {
+  return (
+    <div className={`flex items-center gap-2.5 text-white ${className ?? ''}`}>
+      <SentinelMark size={size} />
+      {!iconOnly && (
+        <span className="font-semibold text-[15px] tracking-tight">Sentinel</span>
+      )}
     </div>
   )
 }
