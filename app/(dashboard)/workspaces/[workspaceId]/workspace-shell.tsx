@@ -5,6 +5,7 @@ import { WorkspaceNav } from "@/components/nav/workspace-nav";
 import { AgentPanel, AgentPanelToggle } from "./agent-panel";
 import { WorkspaceProvider } from "./workspace-context";
 import { WorkspaceJobsProvider } from "./workspace-jobs-context";
+import { PipelineProvider } from "./pipeline-context";
 
 const MIN_WIDTH = 240;
 const MAX_WIDTH = 640;
@@ -58,6 +59,7 @@ export function WorkspaceShell({
 
   return (
     <WorkspaceJobsProvider>
+    <PipelineProvider workspaceId={workspaceId}>
     <WorkspaceProvider>
       <div className="flex flex-col h-full overflow-hidden bg-background">
         <WorkspaceNav workspaceId={workspaceId} />
@@ -87,6 +89,7 @@ export function WorkspaceShell({
         </div>
       </div>
     </WorkspaceProvider>
+    </PipelineProvider>
     </WorkspaceJobsProvider>
   );
 }
