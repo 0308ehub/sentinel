@@ -54,7 +54,7 @@ export function SummaryGenerator({ workspaceId }: SummaryGeneratorProps) {
   }
 
   return (
-    <Card className="bg-white">
+    <Card>
       <CardHeader className="border-b">
         <CardTitle className="text-base flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-indigo-600" />
@@ -65,11 +65,11 @@ export function SummaryGenerator({ workspaceId }: SummaryGeneratorProps) {
         <form onSubmit={handleGenerate} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-gray-700">Audience</label>
+              <label className="text-sm font-medium text-foreground">Audience</label>
               <select
                 value={audience}
                 onChange={(e) => setAudience(e.target.value as Audience)}
-                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               >
                 <option value="Leadership">Leadership</option>
                 <option value="Engineering">Engineering</option>
@@ -79,11 +79,11 @@ export function SummaryGenerator({ workspaceId }: SummaryGeneratorProps) {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-gray-700">Timeframe</label>
+              <label className="text-sm font-medium text-foreground">Timeframe</label>
               <select
                 value={timeframe}
                 onChange={(e) => setTimeframe(e.target.value as Timeframe)}
-                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               >
                 <option value="Last 7 days">Last 7 days</option>
                 <option value="Last 30 days">Last 30 days</option>
@@ -94,7 +94,7 @@ export function SummaryGenerator({ workspaceId }: SummaryGeneratorProps) {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-gray-700">
+            <label className="text-sm font-medium text-foreground">
               Additional Context{" "}
               <span className="font-normal text-gray-400">(optional)</span>
             </label>

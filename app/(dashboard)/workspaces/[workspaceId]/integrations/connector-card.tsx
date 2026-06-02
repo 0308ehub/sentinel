@@ -70,11 +70,11 @@ export function ConnectorCard({ connector, meta, workspaceId }: { connector: Con
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center p-1.5">
+            <div className="w-10 h-10 rounded-xl bg-background shadow-sm flex items-center justify-center p-1.5">
               <ConnectorIcon type={connector.type} className="w-full h-full" />
             </div>
             <div>
-              <p className="font-semibold text-gray-900 text-sm leading-tight">{connector.name}</p>
+              <p className="font-semibold text-foreground text-sm leading-tight">{connector.name}</p>
               <div className="flex items-center gap-1 mt-0.5">
                 <StatusIcon className={cn("h-3 w-3", s.color)} />
                 <span className={cn("text-xs font-medium", s.color)}>{s.label}</span>

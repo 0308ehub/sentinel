@@ -31,7 +31,7 @@ function highlightQuery(text: string, query: string): React.ReactNode {
   const parts = text.split(new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi"));
   return parts.map((part, i) =>
     part.toLowerCase() === query.toLowerCase() ? (
-      <mark key={i} className="bg-indigo-100 text-indigo-800 rounded px-0.5">{part}</mark>
+      <mark key={i} className="bg-indigo-500/20 text-indigo-300 rounded px-0.5">{part}</mark>
     ) : (
       part
     )
@@ -85,18 +85,18 @@ export function SearchClient({ workspaceId }: { workspaceId: string }) {
   }, {});
 
   return (
-    <div className="flex flex-col h-full overflow-hidden bg-gray-50">
+    <div className="flex flex-col h-full overflow-hidden bg-background">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-8 pt-8 pb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">Semantic Search</h1>
-        <p className="text-sm text-gray-400 mb-5">Search across all ingested documents using AI-powered vector similarity</p>
+      <div className="bg-background border-b border-border px-8 pt-8 pb-6">
+        <h1 className="text-2xl font-bold text-foreground mb-1">Semantic Search</h1>
+        <p className="text-sm text-muted-foreground mb-5">Search across all ingested documents using AI-powered vector similarity</p>
 
         <form onSubmit={handleSubmit} className="relative max-w-2xl">
           <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
             {loading ? (
               <Loader2 className="h-4 w-4 text-indigo-500 animate-spin" />
             ) : (
-              <Search className="h-4 w-4 text-gray-400" />
+              <Search className="h-4 w-4 text-muted-foreground" />
             )}
           </div>
           <input
@@ -105,12 +105,12 @@ export function SearchClient({ workspaceId }: { workspaceId: string }) {
             value={query}
             onChange={handleChange}
             placeholder="Search by concept, topic, or exact phrase…"
-            className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-300 shadow-sm"
+            className="w-full pl-11 pr-4 py-3 rounded-xl border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400/50 focus:border-indigo-400/50 shadow-sm"
           />
         </form>
 
         {query.length >= 2 && !loading && (
-          <p className="text-xs text-gray-400 mt-2 max-w-2xl">
+          <p className="text-xs text-muted-foreground mt-2 max-w-2xl">
             {searched
               ? results.length === 0
                 ? "No results — try different keywords or a broader phrase"
@@ -124,11 +124,11 @@ export function SearchClient({ workspaceId }: { workspaceId: string }) {
       <div className="flex-1 overflow-y-auto px-8 py-6">
         {!searched && !loading && (
           <div className="text-center py-20">
-            <div className="w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center mx-auto mb-4">
-              <Search className="h-7 w-7 text-indigo-300" />
+            <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 flex items-center justify-center mx-auto mb-4">
+              <Search className="h-7 w-7 text-indigo-400" />
             </div>
-            <p className="text-sm font-medium text-gray-500">Start typing to search your knowledge base</p>
-            <p className="text-xs text-gray-400 mt-1">Finds semantically similar content — not just exact matches</p>
+            <p className="text-sm font-medium text-muted-foreground">Start typing to search your knowledge base</p>
+            <p className="text-xs text-muted-foreground/70 mt-1">Finds semantically similar content — not just exact matches</p>
           </div>
         )}
 
@@ -137,40 +137,40 @@ export function SearchClient({ workspaceId }: { workspaceId: string }) {
             {Object.entries(grouped).map(([docId, chunks]) => {
               const best = chunks[0];
               return (
-                <div key={docId} className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-sm transition-shadow">
+                <div key={docId} className="bg-card border border-border rounded-xl overflow-hidden hover:shadow-sm transition-shadow">
                   {/* Document header */}
-                  <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2.5">
-                    <div className="w-6 h-6 rounded bg-indigo-50 flex items-center justify-center text-indigo-500">
+                  <div className="px-4 py-3 border-b border-border/50 flex items-center gap-2.5">
+                    <div className="w-6 h-6 rounded bg-indigo-500/10 flex items-center justify-center text-indigo-400">
                       <SourceIcon type={best.sourceType} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <Link
                         href={`/workspaces/${workspaceId}/documents/${docId}`}
-                        className="text-sm font-semibold text-gray-900 hover:text-indigo-700 transition-colors truncate block"
+                        className="text-sm font-semibold text-foreground hover:text-indigo-400 transition-colors truncate block"
                       >
                         {best.documentTitle}
                       </Link>
-                      <span className="text-xs text-gray-400 capitalize">{best.sourceType.toLowerCase()}</span>
+                      <span className="text-xs text-muted-foreground capitalize">{best.sourceType.toLowerCase()}</span>
                     </div>
                     <span className={cn(
                       "text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0",
-                      best.similarity >= 0.8 ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
-                      best.similarity >= 0.6 ? "bg-amber-50 text-amber-700 border-amber-200" :
-                      "bg-gray-50 text-gray-500 border-gray-200"
+                      best.similarity >= 0.8 ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
+                      best.similarity >= 0.6 ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
+                      "bg-muted/30 text-muted-foreground border-border"
                     )}>
                       {Math.round(best.similarity * 100)}% match
                     </span>
                   </div>
 
                   {/* Passages */}
-                  <div className="divide-y divide-gray-50">
+                  <div className="divide-y divide-border/30">
                     {chunks.map((chunk) => (
                       <div key={chunk.chunkId} className="px-4 py-3">
-                        <p className="text-sm text-gray-600 leading-relaxed line-clamp-4">
+                        <p className="text-sm text-muted-foreground leading-relaxed line-clamp-4">
                           {highlightQuery(chunk.content, query)}
                         </p>
                         {chunks.length > 1 && (
-                          <span className="text-[10px] text-gray-300 mt-1 block">
+                          <span className="text-[10px] text-muted-foreground/50 mt-1 block">
                             {Math.round(chunk.similarity * 100)}% similarity
                           </span>
                         )}

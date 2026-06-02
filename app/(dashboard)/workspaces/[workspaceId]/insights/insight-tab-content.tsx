@@ -9,7 +9,7 @@ import type { InsightType } from "@prisma/client";
 
 function InsightCardSkeleton() {
   return (
-    <div className="bg-white rounded-xl border p-4 animate-pulse">
+    <div className="bg-card rounded-xl border p-4 animate-pulse">
       <div className="flex items-start justify-between gap-3 mb-3">
         <Skeleton className="h-4 w-3/4" />
         <Skeleton className="h-5 w-10 rounded-full shrink-0" />
@@ -40,15 +40,15 @@ function StreamingInsightCard({ insight }: { insight: StreamingInsight }) {
   );
   const colorClass =
     pct >= 75
-      ? "bg-emerald-100 text-emerald-700"
+      ? "bg-emerald-500/10 text-emerald-400"
       : pct >= 50
-      ? "bg-indigo-100 text-indigo-700"
-      : "bg-gray-100 text-gray-600";
+      ? "bg-indigo-500/10 text-indigo-400"
+      : "bg-muted/50 text-muted-foreground";
 
   return (
-    <div className="bg-white rounded-xl border border-indigo-200 ring-1 ring-indigo-100 p-4 animate-in fade-in slide-in-from-bottom-1 duration-200">
+    <div className="bg-card rounded-xl border border-indigo-500/30 ring-1 ring-indigo-500/10 p-4 animate-in fade-in slide-in-from-bottom-1 duration-200">
       <div className="flex items-start justify-between gap-3 mb-1.5">
-        <p className="text-sm font-medium text-gray-900 leading-snug">
+        <p className="text-sm font-medium text-foreground leading-snug">
           {insight.title}
         </p>
         <span
@@ -60,7 +60,7 @@ function StreamingInsightCard({ insight }: { insight: StreamingInsight }) {
           {pct}%
         </span>
       </div>
-      <p className="text-xs text-gray-500 leading-relaxed line-clamp-3">
+      <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">
         {insight.description}
       </p>
     </div>
@@ -143,9 +143,9 @@ export function InsightTabContent({
   // Not streaming — render committed insights or empty state.
   if (initialInsights.length === 0) {
     return (
-      <div className="bg-white rounded-xl border border-dashed p-16 text-center">
-        <Lightbulb className="h-10 w-10 text-gray-200 mx-auto mb-3" />
-        <p className="text-sm text-gray-500 max-w-sm mx-auto">
+      <div className="bg-card rounded-xl border border-dashed p-16 text-center">
+        <Lightbulb className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
+        <p className="text-sm text-muted-foreground max-w-sm mx-auto">
           {emptyMessage ??
             "No insights in this category yet. Synthesize your workspace to extract insights from uploaded documents."}
         </p>

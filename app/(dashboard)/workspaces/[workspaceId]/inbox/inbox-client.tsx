@@ -50,12 +50,12 @@ const TYPE_ICONS: Record<ActionType, React.ElementType> = {
 };
 
 const STATUS_CONFIG: Record<ActionStatus, { label: string; icon: React.ElementType; cls: string }> = {
-  PENDING_REVIEW: { label: "Needs Review",  icon: Clock,         cls: "bg-amber-50 text-amber-700 border-amber-200" },
-  APPROVED:       { label: "Approved",      icon: CheckCircle2,  cls: "bg-blue-50 text-blue-700 border-blue-200" },
-  EXECUTING:      { label: "Running",       icon: Loader2,       cls: "bg-indigo-50 text-indigo-700 border-indigo-200" },
-  COMPLETED:      { label: "Done",          icon: CheckCircle2,  cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  REJECTED:       { label: "Rejected",      icon: XCircle,       cls: "bg-gray-50 text-gray-400 border-gray-200" },
-  FAILED:         { label: "Failed",        icon: XCircle,       cls: "bg-red-50 text-red-700 border-red-200" },
+  PENDING_REVIEW: { label: "Needs Review",  icon: Clock,         cls: "bg-amber-500/10 text-amber-400 border-amber-500/20" },
+  APPROVED:       { label: "Approved",      icon: CheckCircle2,  cls: "bg-blue-500/10 text-blue-400 border-blue-500/20" },
+  EXECUTING:      { label: "Running",       icon: Loader2,       cls: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20" },
+  COMPLETED:      { label: "Done",          icon: CheckCircle2,  cls: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" },
+  REJECTED:       { label: "Rejected",      icon: XCircle,       cls: "bg-muted/30 text-muted-foreground border-border" },
+  FAILED:         { label: "Failed",        icon: XCircle,       cls: "bg-red-500/10 text-red-400 border-red-500/20" },
 };
 
 function ActionCard({
@@ -82,29 +82,29 @@ function ActionCard({
   }
 
   return (
-    <div className={cn("bg-white border rounded-xl p-4 transition-all", isPending ? "border-amber-200 shadow-sm" : "border-gray-200")}>
+    <div className={cn("bg-card border rounded-xl p-4 transition-all", isPending ? "border-amber-500/30 shadow-sm" : "border-border")}>
       <div className="flex items-start gap-3">
-        <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center shrink-0", isPending ? "bg-indigo-50" : "bg-gray-50")}>
-          <Icon className={cn("h-4 w-4", isPending ? "text-indigo-600" : "text-gray-400")} />
+        <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center shrink-0", isPending ? "bg-indigo-500/10" : "bg-muted/30")}>
+          <Icon className={cn("h-4 w-4", isPending ? "text-indigo-400" : "text-muted-foreground")} />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-sm font-semibold text-gray-900">{action.title}</p>
+            <p className="text-sm font-semibold text-foreground">{action.title}</p>
             <span className={cn("text-[10px] px-2 py-0.5 rounded-full font-semibold border flex items-center gap-1", cls)}>
               <StatusIcon className={cn("h-2.5 w-2.5", action.status === "EXECUTING" && "animate-spin")} />
               {label}
             </span>
           </div>
-          <p className="text-xs text-gray-500 mt-0.5">{action.description}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{action.description}</p>
 
           {/* Email preview */}
           {preview && preview.length > 0 && (
             <div className="mt-2 space-y-1">
               {preview.map((p, i) => (
-                <div key={i} className="flex items-center gap-2 text-xs bg-gray-50 rounded px-2 py-1">
-                  <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", p.score >= 0.7 ? "bg-emerald-400" : p.score >= 0.5 ? "bg-amber-400" : "bg-gray-300")} />
-                  <span className="truncate text-gray-700 font-medium">{p.subject}</span>
-                  <span className="text-gray-400 shrink-0">{Math.round(p.score * 100)}%</span>
+                <div key={i} className="flex items-center gap-2 text-xs bg-muted/30 rounded px-2 py-1">
+                  <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", p.score >= 0.7 ? "bg-emerald-400" : p.score >= 0.5 ? "bg-amber-400" : "bg-muted-foreground/40")} />
+                  <span className="truncate text-foreground font-medium">{p.subject}</span>
+                  <span className="text-muted-foreground shrink-0">{Math.round(p.score * 100)}%</span>
                 </div>
               ))}
             </div>
@@ -225,11 +225,11 @@ export function InboxClient({ workspaceId, initialActions, settings: initialSett
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="px-8 pt-8 pb-0 shrink-0 bg-white border-b border-gray-200">
+      <div className="px-8 pt-8 pb-0 shrink-0 bg-background border-b border-border">
         <div className="flex items-center justify-between mb-4">
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold text-gray-900">Sentinel Inbox</h1>
+              <h1 className="text-2xl font-bold text-foreground">Sentinel Inbox</h1>
               {pendingActions.length > 0 && (
                 <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-bold">
                   {pendingActions.length} pending
@@ -303,7 +303,7 @@ export function InboxClient({ workspaceId, initialActions, settings: initialSett
         {/* Settings tab */}
         {tab === "settings" && (
           <div className="max-w-lg">
-            <div className="bg-white border border-gray-200 rounded-xl p-5 mb-6">
+            <div className="bg-card border border-border rounded-xl p-5 mb-6">
               <div className="flex items-center gap-2 mb-4">
                 <Settings className="h-4 w-4 text-indigo-500" />
                 <h2 className="text-sm font-semibold text-gray-800">Automation Settings</h2>
@@ -328,9 +328,9 @@ export function InboxClient({ workspaceId, initialActions, settings: initialSett
               />
             </div>
 
-            <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 text-xs text-indigo-700 leading-relaxed">
+            <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-4 text-xs text-indigo-400 leading-relaxed">
               <p className="font-semibold mb-1 flex items-center gap-1.5"><Zap className="h-3 w-3" /> How the autonomous loop works</p>
-              <ol className="space-y-1 list-decimal list-inside text-indigo-600">
+              <ol className="space-y-1 list-decimal list-inside text-indigo-400/80">
                 <li>Hourly: Sentinel scans connected Gmail/Slack for new relevant content</li>
                 <li>Found content appears here as "Import" action for your review</li>
                 <li>Approve → content is imported and processed automatically</li>

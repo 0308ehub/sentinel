@@ -13,7 +13,7 @@ const CONNECTOR_CATALOG = [
     description: "Import customer emails, support threads, and sales conversations.",
     icon: "📧",
     authType: "oauth" as const,
-    color: "bg-red-50 border-red-100",
+    color: "bg-card border-border",
   },
   {
     type: "SLACK",
@@ -21,7 +21,7 @@ const CONNECTOR_CATALOG = [
     description: "Pull messages from customer-facing channels and internal feedback threads.",
     icon: "💬",
     authType: "oauth" as const,
-    color: "bg-purple-50 border-purple-100",
+    color: "bg-card border-border",
   },
   {
     type: "LINEAR",
@@ -29,7 +29,7 @@ const CONNECTOR_CATALOG = [
     description: "Import issues, bug reports, and feature requests from your Linear workspace.",
     icon: "🔷",
     authType: "apikey" as const,
-    color: "bg-indigo-50 border-indigo-100",
+    color: "bg-card border-border",
     fields: [{ key: "apiKey", label: "API Key", type: "password", placeholder: "lin_api_..." }],
   },
   {
@@ -38,7 +38,7 @@ const CONNECTOR_CATALOG = [
     description: "Import tickets, bugs, and feature requests from Jira projects.",
     icon: "🎯",
     authType: "apikey" as const,
-    color: "bg-blue-50 border-blue-100",
+    color: "bg-card border-border",
     fields: [
       { key: "domain", label: "Jira Domain", type: "text", placeholder: "yourcompany.atlassian.net" },
       { key: "email", label: "Email", type: "email", placeholder: "you@company.com" },
@@ -52,7 +52,7 @@ const CONNECTOR_CATALOG = [
     description: "Import customer support conversations and product feedback from Intercom.",
     icon: "💭",
     authType: "apikey" as const,
-    color: "bg-emerald-50 border-emerald-100",
+    color: "bg-card border-border",
     fields: [{ key: "accessToken", label: "Access Token", type: "password", placeholder: "dG9rOi..." }],
   },
   {
@@ -61,7 +61,7 @@ const CONNECTOR_CATALOG = [
     description: "Import support tickets and customer conversations from Zendesk.",
     icon: "🎫",
     authType: "apikey" as const,
-    color: "bg-green-50 border-green-100",
+    color: "bg-card border-border",
     fields: [
       { key: "subdomain", label: "Subdomain", type: "text", placeholder: "yourcompany (from yourcompany.zendesk.com)" },
       { key: "email", label: "Email", type: "email", placeholder: "you@company.com" },
@@ -74,7 +74,7 @@ const CONNECTOR_CATALOG = [
     description: "Import CRM notes, call recordings, and sales feedback from HubSpot.",
     icon: "🧡",
     authType: "apikey" as const,
-    color: "bg-orange-50 border-orange-100",
+    color: "bg-card border-border",
     fields: [{ key: "accessToken", label: "Private App Token", type: "password", placeholder: "pat-na1-..." }],
   },
 ];
@@ -107,8 +107,8 @@ export default async function IntegrationsPage({
 
       <div className="p-8">
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">Integrations</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-2xl font-bold text-foreground">Integrations</h1>
+          <p className="text-sm text-muted-foreground mt-1">
             Connect your tools to automatically import customer evidence into Sentinel.
           </p>
         </div>
@@ -135,7 +135,7 @@ export default async function IntegrationsPage({
         {/* Connected integrations */}
         {connectors.length > 0 && (
           <div className="mb-10">
-            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Connected</h2>
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Connected</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {connectors.map((connector) => {
                 const meta = CONNECTOR_CATALOG.find((c) => c.type === connector.type);
@@ -154,7 +154,7 @@ export default async function IntegrationsPage({
 
         {/* Available integrations */}
         <div>
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">
             {connectors.length > 0 ? "Add More" : "Available Integrations"}
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">

@@ -21,15 +21,15 @@ function formatDate(date: Date) {
 function audienceBadgeClass(audience: string) {
   switch (audience) {
     case "Leadership":
-      return "bg-indigo-100 text-indigo-700 border-indigo-200";
+      return "bg-indigo-500/10 text-indigo-400 border-indigo-500/20";
     case "Engineering":
-      return "bg-blue-100 text-blue-700 border-blue-200";
+      return "bg-blue-500/10 text-blue-400 border-blue-500/20";
     case "Board":
-      return "bg-amber-100 text-amber-700 border-amber-200";
+      return "bg-amber-500/10 text-amber-400 border-amber-500/20";
     case "Investors":
-      return "bg-emerald-100 text-emerald-700 border-emerald-200";
+      return "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
     default:
-      return "bg-gray-100 text-gray-700 border-gray-200";
+      return "bg-muted/50 text-muted-foreground border-border";
   }
 }
 
@@ -59,11 +59,11 @@ export default async function ReportsPage({
 
       <div className="p-8">
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <BarChart2 className="h-6 w-6 text-indigo-600" />
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <BarChart2 className="h-6 w-6 text-indigo-500" />
             Executive Reports
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             Generate AI-powered executive summaries from your product discovery data.
           </p>
         </div>
@@ -75,7 +75,7 @@ export default async function ReportsPage({
 
         {/* Previous summaries */}
         <div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
             <FileText className="h-4 w-4 text-gray-400" />
             Previous Summaries
             <span className="ml-1 text-sm font-normal text-gray-400">
@@ -84,9 +84,9 @@ export default async function ReportsPage({
           </h2>
 
           {summaries.length === 0 ? (
-            <div className="bg-white rounded-xl border border-dashed p-16 text-center">
-              <BarChart2 className="h-10 w-10 text-gray-200 mx-auto mb-3" />
-              <p className="text-sm text-gray-500 max-w-sm mx-auto">
+            <div className="bg-card rounded-xl border border-dashed p-16 text-center">
+              <BarChart2 className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
+              <p className="text-sm text-muted-foreground max-w-sm mx-auto">
                 No summaries generated yet. Use the form above to create your first executive summary.
               </p>
             </div>
@@ -103,7 +103,7 @@ export default async function ReportsPage({
                 const summary = props?.summary ?? "";
 
                 return (
-                  <Card key={event.id} className="bg-white">
+                  <Card key={event.id}>
                     <CardHeader className="pb-3 border-b">
                       <div className="flex items-start justify-between gap-4">
                         <div>

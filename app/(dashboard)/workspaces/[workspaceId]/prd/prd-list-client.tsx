@@ -70,7 +70,7 @@ function SortablePRDCard({
         deleting && "opacity-40 pointer-events-none"
       )}
     >
-      <Card className="bg-white hover:border-indigo-200 transition-all group">
+      <Card className="hover:border-indigo-500/40 transition-all group">
         <CardHeader className="pb-0">
           <div className="flex items-start gap-2">
             {/* Drag handle */}
@@ -211,9 +211,9 @@ export function PRDListClient({
 
   if (prds.length === 0) {
     return (
-      <div className="bg-white rounded-xl border border-dashed p-12 text-center">
-        <FileText className="h-10 w-10 text-gray-200 mx-auto mb-3" />
-        <p className="text-sm text-gray-500">No PRDs yet. Generate your first one using the form.</p>
+      <div className="bg-card rounded-xl border border-dashed p-12 text-center">
+        <FileText className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
+        <p className="text-sm text-muted-foreground">No PRDs yet. Generate your first one using the form.</p>
       </div>
     );
   }

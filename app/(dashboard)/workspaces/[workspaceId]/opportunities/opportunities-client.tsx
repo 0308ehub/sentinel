@@ -13,10 +13,10 @@ import { Target, Loader2 } from "lucide-react";
 // ---------------------------------------------------------------------------
 function OpportunityCardSkeleton({ index }: { index: number }) {
   return (
-    <div className="bg-white rounded-xl border p-5 animate-pulse">
+    <div className="bg-card rounded-xl border p-5 animate-pulse">
       <div className="flex items-start gap-4">
         {/* Rank circle */}
-        <div className="w-8 h-8 rounded-full bg-gray-100 shrink-0 mt-0.5" />
+        <div className="w-8 h-8 rounded-full bg-muted shrink-0 mt-0.5" />
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 space-y-2">
@@ -194,10 +194,10 @@ export function OpportunitiesClient({
   // ---- Empty state (not running) ----
   if (initialOpportunities.length === 0) {
     return (
-      <div className="bg-white rounded-xl border border-dashed p-16 text-center">
-        <Target className="h-12 w-12 text-gray-200 mx-auto mb-4" />
-        <h3 className="font-semibold text-gray-900 mb-2">No opportunities yet</h3>
-        <p className="text-sm text-gray-500 max-w-sm mx-auto">
+      <div className="bg-card rounded-xl border border-dashed p-16 text-center">
+        <Target className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
+        <h3 className="font-semibold text-foreground mb-2">No opportunities yet</h3>
+        <p className="text-sm text-muted-foreground max-w-sm mx-auto">
           Generate opportunities from your synthesized pain points and insights.
         </p>
       </div>

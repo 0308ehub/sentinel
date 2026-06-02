@@ -115,12 +115,12 @@ export function ConnectModal({
     <Card className={cn("border transition-all", catalog.color, expanded && "ring-2 ring-indigo-400")}>
       <CardHeader className="pb-2">
         <div className="flex items-start gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-white shadow-sm flex items-center justify-center p-1.5 shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-background shadow-sm flex items-center justify-center p-1.5 shrink-0">
               <ConnectorIcon type={catalog.type} className="w-full h-full" />
             </div>
           <div>
-            <p className="font-semibold text-gray-900 text-sm">{catalog.name}</p>
-            <p className="text-xs text-gray-500 mt-0.5 leading-snug">{catalog.description}</p>
+            <p className="font-semibold text-foreground text-sm">{catalog.name}</p>
+            <p className="text-xs text-muted-foreground mt-0.5 leading-snug">{catalog.description}</p>
           </div>
         </div>
       </CardHeader>
@@ -131,7 +131,7 @@ export function ConnectModal({
             size="sm"
             onClick={() => setExpanded(true)}
             variant="outline"
-            className="w-full gap-1.5 text-xs border-gray-200 text-gray-700 hover:border-indigo-300 hover:text-indigo-700"
+            className="w-full gap-1.5 text-xs border-border text-foreground hover:border-indigo-400/50 hover:text-indigo-400"
           >
             <Plus className="h-3 w-3" />
             Connect
@@ -140,7 +140,7 @@ export function ConnectModal({
           <div className="space-y-3">
             {catalog.authType === "oauth" ? (
               <>
-                <p className="text-xs text-gray-600 bg-white/80 rounded-lg p-3 border border-gray-100 leading-relaxed">
+                <p className="text-xs text-muted-foreground bg-muted/30 rounded-lg p-3 border border-border/50 leading-relaxed">
                   You&apos;ll be redirected to <span className="font-medium">{catalog.name}</span> to
                   authorize Sentinel. We only request read access to import your data.
                 </p>

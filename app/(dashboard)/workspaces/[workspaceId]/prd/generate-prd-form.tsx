@@ -54,7 +54,7 @@ export function GeneratePRDForm({
   }
 
   return (
-    <Card className="bg-white sticky top-6">
+    <Card className="sticky top-6">
       <CardHeader className="border-b">
         <CardTitle className="text-base flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-indigo-600" />
@@ -64,14 +64,14 @@ export function GeneratePRDForm({
       <CardContent className="pt-5">
         <form onSubmit={handleGenerate} className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-gray-700">
+            <label className="text-sm font-medium text-foreground">
               Link to Opportunity{" "}
-              <span className="font-normal text-gray-400">(optional)</span>
+              <span className="font-normal text-muted-foreground">(optional)</span>
             </label>
             <select
               value={opportunityId}
               onChange={(e) => setOpportunityId(e.target.value)}
-              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             >
               <option value="">— No linked opportunity —</option>
               {opportunities.map((opp) => (
@@ -83,9 +83,9 @@ export function GeneratePRDForm({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-gray-700">
+            <label className="text-sm font-medium text-foreground">
               Instructions{" "}
-              <span className="font-normal text-gray-400">(optional)</span>
+              <span className="font-normal text-muted-foreground">(optional)</span>
             </label>
             <Textarea
               value={userInstruction}
@@ -94,7 +94,7 @@ export function GeneratePRDForm({
               rows={5}
               className="resize-none text-sm"
             />
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-muted-foreground">
               Guide Sentinel on scope, constraints, or specific requirements.
             </p>
           </div>
