@@ -1,22 +1,8 @@
 import { prisma } from "@/lib/db/prisma";
 import { requireWorkspaceAccess } from "@/lib/auth/helpers";
+import type { PipelineStepKey, PipelineStatusStep, PipelineStatusResponse } from "@/app/(dashboard)/workspaces/[workspaceId]/pipeline-types";
 
-export type PipelineStepKey = "synthesize" | "opportunities" | "prd" | "tickets" | "summary";
-
-export interface PipelineStatusStep {
-  key: PipelineStepKey;
-  needsRun: boolean;
-  label: string;
-  reason: string;
-}
-
-export interface PipelineStatusResponse {
-  canRun: boolean;
-  blockedReason: string | null;
-  steps: PipelineStatusStep[];
-  topOpportunityId: string | null;
-  latestPrdId: string | null;
-}
+export type { PipelineStepKey, PipelineStatusStep, PipelineStatusResponse };
 
 export async function GET(
   _req: Request,
@@ -87,7 +73,7 @@ export async function GET(
     const synthesizeNeedsRun =
       painPointCount === 0 ||
       maxPainPointAt === null ||
-      latestCompletedDoc!.createdAt > maxPainPointAt;
+      (latestCompletedDoc?.createdAt ?? new Date(0)) > maxPainPointAt;
 
     const opportunitiesNeedsRun =
       synthesizeNeedsRun || (painPointCount > 0 && opportunityCount === 0);

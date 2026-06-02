@@ -58,6 +58,10 @@ export function PipelineBanner({ workspaceId }: { workspaceId: string }) {
   useEffect(() => {
     let cancelled = false;
     async function check() {
+      if (dismissed) {
+        setPreviewChecking(false);
+        return;
+      }
       try {
         const res = await fetch(`/api/workspaces/${workspaceId}/pipeline/status`);
         if (!res.ok || cancelled) return;
@@ -95,7 +99,7 @@ export function PipelineBanner({ workspaceId }: { workspaceId: string }) {
     <div
       className={cn(
         "bg-card border border-indigo-500/25 rounded-xl overflow-hidden shadow-sm transition-opacity duration-700",
-        done ? "opacity-0" : "opacity-100"
+        done ? "opacity-0 pointer-events-none" : "opacity-100"
       )}
     >
       {/* Pre-run / idle state */}

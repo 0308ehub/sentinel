@@ -5,12 +5,11 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useRef,
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
 import { useJob } from "./workspace-jobs-context";
-import type { PipelineStatusResponse, PipelineStepKey } from "@/app/api/workspaces/[workspaceId]/pipeline/status/route";
+import type { PipelineStatusResponse, PipelineStepKey } from "./pipeline-types";
 
 export type { PipelineStepKey };
 
@@ -76,8 +75,6 @@ export function PipelineProvider({
     );
   });
 
-  const abortRef = useRef(false);
-
   const dismiss = useCallback(() => {
     localStorage.setItem(`sentinel-pipeline-dismissed-${workspaceId}`, "true");
     setDismissed(true);
@@ -121,7 +118,6 @@ export function PipelineProvider({
   );
 
   const runPipeline = useCallback(async () => {
-    abortRef.current = false;
     setIdle(false);
     setChecking(true);
     setFailed(false);
@@ -168,7 +164,6 @@ export function PipelineProvider({
 
     try {
       for (const step of status.steps) {
-        if (abortRef.current) break;
         if (!step.needsRun) continue;
 
         setCurrentStep(step.key);
