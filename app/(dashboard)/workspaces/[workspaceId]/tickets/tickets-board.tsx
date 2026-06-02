@@ -33,18 +33,18 @@ interface TicketsBoardProps {
 }
 
 const COLUMNS: { key: TicketStatus; label: string; color: string; bg: string }[] = [
-  { key: "BACKLOG",     label: "Backlog",      color: "text-gray-500",    bg: "bg-gray-50 border-gray-200" },
-  { key: "IN_SPRINT",  label: "Sprint",        color: "text-blue-600",    bg: "bg-blue-50 border-blue-200" },
-  { key: "IN_PROGRESS",label: "In Progress",   color: "text-indigo-600",  bg: "bg-indigo-50 border-indigo-200" },
-  { key: "IN_REVIEW",  label: "In Review",     color: "text-amber-600",   bg: "bg-amber-50 border-amber-200" },
-  { key: "DONE",       label: "Done",          color: "text-emerald-600", bg: "bg-emerald-50 border-emerald-200" },
+  { key: "BACKLOG",     label: "Backlog",      color: "text-muted-foreground", bg: "bg-muted/20 border-border" },
+  { key: "IN_SPRINT",  label: "Sprint",        color: "text-blue-400",         bg: "bg-blue-500/10 border-blue-500/25" },
+  { key: "IN_PROGRESS",label: "In Progress",   color: "text-indigo-400",       bg: "bg-indigo-500/10 border-indigo-500/25" },
+  { key: "IN_REVIEW",  label: "In Review",     color: "text-amber-400",        bg: "bg-amber-500/10 border-amber-500/25" },
+  { key: "DONE",       label: "Done",          color: "text-emerald-400",      bg: "bg-emerald-500/10 border-emerald-500/25" },
 ];
 
 const PRIORITY_STYLES: Record<TicketPriority, string> = {
-  CRITICAL: "bg-red-100 text-red-700 border-red-200",
-  HIGH:     "bg-orange-100 text-orange-700 border-orange-200",
-  MEDIUM:   "bg-amber-100 text-amber-700 border-amber-200",
-  LOW:      "bg-gray-100 text-gray-600 border-gray-200",
+  CRITICAL: "bg-red-500/15 text-red-400 border-red-500/20",
+  HIGH:     "bg-orange-500/15 text-orange-400 border-orange-500/20",
+  MEDIUM:   "bg-amber-500/15 text-amber-400 border-amber-500/20",
+  LOW:      "bg-muted text-muted-foreground border-border",
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -81,20 +81,20 @@ function TicketCard({
   const statusOptions = COLUMNS.filter((c) => c.key !== ticket.status);
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow group">
+    <div className="bg-card border border-border rounded-lg p-3 hover:border-border/80 hover:shadow-md transition-all group">
       {/* Header */}
       <div className="flex items-start gap-2">
         <PriorityDot priority={ticket.priority} />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-900 leading-snug line-clamp-2">{ticket.title}</p>
+          <p className="text-sm font-medium text-foreground leading-snug line-clamp-2">{ticket.title}</p>
           <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
             {ticket.ticketType && (
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 uppercase tracking-wide">
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-muted text-muted-foreground uppercase tracking-wide">
                 {TYPE_LABELS[ticket.ticketType] ?? ticket.ticketType}
               </span>
             )}
             {ticket.estimate && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded border border-gray-200 text-gray-400">
+              <span className="text-[10px] px-1.5 py-0.5 rounded border border-border text-muted-foreground/70">
                 {ticket.estimate}
               </span>
             )}
@@ -115,31 +115,31 @@ function TicketCard({
         <div className="relative opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             onClick={() => setMenuOpen((v) => !v)}
-            className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600"
+            className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
           >
             <MoreHorizontal className="h-3.5 w-3.5" />
           </button>
           {menuOpen && (
             <div
-              className="absolute right-0 top-6 z-20 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-40"
+              className="absolute right-0 top-6 z-20 bg-card border border-border rounded-lg shadow-lg py-1 min-w-40"
               onMouseLeave={() => setMenuOpen(false)}
             >
-              <div className="px-2 py-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Move to</div>
+              <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Move to</div>
               {statusOptions.map((col) => (
                 <button
                   key={col.key}
                   onClick={() => { onStatusChange(ticket.id, col.key); setMenuOpen(false); }}
-                  className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+                  className="w-full text-left px-3 py-1.5 text-xs text-foreground hover:bg-muted"
                 >
                   {col.label}
                 </button>
               ))}
               {hasLinearConnector && !ticket.externalLinearId && (
                 <>
-                  <div className="border-t border-gray-100 my-1" />
+                  <div className="border-t border-border my-1" />
                   <button
                     onClick={() => { onExportToLinear(ticket.id); setMenuOpen(false); }}
-                    className="w-full text-left px-3 py-1.5 text-xs text-indigo-600 hover:bg-indigo-50 flex items-center gap-1.5"
+                    className="w-full text-left px-3 py-1.5 text-xs text-indigo-400 hover:bg-indigo-500/10 flex items-center gap-1.5"
                   >
                     <Zap className="h-3 w-3" /> Export to Linear
                   </button>
@@ -147,10 +147,10 @@ function TicketCard({
               )}
               {ticket.opportunity && (
                 <>
-                  <div className="border-t border-gray-100 my-1" />
+                  <div className="border-t border-border my-1" />
                   <Link
                     href={`/workspaces/${workspaceId}/opportunities`}
-                    className="block px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-50"
+                    className="block px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted"
                   >
                     View opportunity
                   </Link>
@@ -264,11 +264,11 @@ export function TicketsBoard({ workspaceId, initialTickets, hasLinearConnector }
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="px-8 pt-8 pb-4 shrink-0 border-b border-gray-200 bg-white">
+      <div className="px-8 pt-8 pb-4 shrink-0 border-b border-border bg-background">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Tickets</h1>
-            <p className="text-sm text-gray-400 mt-0.5">
+            <h1 className="text-2xl font-bold text-foreground">Tickets</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">
               {totalCount} ticket{totalCount !== 1 ? "s" : ""} · {doneCount} done
               {totalCount > 0 && (
                 <> · <span className="text-indigo-600 font-medium">{Math.round((doneCount / totalCount) * 100)}% complete</span></>
@@ -289,9 +289,9 @@ export function TicketsBoard({ workspaceId, initialTickets, hasLinearConnector }
                       ? p === "CRITICAL" ? "bg-red-100 text-red-700 border-red-200"
                         : p === "HIGH" ? "bg-orange-100 text-orange-700 border-orange-200"
                         : p === "MEDIUM" ? "bg-amber-100 text-amber-700 border-amber-200"
-                        : p === "LOW" ? "bg-gray-100 text-gray-600 border-gray-200"
+                        : p === "LOW" ? "bg-muted text-muted-foreground border-border"
                         : "bg-indigo-600 text-white border-indigo-600"
-                      : "bg-white text-gray-400 border-gray-200 hover:border-gray-300"
+                      : "bg-transparent text-muted-foreground border-border hover:border-muted-foreground"
                   )}
                 >
                   {p === "ALL" ? "All" : p[0] + p.slice(1).toLowerCase()}

@@ -10,27 +10,27 @@ import { cn, formatDate } from "@/lib/utils";
 import { DeleteDocumentButton } from "./delete-document-button";
 
 const STATUS_STYLES: Record<string, string> = {
-  COMPLETED: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  PENDING: "bg-amber-50 text-amber-700 border-amber-200",
-  FAILED: "bg-red-50 text-red-700 border-red-200",
-  PARSING: "bg-blue-50 text-blue-700 border-blue-200",
-  CHUNKING: "bg-blue-50 text-blue-700 border-blue-200",
-  EMBEDDING: "bg-blue-50 text-blue-700 border-blue-200",
-  EXTRACTING: "bg-indigo-50 text-indigo-700 border-indigo-200",
+  COMPLETED: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20",
+  PENDING: "bg-amber-500/15 text-amber-400 border-amber-500/20",
+  FAILED: "bg-red-500/15 text-red-400 border-red-500/20",
+  PARSING: "bg-blue-500/15 text-blue-400 border-blue-500/20",
+  CHUNKING: "bg-blue-500/15 text-blue-400 border-blue-500/20",
+  EMBEDDING: "bg-blue-500/15 text-blue-400 border-blue-500/20",
+  EXTRACTING: "bg-indigo-500/15 text-indigo-400 border-indigo-500/20",
 };
 
 function FileIcon({ fileType, sourceType }: { fileType?: string | null; sourceType: string }) {
   const ft = (fileType ?? "").toLowerCase();
   const iconClass = "h-8 w-8 shrink-0";
   if (ft.includes("pdf"))
-    return <div className="flex items-center justify-center w-9 h-9 rounded bg-red-50"><FileType className={cn(iconClass, "text-red-500 h-5 w-5")} /></div>;
+    return <div className="flex items-center justify-center w-9 h-9 rounded bg-red-500/10"><FileType className={cn(iconClass, "text-red-400 h-5 w-5")} /></div>;
   if (ft.includes("csv") || ft.includes("xlsx") || ft.includes("xls") || ft.includes("spreadsheet"))
-    return <div className="flex items-center justify-center w-9 h-9 rounded bg-green-50"><FileSpreadsheet className={cn(iconClass, "text-green-600 h-5 w-5")} /></div>;
+    return <div className="flex items-center justify-center w-9 h-9 rounded bg-green-500/10"><FileSpreadsheet className={cn(iconClass, "text-green-400 h-5 w-5")} /></div>;
   if (ft.includes("json") || ft.includes("xml") || ft.includes("html") || ft.includes("code"))
-    return <div className="flex items-center justify-center w-9 h-9 rounded bg-blue-50"><FileCode className={cn(iconClass, "text-blue-500 h-5 w-5")} /></div>;
+    return <div className="flex items-center justify-center w-9 h-9 rounded bg-blue-500/10"><FileCode className={cn(iconClass, "text-blue-400 h-5 w-5")} /></div>;
   if (sourceType === "SUPPORT_TICKET" || sourceType === "SALES_CALL" || sourceType === "CUSTOMER_INTERVIEW")
-    return <div className="flex items-center justify-center w-9 h-9 rounded bg-indigo-50"><FileText className={cn(iconClass, "text-indigo-500 h-5 w-5")} /></div>;
-  return <div className="flex items-center justify-center w-9 h-9 rounded bg-gray-100"><File className={cn(iconClass, "text-gray-400 h-5 w-5")} /></div>;
+    return <div className="flex items-center justify-center w-9 h-9 rounded bg-indigo-500/10"><FileText className={cn(iconClass, "text-indigo-400 h-5 w-5")} /></div>;
+  return <div className="flex items-center justify-center w-9 h-9 rounded bg-muted"><File className={cn(iconClass, "text-muted-foreground h-5 w-5")} /></div>;
 }
 
 export interface DocumentRowProps {
@@ -69,7 +69,6 @@ export function DocumentRow({ doc }: { doc: DocumentRowProps }) {
       return;
     }
 
-    // Already polling — don't start a second interval
     if (pollRef.current) return;
 
     pollRef.current = setInterval(async () => {
@@ -83,7 +82,7 @@ export function DocumentRow({ doc }: { doc: DocumentRowProps }) {
         if (newChunkCount !== chunkCount) setChunkCount(newChunkCount);
         if (!PROCESSING_STATUSES.has(newStatus)) {
           stopPolling();
-          router.refresh(); // sync server component counts in header
+          router.refresh();
         }
       } catch {
         // network blip — keep polling
@@ -137,23 +136,23 @@ export function DocumentRow({ doc }: { doc: DocumentRowProps }) {
   const canReextract = status === "COMPLETED";
 
   return (
-    <div className="group grid grid-cols-[1fr_160px_120px_80px_160px_100px] gap-4 px-3 py-3 rounded-lg hover:bg-white hover:shadow-sm border border-transparent hover:border-gray-100 items-center transition-all">
+    <div className="group grid grid-cols-[1fr_160px_120px_80px_160px_100px] gap-4 px-3 py-3 rounded-lg hover:bg-muted/40 border border-transparent hover:border-border items-center transition-all">
       {/* Name + icon */}
       <Link href={`/workspaces/${doc.workspaceId}/documents/${doc.id}`} className="flex items-center gap-3 min-w-0">
         <FileIcon fileType={doc.fileType} sourceType={doc.sourceType} />
         <div className="min-w-0">
-          <p className="text-sm font-medium text-gray-900 group-hover:text-indigo-700 transition-colors" title={doc.title}>
+          <p className="text-sm font-medium text-foreground group-hover:text-indigo-400 transition-colors" title={doc.title}>
             {doc.title}
           </p>
           {doc.uploaderName && (
-            <p className="text-xs text-gray-400 truncate">{doc.uploaderName}</p>
+            <p className="text-xs text-muted-foreground/70 truncate">{doc.uploaderName}</p>
           )}
         </div>
       </Link>
 
       {/* Source type */}
       <div>
-        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded font-medium">
+        <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded font-medium">
           {doc.sourceType.replace(/_/g, " ")}
         </span>
       </div>
@@ -162,32 +161,32 @@ export function DocumentRow({ doc }: { doc: DocumentRowProps }) {
       <div>
         <span
           title={status === "FAILED" && doc.errorMessage ? doc.errorMessage : undefined}
-          className={cn("text-xs px-2 py-0.5 rounded-full font-medium border cursor-default", STATUS_STYLES[status] ?? "bg-gray-100 text-gray-600 border-gray-200")}
+          className={cn("text-xs px-2 py-0.5 rounded-full font-medium border cursor-default", STATUS_STYLES[status] ?? "bg-muted text-muted-foreground border-border")}
         >
           {status}
         </span>
         {status === "FAILED" && doc.errorMessage && (
-          <p className="text-xs text-red-500 mt-1 max-w-[200px] truncate" title={doc.errorMessage}>
+          <p className="text-xs text-red-400 mt-1 max-w-[200px] truncate" title={doc.errorMessage}>
             {doc.errorMessage}
           </p>
         )}
       </div>
 
       {/* Chunks */}
-      <div className="text-sm text-gray-500">{chunkCount}</div>
+      <div className="text-sm text-muted-foreground">{chunkCount}</div>
 
       {/* Uploaded */}
-      <div className="text-xs text-gray-400">{formatDate(doc.createdAt)}</div>
+      <div className="text-xs text-muted-foreground/70">{formatDate(doc.createdAt)}</div>
 
       {/* Actions */}
       <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
         {canReextract && (
-          <Button size="sm" variant="ghost" onClick={handleReextract} disabled={reextracting} title="Re-extract insights (keeps chunks & embeddings)" className="h-7 w-7 p-0 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50">
+          <Button size="sm" variant="ghost" onClick={handleReextract} disabled={reextracting} title="Re-extract insights (keeps chunks & embeddings)" className="h-7 w-7 p-0 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10">
             <Wand2 className={cn("h-3.5 w-3.5", reextracting && "animate-pulse")} />
           </Button>
         )}
         {canReprocess && (
-          <Button size="sm" variant="ghost" onClick={handleReprocess} disabled={reprocessing} title="Reprocess (re-parse, re-embed, re-extract)" className="h-7 w-7 p-0 text-gray-400 hover:text-gray-700 hover:bg-gray-100">
+          <Button size="sm" variant="ghost" onClick={handleReprocess} disabled={reprocessing} title="Reprocess (re-parse, re-embed, re-extract)" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground hover:bg-muted">
             <RefreshCw className={cn("h-3.5 w-3.5", reprocessing && "animate-spin")} />
           </Button>
         )}

@@ -48,8 +48,8 @@ export default async function InsightsPage({
       <div className="p-8">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Insights</h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <h1 className="text-2xl font-bold text-foreground">Insights</h1>
+            <p className="text-sm text-muted-foreground mt-1">
               {insights.length} insights synthesized from your evidence
             </p>
           </div>
@@ -57,8 +57,7 @@ export default async function InsightsPage({
         </div>
 
         <Tabs defaultValue="pain-points">
-          {/* Scrollable wrapper prevents the tab bar from overhanging the viewport */}
-          <div className="mb-6 overflow-x-auto overflow-y-hidden border-b border-gray-200 -mx-8 px-8 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          <div className="mb-6 overflow-x-auto overflow-y-hidden border-b border-border -mx-8 px-8 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             <TabsList variant="line" className="rounded-none min-w-max border-b-0 justify-start gap-0 h-auto pb-0">
               <TabsTrigger value="pain-points" className="rounded-none px-3 py-1.5 text-xs shrink-0">
                 <AlertTriangle className="h-3 w-3" />
@@ -93,52 +92,21 @@ export default async function InsightsPage({
             </TabsList>
           </div>
 
-          {/* Pain Points Tab */}
           <TabsContent value="pain-points">
             <PainPointsTabContent initialPainPoints={painPoints} workspaceId={workspaceId} />
           </TabsContent>
-
-          {/* Feature Requests */}
           <TabsContent value="features">
-            <InsightTabContent
-              initialInsights={featureRequests}
-              insightTypes={["FEATURE_REQUEST"]}
-              workspaceId={workspaceId}
-              layout="grid"
-            />
+            <InsightTabContent initialInsights={featureRequests} insightTypes={["FEATURE_REQUEST"]} workspaceId={workspaceId} layout="grid" />
           </TabsContent>
-
-          {/* Segments */}
           <TabsContent value="segments">
-            <InsightTabContent
-              initialInsights={segments}
-              insightTypes={["USER_SEGMENT"]}
-              workspaceId={workspaceId}
-              layout="grid"
-            />
+            <InsightTabContent initialInsights={segments} insightTypes={["USER_SEGMENT"]} workspaceId={workspaceId} layout="grid" />
           </TabsContent>
-
-          {/* Workflow Issues */}
           <TabsContent value="workflow">
-            <InsightTabContent
-              initialInsights={workflowIssues}
-              insightTypes={["WORKFLOW_ISSUE"]}
-              workspaceId={workspaceId}
-              layout="grid"
-            />
+            <InsightTabContent initialInsights={workflowIssues} insightTypes={["WORKFLOW_ISSUE"]} workspaceId={workspaceId} layout="grid" />
           </TabsContent>
-
-          {/* Competitors */}
           <TabsContent value="competitors">
-            <InsightTabContent
-              initialInsights={competitors}
-              insightTypes={["COMPETITIVE_MENTION"]}
-              workspaceId={workspaceId}
-              layout="grid"
-            />
+            <InsightTabContent initialInsights={competitors} insightTypes={["COMPETITIVE_MENTION"]} workspaceId={workspaceId} layout="grid" />
           </TabsContent>
-
-          {/* Quotes & Signals */}
           <TabsContent value="quotes">
             <InsightTabContent
               initialInsights={quotes}
@@ -153,4 +121,3 @@ export default async function InsightsPage({
     </div>
   );
 }
-

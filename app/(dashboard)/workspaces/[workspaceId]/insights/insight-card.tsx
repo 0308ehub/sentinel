@@ -29,7 +29,7 @@ interface Insight {
 function confidenceBar(confidence: number) {
   const safe = typeof confidence === "number" && isFinite(confidence) ? confidence : 0;
   const pct = Math.round(safe * 100);
-  const color = pct >= 75 ? "bg-emerald-500" : pct >= 50 ? "bg-indigo-500" : "bg-gray-300";
+  const color = pct >= 75 ? "bg-emerald-500" : pct >= 50 ? "bg-indigo-500" : "bg-muted-foreground/30";
   return { pct, color };
 }
 
@@ -102,12 +102,12 @@ export function InsightCard({
 
   if (editing) {
     return (
-      <Card className="bg-white ring-2 ring-indigo-200 flex flex-col">
+      <Card className="bg-card ring-2 ring-indigo-500/40 flex flex-col">
         <CardHeader className="pb-0">
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full text-sm font-semibold text-gray-900 border-b border-gray-200 pb-1 focus:outline-none focus:border-indigo-400"
+            className="w-full text-sm font-semibold text-foreground border-b border-border pb-1 focus:outline-none focus:border-indigo-400 bg-transparent"
           />
         </CardHeader>
         <CardContent className="pt-3 space-y-3 flex flex-col flex-1">
@@ -115,10 +115,10 @@ export function InsightCard({
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={4}
-            className="w-full text-sm text-gray-600 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none flex-1"
+            className="w-full text-sm text-muted-foreground border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 resize-none flex-1 bg-background"
           />
           <label className="space-y-1 block">
-            <span className="text-xs font-medium text-gray-500">Confidence: {confidence}%</span>
+            <span className="text-xs font-medium text-muted-foreground">Confidence: {confidence}%</span>
             <input
               type="range"
               min={0}
@@ -127,7 +127,7 @@ export function InsightCard({
               onChange={(e) => setConfidence(Number(e.target.value))}
               className="w-full h-2 rounded-full appearance-none cursor-pointer"
               style={{
-                background: `linear-gradient(to right, #7c3aed 0%, #7c3aed ${confidence}%, #e5e7eb ${confidence}%, #e5e7eb 100%)`,
+                background: `linear-gradient(to right, #7c3aed 0%, #7c3aed ${confidence}%, oklch(0.28 0.003 258) ${confidence}%, oklch(0.28 0.003 258) 100%)`,
               }}
             />
           </label>
@@ -146,16 +146,16 @@ export function InsightCard({
   }
 
   return (
-    <Card className="bg-white flex flex-col group">
+    <Card className="bg-card flex flex-col group">
       <CardHeader className="pb-0">
         <div className="flex items-start justify-between gap-3">
-          <CardTitle className="text-sm text-gray-900 leading-snug">{insight.title}</CardTitle>
+          <CardTitle className="text-sm text-foreground leading-snug">{insight.title}</CardTitle>
           <div className="flex items-center gap-1 shrink-0">
             <Badge
               className={cn(
-                "text-xs font-semibold",
-                pct >= 75 ? "bg-emerald-100 text-emerald-700" :
-                pct >= 50 ? "bg-indigo-100 text-indigo-700" : "bg-gray-100 text-gray-600"
+                "text-xs font-semibold border",
+                pct >= 75 ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/20" :
+                pct >= 50 ? "bg-indigo-500/15 text-indigo-400 border-indigo-500/20" : "bg-muted text-muted-foreground border-border"
               )}
             >
               {pct}%
@@ -164,7 +164,7 @@ export function InsightCard({
               <Tooltip>
                 <TooltipTrigger
                   onClick={() => setEditing(true)}
-                  className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-all"
+                  className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-all"
                 >
                   <Pencil className="h-3 w-3" />
                 </TooltipTrigger>
@@ -174,7 +174,7 @@ export function InsightCard({
                 <TooltipTrigger
                   onClick={handleDelete}
                   disabled={deleting}
-                  className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-600 transition-all"
+                  className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-all"
                 >
                   {deleting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
                 </TooltipTrigger>
@@ -185,13 +185,13 @@ export function InsightCard({
         </div>
       </CardHeader>
       <CardContent className="pt-3 flex flex-col flex-1">
-        <p className="text-sm text-gray-600 leading-relaxed mb-4 flex-1">{insight.description}</p>
+        <p className="text-sm text-muted-foreground leading-relaxed mb-4 flex-1">{insight.description}</p>
         <div className="mb-3">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-gray-400">Confidence</span>
-            <span className="text-xs text-gray-500 font-medium">{pct}%</span>
+            <span className="text-xs text-muted-foreground/70">Confidence</span>
+            <span className="text-xs text-muted-foreground font-medium">{pct}%</span>
           </div>
-          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
             <div className={cn("h-full rounded-full transition-all", color)} style={{ width: `${pct}%` }} />
           </div>
         </div>
@@ -200,7 +200,7 @@ export function InsightCard({
             <Badge key={seg} variant="secondary" className="text-xs">{seg}</Badge>
           ))}
           {insight.evidenceIds.length > 0 && (
-            <span className="text-xs text-gray-400 ml-auto">
+            <span className="text-xs text-muted-foreground/70 ml-auto">
               {insight.evidenceIds.length} evidence{insight.evidenceIds.length !== 1 ? "s" : ""}
             </span>
           )}

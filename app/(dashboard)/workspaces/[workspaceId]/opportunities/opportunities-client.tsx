@@ -48,9 +48,9 @@ function OpportunityCardSkeleton({ index }: { index: number }) {
 // Streaming preview card — shown as each opportunity arrives
 // ---------------------------------------------------------------------------
 function scoreColor(score: number) {
-  if (score >= 80) return "text-emerald-700 bg-emerald-50 border-emerald-200";
-  if (score >= 60) return "text-amber-700 bg-amber-50 border-amber-200";
-  return "text-red-700 bg-red-50 border-red-200";
+  if (score >= 80) return "text-emerald-400 bg-emerald-500/10 border-emerald-500/25";
+  if (score >= 60) return "text-amber-400 bg-amber-500/10 border-amber-500/25";
+  return "text-red-400 bg-red-500/10 border-red-500/25";
 }
 
 function StreamingOpportunityCard({
@@ -61,16 +61,16 @@ function StreamingOpportunityCard({
   index: number;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-indigo-200 ring-1 ring-indigo-100 p-5 animate-in fade-in slide-in-from-bottom-2 duration-300">
+    <div className="bg-card rounded-xl border border-indigo-500/30 ring-1 ring-indigo-500/10 p-5 animate-in fade-in slide-in-from-bottom-2 duration-300">
       <div className="flex items-start gap-4">
-        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-600 font-bold text-sm shrink-0 mt-0.5">
+        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-bold text-sm shrink-0 mt-0.5">
           {index + 1}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
-              <p className="text-base font-semibold text-gray-900 mb-1">{opp.title}</p>
-              <p className="text-sm text-gray-500 leading-relaxed">{opp.description}</p>
+              <p className="text-base font-semibold text-foreground mb-1">{opp.title}</p>
+              <p className="text-sm text-muted-foreground leading-relaxed">{opp.description}</p>
             </div>
             <div
               className={cn(
@@ -89,8 +89,8 @@ function StreamingOpportunityCard({
               { label: "Urgency", value: opp.urgencyScore },
             ].map(({ label, value }) => (
               <div key={label} className="flex flex-col items-center">
-                <span className="text-sm font-bold text-gray-700">{value.toFixed(0)}</span>
-                <span className="text-xs text-gray-400">{label}</span>
+                <span className="text-sm font-bold text-foreground/80">{value.toFixed(0)}</span>
+                <span className="text-xs text-muted-foreground/70">{label}</span>
               </div>
             ))}
             {opp.targetSegments.length > 0 && (

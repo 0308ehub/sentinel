@@ -21,9 +21,9 @@ interface PainPoint {
 }
 
 function severityBadgeClass(score: number) {
-  if (score >= 8) return "bg-red-100 text-red-700 border-red-200";
-  if (score >= 5) return "bg-orange-100 text-orange-700 border-orange-200";
-  return "bg-yellow-100 text-yellow-700 border-yellow-200";
+  if (score >= 8) return "bg-red-500/15 text-red-400 border-red-500/20";
+  if (score >= 5) return "bg-orange-500/15 text-orange-400 border-orange-500/20";
+  return "bg-yellow-500/15 text-yellow-400 border-yellow-500/20";
 }
 
 export function PainPointCard({
@@ -99,12 +99,12 @@ export function PainPointCard({
 
   if (editing) {
     return (
-      <Card className="bg-white ring-2 ring-indigo-200">
+      <Card className="bg-card ring-2 ring-indigo-500/40">
         <CardHeader className="pb-0">
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full text-base font-semibold text-gray-900 border-b border-gray-200 pb-1 focus:outline-none focus:border-indigo-400"
+            className="w-full text-base font-semibold text-foreground border-b border-border pb-1 focus:outline-none focus:border-indigo-400 bg-transparent"
           />
         </CardHeader>
         <CardContent className="pt-3 space-y-3">
@@ -112,40 +112,40 @@ export function PainPointCard({
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={4}
-            className="w-full text-sm text-gray-600 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
+            className="w-full text-sm text-muted-foreground border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 resize-none bg-background"
           />
 
           <div className="grid grid-cols-2 gap-3">
             <label className="space-y-1">
-              <span className="text-xs font-medium text-gray-500">Severity (1–10)</span>
+              <span className="text-xs font-medium text-muted-foreground">Severity (1–10)</span>
               <input
                 type="number"
                 min={1}
                 max={10}
                 value={severity}
                 onChange={(e) => setSeverity(Number(e.target.value))}
-                className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                className="w-full border border-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 bg-background text-foreground"
               />
             </label>
             <label className="space-y-1">
-              <span className="text-xs font-medium text-gray-500">Urgency (1–10)</span>
+              <span className="text-xs font-medium text-muted-foreground">Urgency (1–10)</span>
               <input
                 type="number"
                 min={1}
                 max={10}
                 value={urgency}
                 onChange={(e) => setUrgency(Number(e.target.value))}
-                className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                className="w-full border border-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 bg-background text-foreground"
               />
             </label>
           </div>
 
           <label className="space-y-1 block">
-            <span className="text-xs font-medium text-gray-500">Affected Segments (comma-separated)</span>
+            <span className="text-xs font-medium text-muted-foreground">Affected Segments (comma-separated)</span>
             <input
               value={segmentsRaw}
               onChange={(e) => setSegmentsRaw(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              className="w-full border border-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 bg-background text-foreground"
             />
           </label>
 
@@ -164,24 +164,23 @@ export function PainPointCard({
   }
 
   return (
-    <Card className="bg-white group">
+    <Card className="bg-card group">
       <CardHeader className="pb-0">
         <div className="flex items-start justify-between gap-4">
-          <CardTitle className="text-base text-gray-900">{pp.title}</CardTitle>
+          <CardTitle className="text-base text-foreground">{pp.title}</CardTitle>
           <div className="flex items-center gap-2 shrink-0">
             <span className={cn("text-xs font-semibold px-2.5 py-1 rounded-full border", severityBadgeClass(pp.severity))}>
               Severity {pp.severity}/10
             </span>
-            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200">
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-500/15 text-indigo-400 border border-indigo-500/20">
               Urgency {pp.urgency}/10
             </span>
-            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 border border-blue-200">
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/20">
               {pp.frequency} {pp.frequency === 1 ? "mention" : "mentions"}
             </span>
-            {/* Action buttons — visible on hover */}
             <button
               onClick={() => setEditing(true)}
-              className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-all"
+              className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-all"
               title="Edit"
             >
               <Pencil className="h-3.5 w-3.5" />
@@ -189,7 +188,7 @@ export function PainPointCard({
             <button
               onClick={handleDelete}
               disabled={deleting}
-              className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-600 transition-all"
+              className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-all"
               title="Delete"
             >
               {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
@@ -198,7 +197,7 @@ export function PainPointCard({
         </div>
       </CardHeader>
       <CardContent className="pt-3">
-        <p className="text-sm text-gray-600 leading-relaxed mb-3">{pp.description}</p>
+        <p className="text-sm text-muted-foreground leading-relaxed mb-3">{pp.description}</p>
         <div className="flex flex-wrap items-center gap-2">
           {pp.affectedSegments.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
@@ -208,7 +207,7 @@ export function PainPointCard({
             </div>
           )}
           {pp.evidenceIds.length > 0 && (
-            <span className="text-xs text-gray-400 ml-auto">
+            <span className="text-xs text-muted-foreground/70 ml-auto">
               {pp.evidenceIds.length} evidence{pp.evidenceIds.length !== 1 ? "s" : ""}
             </span>
           )}

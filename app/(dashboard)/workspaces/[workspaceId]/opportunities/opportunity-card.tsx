@@ -29,45 +29,45 @@ const STATUS_CONFIG: Record<OpportunityStatus, {
 }> = {
   PROPOSED: {
     label: "Proposed",
-    color: "text-slate-600",
-    bg: "bg-slate-50",
-    border: "border-slate-200",
+    color: "text-muted-foreground",
+    bg: "bg-muted/50",
+    border: "border-border",
     nextStatus: "ACCEPTED",
     nextLabel: "Accept",
     nextIcon: Check,
   },
   ACCEPTED: {
     label: "Accepted",
-    color: "text-blue-600",
-    bg: "bg-blue-50",
-    border: "border-blue-200",
+    color: "text-blue-400",
+    bg: "bg-blue-500/10",
+    border: "border-blue-500/25",
     nextStatus: "IN_PROGRESS",
     nextLabel: "Start",
     nextIcon: ChevronRight,
   },
   IN_PROGRESS: {
     label: "In Progress",
-    color: "text-amber-600",
-    bg: "bg-amber-50",
-    border: "border-amber-200",
+    color: "text-amber-400",
+    bg: "bg-amber-500/10",
+    border: "border-amber-500/25",
     nextStatus: "SHIPPED",
     nextLabel: "Ship it",
     nextIcon: Rocket,
   },
   SHIPPED: {
     label: "Shipped",
-    color: "text-emerald-600",
-    bg: "bg-emerald-50",
-    border: "border-emerald-200",
+    color: "text-emerald-400",
+    bg: "bg-emerald-500/10",
+    border: "border-emerald-500/25",
     nextStatus: null,
     nextLabel: null,
     nextIcon: null,
   },
   REJECTED: {
     label: "Rejected",
-    color: "text-gray-400",
-    bg: "bg-gray-50",
-    border: "border-gray-200",
+    color: "text-muted-foreground/60",
+    bg: "bg-muted/30",
+    border: "border-border/50",
     nextStatus: "PROPOSED" as OpportunityStatus,
     nextLabel: "Reopen",
     nextIcon: ChevronRight,
@@ -91,15 +91,15 @@ interface Opportunity {
 }
 
 function scoreColor(score: number) {
-  if (score >= 80) return "text-emerald-700 bg-emerald-50 border-emerald-200";
-  if (score >= 60) return "text-amber-700 bg-amber-50 border-amber-200";
-  return "text-red-700 bg-red-50 border-red-200";
+  if (score >= 80) return "text-emerald-400 bg-emerald-500/10 border-emerald-500/25";
+  if (score >= 60) return "text-amber-400 bg-amber-500/10 border-amber-500/25";
+  return "text-red-400 bg-red-500/10 border-red-500/25";
 }
 
 function miniScoreColor(score: number) {
-  if (score >= 80) return "text-emerald-600";
-  if (score >= 60) return "text-amber-600";
-  return "text-red-500";
+  if (score >= 80) return "text-emerald-400";
+  if (score >= 60) return "text-amber-400";
+  return "text-red-400";
 }
 
 export function OpportunityCard({
@@ -233,41 +233,41 @@ export function OpportunityCard({
 
   if (editing) {
     return (
-      <Card className="bg-white ring-2 ring-indigo-200">
+      <Card className="bg-card ring-2 ring-indigo-500/40">
         <CardHeader className="pb-0">
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full text-base font-semibold text-gray-900 border-b border-gray-200 pb-1 focus:outline-none focus:border-indigo-400"
+            className="w-full text-base font-semibold text-foreground border-b border-border pb-1 focus:outline-none focus:border-indigo-400 bg-transparent"
             placeholder="Title"
           />
         </CardHeader>
         <CardContent className="pt-3 space-y-3">
           <div>
-            <label className="text-xs font-medium text-gray-500 block mb-1">Description</label>
+            <label className="text-xs font-medium text-muted-foreground block mb-1">Description</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
-              className="w-full text-sm text-gray-600 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
+              className="w-full text-sm text-muted-foreground border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 resize-none bg-background"
             />
           </div>
           <div>
-            <label className="text-xs font-medium text-gray-500 block mb-1">Problem Statement</label>
+            <label className="text-xs font-medium text-muted-foreground block mb-1">Problem Statement</label>
             <textarea
               value={problemStatement}
               onChange={(e) => setProblemStatement(e.target.value)}
               rows={4}
-              className="w-full text-sm text-gray-600 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
+              className="w-full text-sm text-muted-foreground border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 resize-none bg-background"
             />
           </div>
           <div>
-            <label className="text-xs font-medium text-gray-500 block mb-1">Proposed Solution</label>
+            <label className="text-xs font-medium text-muted-foreground block mb-1">Proposed Solution</label>
             <textarea
               value={proposedSolution}
               onChange={(e) => setProposedSolution(e.target.value)}
               rows={3}
-              className="w-full text-sm text-gray-600 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
+              className="w-full text-sm text-muted-foreground border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 resize-none bg-background"
             />
           </div>
           <div className="flex justify-end gap-2 pt-1">
@@ -285,27 +285,26 @@ export function OpportunityCard({
   }
 
   return (
-    <Card className="bg-white hover:shadow-sm transition-shadow group">
+    <Card className="bg-card hover:shadow-sm transition-shadow group">
       <CardHeader className="pb-0">
         <div className="flex items-start gap-4">
-          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-600 font-bold text-sm shrink-0 mt-0.5">
+          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-bold text-sm shrink-0 mt-0.5">
             {index + 1}
           </div>
 
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
-                <CardTitle className="text-base text-gray-900 mb-1">{title}</CardTitle>
-                <p className="text-sm text-gray-500 leading-relaxed">{description}</p>
+                <CardTitle className="text-base text-foreground mb-1">{title}</CardTitle>
+                <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
               </div>
 
               <div className="flex items-center gap-1.5 shrink-0">
-                {/* Action buttons — visible on hover */}
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger
                       onClick={() => setEditing(true)}
-                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-all"
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-all"
                     >
                       <Pencil className="h-3.5 w-3.5" />
                     </TooltipTrigger>
@@ -315,7 +314,7 @@ export function OpportunityCard({
                     <TooltipTrigger
                       onClick={handleDelete}
                       disabled={deleting}
-                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-600 transition-all"
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-all"
                     >
                       {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                     </TooltipTrigger>
@@ -339,8 +338,8 @@ export function OpportunityCard({
       </CardHeader>
 
       <CardContent className="pt-4 pl-16">
-        <div className="text-sm text-gray-600 bg-gray-50 rounded-lg px-3 py-2.5 mb-4 leading-relaxed border border-gray-100 max-h-28 overflow-y-auto">
-          <span className="font-medium text-gray-700">Problem: </span>
+        <div className="text-sm text-muted-foreground bg-muted/40 rounded-lg px-3 py-2.5 mb-4 leading-relaxed border border-border/50 max-h-28 overflow-y-auto">
+          <span className="font-medium text-foreground/80">Problem: </span>
           {problemStatement}
         </div>
 
@@ -358,7 +357,7 @@ export function OpportunityCard({
                 <span className={cn("text-sm font-bold", miniScoreColor(displayScore))}>
                   {value.toFixed(0)}
                 </span>
-                <span className="text-xs text-gray-400">{label}</span>
+                <span className="text-xs text-muted-foreground/70">{label}</span>
               </div>
             );
           })}
@@ -437,7 +436,7 @@ export function OpportunityCard({
                 }
               }}
               disabled={advancingStatus}
-              className="gap-1.5 text-gray-500 border-gray-200 hover:text-red-600 hover:border-red-200"
+              className="gap-1.5 text-muted-foreground hover:text-red-400 hover:border-red-500/30"
             >
               <X className="h-3.5 w-3.5" /> Reject
             </Button>
@@ -459,7 +458,7 @@ export function OpportunityCard({
             </Button>
           </Link>
           <Link href={`/workspaces/${workspaceId}/opportunities/${opp.id}`}>
-            <Button size="sm" variant="ghost" className="gap-1.5 text-gray-400 hover:text-gray-700">
+            <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground hover:text-foreground">
               <ExternalLink className="h-3.5 w-3.5" />
             </Button>
           </Link>
