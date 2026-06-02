@@ -21,7 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <body className="min-h-full bg-background text-foreground">
           <script
             dangerouslySetInnerHTML={{
-              __html: `(function(){try{var t=localStorage.getItem('sentinel-theme');if(t==='dark')document.documentElement.classList.add('dark')}catch(e){}})()`,
+              __html: `(function(){try{var t=localStorage.getItem('sentinel-theme');if(!t||t==='dark')document.documentElement.classList.add('dark')}catch(e){document.documentElement.classList.add('dark')}})()`,
             }}
           />
           <ThemeProvider>
