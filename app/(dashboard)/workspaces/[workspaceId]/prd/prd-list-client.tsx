@@ -70,7 +70,7 @@ function SortablePRDCard({
         deleting && "opacity-40 pointer-events-none"
       )}
     >
-      <Card className="bg-white hover:border-violet-200 transition-all group">
+      <Card className="bg-white hover:border-indigo-200 transition-all group">
         <CardHeader className="pb-0">
           <div className="flex items-start gap-2">
             {/* Drag handle */}
@@ -94,7 +94,7 @@ function SortablePRDCard({
               href={`/workspaces/${workspaceId}/prd/${prd.id}`}
               className="flex-1 min-w-0"
             >
-              <CardTitle className="text-sm text-gray-900 leading-snug group-hover:text-violet-700 transition-colors">
+              <CardTitle className="text-sm text-gray-900 leading-snug group-hover:text-indigo-700 transition-colors">
                 {prd.title}
               </CardTitle>
             </Link>
@@ -129,8 +129,8 @@ function SortablePRDCard({
 
         <CardContent className="pt-2 pl-8">
           {prd.opportunity && (
-            <p className="text-xs text-violet-600 font-medium mb-1.5 flex items-center gap-1">
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-violet-400" />
+            <p className="text-xs text-indigo-600 font-medium mb-1.5 flex items-center gap-1">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-indigo-400" />
               {prd.opportunity.title}
             </p>
           )}

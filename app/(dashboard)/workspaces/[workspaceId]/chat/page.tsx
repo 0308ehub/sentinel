@@ -168,7 +168,7 @@ export default function ChatPage({ params }: { params: Promise<{ workspaceId: st
             <Button
               onClick={startNewConversation}
               size="sm"
-              className="w-full gap-2 bg-violet-600 hover:bg-violet-700 text-white"
+              className="w-full gap-2 bg-indigo-600 hover:bg-indigo-700 text-white"
             >
               <Plus className="h-3.5 w-3.5" />
               New Conversation
@@ -197,13 +197,13 @@ export default function ChatPage({ params }: { params: Promise<{ workspaceId: st
                       className={cn(
                         "w-full text-left rounded-lg px-3 py-2.5 transition-colors",
                         activeConvId === conv.id
-                          ? "bg-violet-50 border border-violet-200"
+                          ? "bg-indigo-50 border border-indigo-200"
                           : "hover:bg-gray-50 border border-transparent"
                       )}
                     >
                       <p className={cn(
                         "text-sm font-medium truncate leading-snug",
-                        activeConvId === conv.id ? "text-violet-800" : "text-gray-700"
+                        activeConvId === conv.id ? "text-indigo-800" : "text-gray-700"
                       )}>
                         {conv.title ?? "Untitled conversation"}
                       </p>
@@ -255,7 +255,7 @@ export default function ChatPage({ params }: { params: Promise<{ workspaceId: st
                       key={prompt}
                       onClick={() => sendMessage(prompt)}
                       disabled={sending}
-                      className="text-xs px-3 py-1.5 rounded-full border border-violet-200 text-violet-700 bg-violet-50 hover:bg-violet-100 transition-colors font-medium disabled:opacity-50"
+                      className="text-xs px-3 py-1.5 rounded-full border border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition-colors font-medium disabled:opacity-50"
                     >
                       {prompt}
                     </button>
@@ -278,7 +278,7 @@ export default function ChatPage({ params }: { params: Promise<{ workspaceId: st
                   onClick={() => sendMessage()}
                   disabled={sending || !input.trim()}
                   size="icon"
-                  className="h-[68px] w-11 shrink-0 bg-violet-600 hover:bg-violet-700 text-white rounded-xl"
+                  className="h-[68px] w-11 shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl"
                 >
                   {sending ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -308,8 +308,8 @@ function MessageBubble({ message }: { message: Message }) {
       <div className={cn(
         "flex items-center justify-center w-8 h-8 rounded-full shrink-0",
         isUser
-          ? "bg-violet-600 text-white"
-          : "bg-gradient-to-br from-violet-500 to-indigo-600 text-white"
+          ? "bg-indigo-600 text-white"
+          : "bg-gradient-to-br from-indigo-500 to-indigo-600 text-white"
       )}>
         {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
       </div>
@@ -318,7 +318,7 @@ function MessageBubble({ message }: { message: Message }) {
       <div className={cn(
         "max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed",
         isUser
-          ? "bg-violet-600 text-white rounded-br-sm"
+          ? "bg-indigo-600 text-white rounded-br-sm"
           : "bg-white border border-gray-100 text-gray-800 shadow-sm rounded-bl-sm"
       )}>
         <p className="whitespace-pre-wrap break-words">{message.content}</p>
@@ -330,14 +330,14 @@ function MessageBubble({ message }: { message: Message }) {
 function TypingIndicator() {
   return (
     <div className="flex gap-3 items-end">
-      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-white shrink-0">
+      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-600 text-white shrink-0">
         <Bot className="h-4 w-4" />
       </div>
       <div className="bg-white border border-gray-100 rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm">
         <div className="flex items-center gap-1.5">
-          <div className="w-2 h-2 rounded-full bg-violet-400 animate-bounce [animation-delay:0ms]" />
-          <div className="w-2 h-2 rounded-full bg-violet-400 animate-bounce [animation-delay:150ms]" />
-          <div className="w-2 h-2 rounded-full bg-violet-400 animate-bounce [animation-delay:300ms]" />
+          <div className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce [animation-delay:0ms]" />
+          <div className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce [animation-delay:150ms]" />
+          <div className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce [animation-delay:300ms]" />
         </div>
       </div>
     </div>
@@ -347,7 +347,7 @@ function TypingIndicator() {
 function WelcomeScreen({ onPrompt }: { onPrompt: (p: string) => void }) {
   return (
     <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center px-4 py-12">
-      <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 mb-5 shadow-lg">
+      <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 mb-5 shadow-lg">
         <Sparkles className="h-8 w-8 text-white" />
       </div>
       <h2 className="text-xl font-bold text-gray-900 mb-2">Ask Sentinel</h2>
@@ -360,7 +360,7 @@ function WelcomeScreen({ onPrompt }: { onPrompt: (p: string) => void }) {
           <button
             key={prompt}
             onClick={() => onPrompt(prompt)}
-            className="text-sm px-4 py-2 rounded-xl border border-violet-200 text-violet-700 bg-violet-50 hover:bg-violet-100 hover:border-violet-300 transition-colors font-medium"
+            className="text-sm px-4 py-2 rounded-xl border border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 hover:border-indigo-300 transition-colors font-medium"
           >
             {prompt}
           </button>

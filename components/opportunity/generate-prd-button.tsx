@@ -41,7 +41,7 @@ export function GeneratePRDButton({ workspaceId, opportunityId }: Props) {
     <Button
       onClick={handleClick}
       disabled={loading}
-      className="gap-2 bg-violet-600 hover:bg-violet-700 text-white"
+      className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white"
     >
       {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
       Generate PRD

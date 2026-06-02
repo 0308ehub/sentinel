@@ -105,7 +105,7 @@ export default async function WorkspacePage({
     PARSING: "bg-blue-100 text-blue-700",
     CHUNKING: "bg-blue-100 text-blue-700",
     EMBEDDING: "bg-blue-100 text-blue-700",
-    EXTRACTING: "bg-violet-100 text-violet-700",
+    EXTRACTING: "bg-indigo-100 text-indigo-700",
   };
 
   return (
@@ -125,7 +125,7 @@ export default async function WorkspacePage({
             </Button>
           </Link>
           <Link href={`/workspaces/${workspaceId}/chat`}>
-            <Button size="sm" className="gap-2 bg-violet-600 hover:bg-violet-700 text-white">
+            <Button size="sm" className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white">
               <MessageSquare className="h-3.5 w-3.5" /> Ask Sentinel
             </Button>
           </Link>
@@ -135,18 +135,18 @@ export default async function WorkspacePage({
       <div className="p-8 space-y-8">
         {/* Autonomous suggestion banner */}
         {suggestion && (
-          <div className="bg-card border border-violet-200 rounded-xl px-5 py-4 flex items-center justify-between gap-4 shadow-sm">
+          <div className="bg-card border border-indigo-200 rounded-xl px-5 py-4 flex items-center justify-between gap-4 shadow-sm">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-violet-50 flex items-center justify-center shrink-0">
-                <suggestion.icon className="h-4 w-4 text-violet-600" />
+              <div className="w-9 h-9 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0">
+                <suggestion.icon className="h-4 w-4 text-indigo-600" />
               </div>
               <div>
-                <p className="text-[11px] font-semibold text-violet-500 uppercase tracking-wide mb-0.5">Sentinel Suggests</p>
+                <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-0.5">Sentinel Suggests</p>
                 <p className="text-sm font-medium text-foreground">{suggestion.label}</p>
               </div>
             </div>
             <Link href={`/workspaces/${workspaceId}/${suggestion.href}`} className="shrink-0">
-              <Button size="sm" className="gap-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs">
+              <Button size="sm" className="gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs">
                 {suggestion.action} <ArrowRight className="h-3 w-3" />
               </Button>
             </Link>
@@ -178,11 +178,11 @@ export default async function WorkspacePage({
             { label: "Documents",    value: documentCount,           href: "documents",    color: "text-foreground" },
             { label: "Pain Points",  value: activePainPointCount,    href: "insights",     color: "text-amber-600" },
             { label: "Opportunities",value: opportunities.length,    href: "opportunities",color: "text-blue-600" },
-            { label: "In Sprint",    value: inSprintTickets.length,  href: "tickets",      color: "text-violet-600" },
+            { label: "In Sprint",    value: inSprintTickets.length,  href: "tickets",      color: "text-indigo-600" },
             { label: "Done",         value: doneTickets.length,      href: "tickets",      color: "text-emerald-600" },
           ].map(({ label, value, href, color }) => (
             <Link key={label} href={`/workspaces/${workspaceId}/${href}`}>
-              <div className="bg-card rounded-xl border border-border px-4 py-3 hover:border-violet-200 transition-colors cursor-pointer">
+              <div className="bg-card rounded-xl border border-border px-4 py-3 hover:border-indigo-200 transition-colors cursor-pointer">
                 <p className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wide mb-1">{label}</p>
                 <p className={`text-2xl font-bold ${color}`}>{value}</p>
               </div>
@@ -200,7 +200,7 @@ export default async function WorkspacePage({
               <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
                 <Kanban className="h-3.5 w-3.5" /> Sprint Progress
               </h2>
-              <Link href={`/workspaces/${workspaceId}/tickets`} className="text-xs text-violet-600 hover:underline flex items-center gap-1">
+              <Link href={`/workspaces/${workspaceId}/tickets`} className="text-xs text-indigo-600 hover:underline flex items-center gap-1">
                 Board <ChevronRight className="h-3 w-3" />
               </Link>
             </div>
@@ -209,7 +209,7 @@ export default async function WorkspacePage({
                 {[
                   { label: "Backlog", count: backlogTickets.length, color: "text-muted-foreground" },
                   { label: "Sprint",  count: inSprintTickets.length, color: "text-blue-600" },
-                  { label: "In Progress", count: inProgressTickets.length, color: "text-violet-600" },
+                  { label: "In Progress", count: inProgressTickets.length, color: "text-indigo-600" },
                   { label: "Review",  count: tickets.filter((t) => t.status === "IN_REVIEW").length, color: "text-amber-600" },
                   { label: "Done",    count: doneTickets.length, color: "text-emerald-600" },
                 ].map(({ label, count, color }) => (
@@ -224,7 +224,7 @@ export default async function WorkspacePage({
                 {[
                   { count: backlogTickets.length, color: "bg-muted-foreground/30" },
                   { count: inSprintTickets.length, color: "bg-blue-400" },
-                  { count: inProgressTickets.length, color: "bg-violet-500" },
+                  { count: inProgressTickets.length, color: "bg-indigo-500" },
                   { count: tickets.filter((t) => t.status === "IN_REVIEW").length, color: "bg-amber-400" },
                   { count: doneTickets.length, color: "bg-emerald-500" },
                 ].map(({ count, color }, i) =>
@@ -246,7 +246,7 @@ export default async function WorkspacePage({
                 <div className="mt-3 pt-3 border-t border-border/50 space-y-1.5">
                   {inProgressTickets.slice(0, 3).map((t) => (
                     <div key={t.id} className="flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-violet-500 shrink-0" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0" />
                       <p className="text-xs text-foreground/80 truncate">{t.title}</p>
                       <Badge variant="outline" className="text-[10px] ml-auto shrink-0">{t.priority}</Badge>
                     </div>
@@ -264,7 +264,7 @@ export default async function WorkspacePage({
               <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
                 <Target className="h-3.5 w-3.5" /> Top Opportunities
               </h2>
-              <Link href={`/workspaces/${workspaceId}/opportunities`} className="text-xs text-violet-600 hover:underline flex items-center gap-1">
+              <Link href={`/workspaces/${workspaceId}/opportunities`} className="text-xs text-indigo-600 hover:underline flex items-center gap-1">
                 View all <ChevronRight className="h-3 w-3" />
               </Link>
             </div>
@@ -276,7 +276,7 @@ export default async function WorkspacePage({
               ) : (
                 opportunities.map((opp) => (
                   <Link key={opp.id} href={`/workspaces/${workspaceId}/opportunities/${opp.id}`}>
-                    <div className="bg-card rounded-xl border border-border px-4 py-3 hover:border-violet-200 transition-colors cursor-pointer">
+                    <div className="bg-card rounded-xl border border-border px-4 py-3 hover:border-indigo-200 transition-colors cursor-pointer">
                       <div className="flex items-center justify-between gap-2">
                         <p className="text-sm font-medium text-foreground truncate">{opp.title}</p>
                         <Badge className={`text-xs font-bold shrink-0 ${scoreToColor(opp.totalScore)} bg-transparent border`}>
@@ -303,7 +303,7 @@ export default async function WorkspacePage({
                   </span>
                 )}
               </h2>
-              <Link href={`/workspaces/${workspaceId}/documents`} className="text-xs text-violet-600 hover:underline flex items-center gap-1">
+              <Link href={`/workspaces/${workspaceId}/documents`} className="text-xs text-indigo-600 hover:underline flex items-center gap-1">
                 View all <ChevronRight className="h-3 w-3" />
               </Link>
             </div>
@@ -312,13 +312,13 @@ export default async function WorkspacePage({
                 <div className="bg-card rounded-xl border border-dashed px-4 py-8 text-center">
                   <p className="text-sm text-muted-foreground/60">No documents yet.</p>
                   <Link href={`/workspaces/${workspaceId}/documents/upload`}>
-                    <Button variant="link" className="mt-2 text-violet-600 text-sm">Upload your first document</Button>
+                    <Button variant="link" className="mt-2 text-indigo-600 text-sm">Upload your first document</Button>
                   </Link>
                 </div>
               ) : (
                 recentDocs.map((doc) => (
                   <Link key={doc.id} href={`/workspaces/${workspaceId}/documents/${doc.id}`}>
-                    <div className="bg-card rounded-xl border border-border px-4 py-3 hover:border-violet-200 transition-colors cursor-pointer flex items-center gap-3">
+                    <div className="bg-card rounded-xl border border-border px-4 py-3 hover:border-indigo-200 transition-colors cursor-pointer flex items-center gap-3">
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-foreground truncate">{doc.title}</p>
                         <p className="text-xs text-muted-foreground/60 mt-0.5">{doc.sourceType.replace(/_/g, " ")} · {formatDate(doc.createdAt)}</p>

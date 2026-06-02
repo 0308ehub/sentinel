@@ -9,7 +9,7 @@ const STATUS_STYLES: Record<string, string> = {
   COMPLETED: "bg-emerald-50 text-emerald-700 border border-emerald-200",
   PENDING: "bg-amber-50 text-amber-700 border border-amber-200",
   FAILED: "bg-red-50 text-red-700 border border-red-200",
-  EXTRACTING: "bg-violet-50 text-violet-700 border border-violet-200",
+  EXTRACTING: "bg-indigo-50 text-indigo-700 border border-indigo-200",
   PARSING: "bg-blue-50 text-blue-700 border border-blue-200",
   CHUNKING: "bg-blue-50 text-blue-700 border border-blue-200",
   EMBEDDING: "bg-blue-50 text-blue-700 border border-blue-200",
@@ -55,8 +55,8 @@ export default async function DocumentDetailPage({
         </Link>
 
         <div className="flex items-start gap-4">
-          <div className="w-10 h-10 rounded-lg bg-violet-50 flex items-center justify-center shrink-0">
-            <FileText className="h-5 w-5 text-violet-500" />
+          <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0">
+            <FileText className="h-5 w-5 text-indigo-500" />
           </div>
           <div className="min-w-0 flex-1">
             <h1 className="text-xl font-bold text-gray-900 break-words">{doc.title}</h1>
@@ -86,8 +86,8 @@ export default async function DocumentDetailPage({
       <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
         {/* AI extraction summary */}
         {extraction?.summary && (
-          <div className="rounded-xl border border-violet-100 bg-violet-50/50 p-5">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-violet-500 mb-2">AI Summary</h2>
+          <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-5">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-indigo-500 mb-2">AI Summary</h2>
             <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{extraction.summary}</p>
           </div>
         )}

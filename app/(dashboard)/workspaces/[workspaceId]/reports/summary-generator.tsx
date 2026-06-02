@@ -57,7 +57,7 @@ export function SummaryGenerator({ workspaceId }: SummaryGeneratorProps) {
     <Card className="bg-white">
       <CardHeader className="border-b">
         <CardTitle className="text-base flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-violet-600" />
+          <Sparkles className="h-4 w-4 text-indigo-600" />
           Generate Executive Summary
         </CardTitle>
       </CardHeader>
@@ -69,7 +69,7 @@ export function SummaryGenerator({ workspaceId }: SummaryGeneratorProps) {
               <select
                 value={audience}
                 onChange={(e) => setAudience(e.target.value as Audience)}
-                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               >
                 <option value="Leadership">Leadership</option>
                 <option value="Engineering">Engineering</option>
@@ -83,7 +83,7 @@ export function SummaryGenerator({ workspaceId }: SummaryGeneratorProps) {
               <select
                 value={timeframe}
                 onChange={(e) => setTimeframe(e.target.value as Timeframe)}
-                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               >
                 <option value="Last 7 days">Last 7 days</option>
                 <option value="Last 30 days">Last 30 days</option>
@@ -110,7 +110,7 @@ export function SummaryGenerator({ workspaceId }: SummaryGeneratorProps) {
           <Button
             type="submit"
             disabled={loading}
-            className="w-full gap-2 bg-violet-600 hover:bg-violet-700 text-white"
+            className="w-full gap-2 bg-indigo-600 hover:bg-indigo-700 text-white"
           >
             {loading ? (
               <>

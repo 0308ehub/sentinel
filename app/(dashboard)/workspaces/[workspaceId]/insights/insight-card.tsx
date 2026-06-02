@@ -29,7 +29,7 @@ interface Insight {
 function confidenceBar(confidence: number) {
   const safe = typeof confidence === "number" && isFinite(confidence) ? confidence : 0;
   const pct = Math.round(safe * 100);
-  const color = pct >= 75 ? "bg-emerald-500" : pct >= 50 ? "bg-violet-500" : "bg-gray-300";
+  const color = pct >= 75 ? "bg-emerald-500" : pct >= 50 ? "bg-indigo-500" : "bg-gray-300";
   return { pct, color };
 }
 
@@ -102,12 +102,12 @@ export function InsightCard({
 
   if (editing) {
     return (
-      <Card className="bg-white ring-2 ring-violet-200 flex flex-col">
+      <Card className="bg-white ring-2 ring-indigo-200 flex flex-col">
         <CardHeader className="pb-0">
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full text-sm font-semibold text-gray-900 border-b border-gray-200 pb-1 focus:outline-none focus:border-violet-400"
+            className="w-full text-sm font-semibold text-gray-900 border-b border-gray-200 pb-1 focus:outline-none focus:border-indigo-400"
           />
         </CardHeader>
         <CardContent className="pt-3 space-y-3 flex flex-col flex-1">
@@ -115,7 +115,7 @@ export function InsightCard({
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={4}
-            className="w-full text-sm text-gray-600 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-300 resize-none flex-1"
+            className="w-full text-sm text-gray-600 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none flex-1"
           />
           <label className="space-y-1 block">
             <span className="text-xs font-medium text-gray-500">Confidence: {confidence}%</span>
@@ -135,7 +135,7 @@ export function InsightCard({
             <Button variant="ghost" size="sm" onClick={cancelEdit} disabled={saving}>
               <X className="h-4 w-4 mr-1" /> Cancel
             </Button>
-            <Button size="sm" onClick={handleSave} disabled={saving} className="bg-violet-600 hover:bg-violet-700 text-white">
+            <Button size="sm" onClick={handleSave} disabled={saving} className="bg-indigo-600 hover:bg-indigo-700 text-white">
               {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Check className="h-4 w-4 mr-1" />}
               Save
             </Button>
@@ -155,7 +155,7 @@ export function InsightCard({
               className={cn(
                 "text-xs font-semibold",
                 pct >= 75 ? "bg-emerald-100 text-emerald-700" :
-                pct >= 50 ? "bg-violet-100 text-violet-700" : "bg-gray-100 text-gray-600"
+                pct >= 50 ? "bg-indigo-100 text-indigo-700" : "bg-gray-100 text-gray-600"
               )}
             >
               {pct}%

@@ -31,7 +31,7 @@ function highlightQuery(text: string, query: string): React.ReactNode {
   const parts = text.split(new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi"));
   return parts.map((part, i) =>
     part.toLowerCase() === query.toLowerCase() ? (
-      <mark key={i} className="bg-violet-100 text-violet-800 rounded px-0.5">{part}</mark>
+      <mark key={i} className="bg-indigo-100 text-indigo-800 rounded px-0.5">{part}</mark>
     ) : (
       part
     )
@@ -94,7 +94,7 @@ export function SearchClient({ workspaceId }: { workspaceId: string }) {
         <form onSubmit={handleSubmit} className="relative max-w-2xl">
           <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
             {loading ? (
-              <Loader2 className="h-4 w-4 text-violet-500 animate-spin" />
+              <Loader2 className="h-4 w-4 text-indigo-500 animate-spin" />
             ) : (
               <Search className="h-4 w-4 text-gray-400" />
             )}
@@ -105,7 +105,7 @@ export function SearchClient({ workspaceId }: { workspaceId: string }) {
             value={query}
             onChange={handleChange}
             placeholder="Search by concept, topic, or exact phrase…"
-            className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 focus:border-violet-300 shadow-sm"
+            className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-300 shadow-sm"
           />
         </form>
 
@@ -124,8 +124,8 @@ export function SearchClient({ workspaceId }: { workspaceId: string }) {
       <div className="flex-1 overflow-y-auto px-8 py-6">
         {!searched && !loading && (
           <div className="text-center py-20">
-            <div className="w-14 h-14 rounded-2xl bg-violet-50 flex items-center justify-center mx-auto mb-4">
-              <Search className="h-7 w-7 text-violet-300" />
+            <div className="w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center mx-auto mb-4">
+              <Search className="h-7 w-7 text-indigo-300" />
             </div>
             <p className="text-sm font-medium text-gray-500">Start typing to search your knowledge base</p>
             <p className="text-xs text-gray-400 mt-1">Finds semantically similar content — not just exact matches</p>
@@ -140,13 +140,13 @@ export function SearchClient({ workspaceId }: { workspaceId: string }) {
                 <div key={docId} className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-sm transition-shadow">
                   {/* Document header */}
                   <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2.5">
-                    <div className="w-6 h-6 rounded bg-violet-50 flex items-center justify-center text-violet-500">
+                    <div className="w-6 h-6 rounded bg-indigo-50 flex items-center justify-center text-indigo-500">
                       <SourceIcon type={best.sourceType} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <Link
                         href={`/workspaces/${workspaceId}/documents/${docId}`}
-                        className="text-sm font-semibold text-gray-900 hover:text-violet-700 transition-colors truncate block"
+                        className="text-sm font-semibold text-gray-900 hover:text-indigo-700 transition-colors truncate block"
                       >
                         {best.documentTitle}
                       </Link>

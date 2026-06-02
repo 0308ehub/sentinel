@@ -112,7 +112,7 @@ export function ConnectModal({
   const isBusy = loading || testState === "testing";
 
   return (
-    <Card className={cn("border transition-all", catalog.color, expanded && "ring-2 ring-violet-400")}>
+    <Card className={cn("border transition-all", catalog.color, expanded && "ring-2 ring-indigo-400")}>
       <CardHeader className="pb-2">
         <div className="flex items-start gap-2.5">
           <div className="w-9 h-9 rounded-xl bg-white shadow-sm flex items-center justify-center p-1.5 shrink-0">
@@ -131,7 +131,7 @@ export function ConnectModal({
             size="sm"
             onClick={() => setExpanded(true)}
             variant="outline"
-            className="w-full gap-1.5 text-xs border-gray-200 text-gray-700 hover:border-violet-300 hover:text-violet-700"
+            className="w-full gap-1.5 text-xs border-gray-200 text-gray-700 hover:border-indigo-300 hover:text-indigo-700"
           >
             <Plus className="h-3 w-3" />
             Connect
@@ -148,7 +148,7 @@ export function ConnectModal({
                   <Button
                     size="sm"
                     onClick={handleOAuth}
-                    className="flex-1 gap-1.5 text-xs bg-violet-600 hover:bg-violet-700 text-white"
+                    className="flex-1 gap-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
                   >
                     Connect with {catalog.name}
                   </Button>
@@ -191,7 +191,7 @@ export function ConnectModal({
                     size="sm"
                     onClick={handleTestAndConnect}
                     disabled={isBusy}
-                    className="flex-1 gap-1.5 text-xs bg-violet-600 hover:bg-violet-700 text-white"
+                    className="flex-1 gap-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
                   >
                     {testState === "testing" ? (
                       <><Loader2 className="h-3 w-3 animate-spin" /> Checking credentials…</>

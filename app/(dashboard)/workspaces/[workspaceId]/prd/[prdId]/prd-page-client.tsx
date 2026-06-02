@@ -37,7 +37,7 @@ function TicketCard({
     <div
       className={cn(
         "bg-white rounded-lg border px-3 py-2.5 animate-in fade-in slide-in-from-bottom-1 duration-200",
-        streaming && "border-violet-200 ring-1 ring-violet-100"
+        streaming && "border-indigo-200 ring-1 ring-indigo-100"
       )}
     >
       <div className="flex items-start justify-between gap-2 mb-1">
@@ -159,11 +159,11 @@ export function PRDPageClient({ prd, workspaceId }: PRDPageClientProps) {
             {prd.opportunity && (
               <Link
                 href={`/workspaces/${workspaceId}/opportunities/${prd.opportunity.id}`}
-                className="flex items-center gap-1.5 text-xs text-violet-600 font-medium hover:underline"
+                className="flex items-center gap-1.5 text-xs text-indigo-600 font-medium hover:underline"
               >
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-violet-500" />
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-indigo-500" />
                 {prd.opportunity.title}
-                <Badge className="ml-1 text-xs bg-violet-100 text-violet-700 border-violet-200">
+                <Badge className="ml-1 text-xs bg-indigo-100 text-indigo-700 border-indigo-200">
                   {prd.opportunity.totalScore.toFixed(0)}
                 </Badge>
               </Link>
@@ -206,7 +206,7 @@ export function PRDPageClient({ prd, workspaceId }: PRDPageClientProps) {
           {editing ? (
             <div className="bg-white rounded-xl border overflow-hidden">
               <div className="border-b px-5 py-2.5 bg-gray-50 flex items-center gap-2">
-                <Pencil className="h-3.5 w-3.5 text-violet-500" />
+                <Pencil className="h-3.5 w-3.5 text-indigo-500" />
                 <span className="text-xs font-medium text-gray-600">
                   Editing — {prd.title}
                 </span>
@@ -240,10 +240,10 @@ export function PRDPageClient({ prd, workspaceId }: PRDPageClientProps) {
         <div className="space-y-6">
           <div>
             <h2 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide flex items-center gap-2">
-              <Ticket className="h-3.5 w-3.5 text-violet-600" />
+              <Ticket className="h-3.5 w-3.5 text-indigo-600" />
               Engineering Tickets
               {showStreaming && streamingTickets.length > 0 && (
-                <span className="ml-auto text-xs font-normal text-violet-600 flex items-center gap-1">
+                <span className="ml-auto text-xs font-normal text-indigo-600 flex items-center gap-1">
                   <Loader2 className="h-3 w-3 animate-spin" />
                   {streamingTickets.length} so far…
                 </span>
@@ -254,7 +254,7 @@ export function PRDPageClient({ prd, workspaceId }: PRDPageClientProps) {
               <div className="bg-white rounded-xl border border-dashed p-6 text-center">
                 {generatingTickets ? (
                   <div className="flex flex-col items-center gap-2">
-                    <Loader2 className="h-5 w-5 text-violet-400 animate-spin" />
+                    <Loader2 className="h-5 w-5 text-indigo-400 animate-spin" />
                     <p className="text-xs text-gray-400">Generating tickets…</p>
                   </div>
                 ) : (

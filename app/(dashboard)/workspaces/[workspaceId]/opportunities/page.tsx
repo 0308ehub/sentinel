@@ -99,8 +99,8 @@ export default async function OpportunitiesPage({
                 <button className={cn(
                   "text-xs px-3 py-1.5 rounded-full border font-medium transition-colors whitespace-nowrap flex items-center gap-1.5",
                   isActive
-                    ? "bg-violet-600 text-white border-violet-600"
-                    : "bg-white text-gray-600 border-gray-200 hover:border-violet-300 hover:text-violet-700"
+                    ? "bg-indigo-600 text-white border-indigo-600"
+                    : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300 hover:text-indigo-700"
                 )}>
                   {STATUS_LABELS[s]}
                   {count > 0 && <span className={cn("text-[10px] font-bold rounded-full px-1", isActive ? "bg-white/20" : "bg-gray-100 text-gray-500")}>{count}</span>}
@@ -122,8 +122,8 @@ export default async function OpportunitiesPage({
                 className={cn(
                   "text-xs px-3 py-1.5 rounded-full border font-medium transition-colors",
                   activeSort === key
-                    ? "bg-violet-600 text-white border-violet-600"
-                    : "bg-white text-gray-600 border-gray-200 hover:border-violet-300 hover:text-violet-700"
+                    ? "bg-indigo-600 text-white border-indigo-600"
+                    : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300 hover:text-indigo-700"
                 )}
               >
                 {label}

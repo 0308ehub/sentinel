@@ -9,8 +9,6 @@ import {
   Sparkles,
   ChevronLeft,
   ChevronRight,
-  Target,
-  Cpu,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
@@ -19,8 +17,6 @@ import { ThemeToggle } from "@/components/theme-toggle";
 const nav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/workspaces", label: "Projects", icon: FolderKanban },
-  { href: "/insights", label: "AI Insights", icon: Cpu },
-  { href: "/goals", label: "Goals", icon: Target },
 ];
 
 export function Sidebar() {
@@ -52,7 +48,7 @@ export function Sidebar() {
           collapsed ? "px-3.5 py-5 justify-center" : "px-4 py-5"
         )}
       >
-        <div className="w-6 h-6 rounded-md bg-violet-500 flex items-center justify-center shrink-0">
+        <div className="w-6 h-6 rounded-md bg-indigo-500 flex items-center justify-center shrink-0">
           <Sparkles className="h-3.5 w-3.5 text-white" />
         </div>
         {!collapsed && (
@@ -73,7 +69,7 @@ export function Sidebar() {
                 "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150",
                 collapsed && "justify-center px-2",
                 active
-                  ? "bg-violet-500/15 text-violet-400 border border-violet-500/20"
+                  ? "bg-indigo-500/15 text-indigo-400 border border-indigo-500/20"
                   : "text-gray-400 hover:bg-gray-800 hover:text-gray-100 border border-transparent"
               )}
             >
@@ -86,10 +82,10 @@ export function Sidebar() {
 
       {/* AI status badge */}
       {!collapsed && (
-        <div className="mx-2 mb-2 p-2.5 rounded-lg bg-violet-500/10 border border-violet-500/20">
+        <div className="mx-2 mb-2 p-2.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
           <div className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 bg-violet-400 rounded-full animate-pulse" />
-            <span className="text-xs font-medium text-violet-300">AI Agent Active</span>
+            <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-pulse" />
+            <span className="text-xs font-medium text-indigo-300">AI Agent Active</span>
           </div>
           <p className="text-xs text-gray-500 mt-1 leading-snug">Monitoring 3 projects</p>
         </div>

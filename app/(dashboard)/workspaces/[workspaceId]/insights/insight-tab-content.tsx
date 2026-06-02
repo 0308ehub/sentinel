@@ -42,11 +42,11 @@ function StreamingInsightCard({ insight }: { insight: StreamingInsight }) {
     pct >= 75
       ? "bg-emerald-100 text-emerald-700"
       : pct >= 50
-      ? "bg-violet-100 text-violet-700"
+      ? "bg-indigo-100 text-indigo-700"
       : "bg-gray-100 text-gray-600";
 
   return (
-    <div className="bg-white rounded-xl border border-violet-200 ring-1 ring-violet-100 p-4 animate-in fade-in slide-in-from-bottom-1 duration-200">
+    <div className="bg-white rounded-xl border border-indigo-200 ring-1 ring-indigo-100 p-4 animate-in fade-in slide-in-from-bottom-1 duration-200">
       <div className="flex items-start justify-between gap-3 mb-1.5">
         <p className="text-sm font-medium text-gray-900 leading-snug">
           {insight.title}
@@ -104,7 +104,7 @@ export function InsightTabContent({
       return (
         <div className="space-y-3">
           {stillExtracting && (
-            <div className="flex items-center gap-2 text-sm text-violet-600 font-medium">
+            <div className="flex items-center gap-2 text-sm text-indigo-600 font-medium">
               <Loader2 className="h-4 w-4 animate-spin" />
               Extracting… {filteredStreaming.length} found so far
             </div>
@@ -128,7 +128,7 @@ export function InsightTabContent({
     return (
       <div className="space-y-3">
         {stillExtracting && (
-          <div className="flex items-center gap-2 text-sm text-violet-600 font-medium">
+          <div className="flex items-center gap-2 text-sm text-indigo-600 font-medium">
             <Loader2 className="h-4 w-4 animate-spin" />
             Extracting insights…
           </div>

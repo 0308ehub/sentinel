@@ -32,7 +32,7 @@ export default async function WorkspacesPage() {
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-2xl font-bold text-foreground">Workspaces</h1>
         <Link href="/workspaces/new">
-          <Button className="bg-violet-600 hover:bg-violet-700 text-white gap-2">
+          <Button className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2">
             <Plus className="h-4 w-4" /> New Workspace
           </Button>
         </Link>
@@ -47,7 +47,7 @@ export default async function WorkspacesPage() {
               Create a workspace for each product or feature area you want to analyze.
             </p>
             <Link href="/workspaces/new">
-              <Button className="bg-violet-600 hover:bg-violet-700 text-white">Create your first workspace</Button>
+              <Button className="bg-indigo-600 hover:bg-indigo-700 text-white">Create your first workspace</Button>
             </Link>
           </CardContent>
         </Card>
@@ -55,7 +55,7 @@ export default async function WorkspacesPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {workspaces.map((ws) => (
             <Link key={ws.id} href={`/workspaces/${ws.id}`}>
-              <Card className="hover:border-violet-300 hover:shadow-sm transition-all cursor-pointer h-full">
+              <Card className="hover:border-indigo-300 hover:shadow-sm transition-all cursor-pointer h-full">
                 <CardHeader>
                   <p className="text-xs text-muted-foreground/60 font-medium">{ws.organization.name}</p>
                   <CardTitle className="text-base">{ws.name}</CardTitle>

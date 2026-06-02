@@ -111,7 +111,7 @@ export default async function OpportunityDetailPage({
             <CardContent>
               <div className="flex flex-wrap gap-2">
                 {opportunity.targetSegments.map((seg) => (
-                  <Badge key={seg} variant="secondary" className="text-violet-700 bg-violet-50">{seg}</Badge>
+                  <Badge key={seg} variant="secondary" className="text-indigo-700 bg-indigo-50">{seg}</Badge>
                 ))}
               </div>
             </CardContent>
@@ -148,12 +148,12 @@ export default async function OpportunityDetailPage({
         {opportunity.prds.length > 0 && (
           <section className="mb-8">
             <h2 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-              <FileText className="h-4 w-4 text-violet-600" /> Generated PRDs
+              <FileText className="h-4 w-4 text-indigo-600" /> Generated PRDs
             </h2>
             <div className="space-y-2">
               {opportunity.prds.map((prd) => (
                 <Link key={prd.id} href={`/workspaces/${workspaceId}/prd/${prd.id}`}>
-                  <div className="flex items-center justify-between bg-white rounded-lg border px-4 py-3 hover:border-violet-200 transition-colors">
+                  <div className="flex items-center justify-between bg-white rounded-lg border px-4 py-3 hover:border-indigo-200 transition-colors">
                     <p className="text-sm font-medium text-gray-800">{prd.title}</p>
                     <span className="text-xs text-gray-400">{formatDate(prd.createdAt)}</span>
                   </div>
@@ -167,7 +167,7 @@ export default async function OpportunityDetailPage({
         {opportunity.tickets.length > 0 && (
           <section>
             <h2 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-              <Ticket className="h-4 w-4 text-violet-600" /> Engineering Tickets
+              <Ticket className="h-4 w-4 text-indigo-600" /> Engineering Tickets
             </h2>
             <div className="space-y-2">
               {opportunity.tickets.map((ticket) => (

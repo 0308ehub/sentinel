@@ -291,12 +291,12 @@ function SessionTabs({ onClose }: { onClose: () => void }) {
                 "group flex items-center gap-1.5 px-3 min-w-0 max-w-[160px] border-r border-border cursor-pointer select-none shrink-0 h-[34px]",
                 "text-xs font-medium transition-colors",
                 active
-                  ? "bg-card text-foreground border-t-2 border-t-violet-600 -mt-px"
+                  ? "bg-card text-foreground border-t-2 border-t-indigo-600 -mt-px"
                   : "bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground border-t-2 border-t-transparent"
               )}
               onClick={() => setActiveSession(session.id)}
             >
-              <Bot className={cn("h-3 w-3 shrink-0", active ? "text-violet-500" : "text-muted-foreground")} />
+              <Bot className={cn("h-3 w-3 shrink-0", active ? "text-indigo-500" : "text-muted-foreground")} />
               <span className="truncate flex-1">{session.label}</span>
               <button
                 onClick={(e) => handleRemove(e, session.id)}
@@ -501,8 +501,8 @@ function ChatBody({ workspaceId }: { workspaceId: string }) {
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full py-8 text-center">
-            <div className="w-12 h-12 rounded-full bg-violet-50 flex items-center justify-center mb-3">
-              <Bot className="h-6 w-6 text-violet-500" />
+            <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center mb-3">
+              <Bot className="h-6 w-6 text-indigo-500" />
             </div>
             <p className="text-sm font-medium text-foreground mb-1">Sentinel Agent</p>
             <p className="text-xs text-muted-foreground mb-6 max-w-[240px]">
@@ -513,7 +513,7 @@ function ChatBody({ workspaceId }: { workspaceId: string }) {
                 <button
                   key={prompt}
                   onClick={() => sendMessage(prompt)}
-                  className="w-full text-left text-xs text-muted-foreground bg-muted/50 hover:bg-violet-50 hover:text-violet-700 dark:hover:bg-violet-900/20 dark:hover:text-violet-300 border border-border hover:border-violet-200 rounded-lg px-3 py-2 transition-colors"
+                  className="w-full text-left text-xs text-muted-foreground bg-muted/50 hover:bg-indigo-50 hover:text-indigo-700 dark:hover:bg-indigo-900/20 dark:hover:text-indigo-300 border border-border hover:border-indigo-200 rounded-lg px-3 py-2 transition-colors"
                 >
                   {prompt}
                 </button>
@@ -566,7 +566,7 @@ function ChatBody({ workspaceId }: { workspaceId: string }) {
             onClick={() => sendMessage(input)}
             disabled={isLoading || !input.trim()}
             size="sm"
-            className="bg-violet-600 hover:bg-violet-700 text-white h-9 w-9 p-0 shrink-0"
+            className="bg-indigo-600 hover:bg-indigo-700 text-white h-9 w-9 p-0 shrink-0"
           >
             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
@@ -594,12 +594,12 @@ export function AgentPanelToggle({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="flex flex-col items-center gap-1.5 px-1.5 py-3 h-full border-l border-border bg-card hover:bg-violet-50 dark:hover:bg-violet-900/10 hover:border-violet-200 transition-colors group"
+      className="flex flex-col items-center gap-1.5 px-1.5 py-3 h-full border-l border-border bg-card hover:bg-indigo-50 dark:hover:bg-indigo-900/10 hover:border-indigo-200 transition-colors group"
       title="Open Sentinel Agent"
     >
-      <MessageSquare className="h-4 w-4 text-muted-foreground group-hover:text-violet-600 transition-colors" />
+      <MessageSquare className="h-4 w-4 text-muted-foreground group-hover:text-indigo-600 transition-colors" />
       <span
-        className="text-[10px] font-medium text-muted-foreground group-hover:text-violet-600 transition-colors"
+        className="text-[10px] font-medium text-muted-foreground group-hover:text-indigo-600 transition-colors"
         style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}
       >
         Sentinel

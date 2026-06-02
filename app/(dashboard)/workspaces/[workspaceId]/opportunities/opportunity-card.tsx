@@ -233,12 +233,12 @@ export function OpportunityCard({
 
   if (editing) {
     return (
-      <Card className="bg-white ring-2 ring-violet-200">
+      <Card className="bg-white ring-2 ring-indigo-200">
         <CardHeader className="pb-0">
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full text-base font-semibold text-gray-900 border-b border-gray-200 pb-1 focus:outline-none focus:border-violet-400"
+            className="w-full text-base font-semibold text-gray-900 border-b border-gray-200 pb-1 focus:outline-none focus:border-indigo-400"
             placeholder="Title"
           />
         </CardHeader>
@@ -249,7 +249,7 @@ export function OpportunityCard({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
-              className="w-full text-sm text-gray-600 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-300 resize-none"
+              className="w-full text-sm text-gray-600 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
             />
           </div>
           <div>
@@ -258,7 +258,7 @@ export function OpportunityCard({
               value={problemStatement}
               onChange={(e) => setProblemStatement(e.target.value)}
               rows={4}
-              className="w-full text-sm text-gray-600 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-300 resize-none"
+              className="w-full text-sm text-gray-600 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
             />
           </div>
           <div>
@@ -267,14 +267,14 @@ export function OpportunityCard({
               value={proposedSolution}
               onChange={(e) => setProposedSolution(e.target.value)}
               rows={3}
-              className="w-full text-sm text-gray-600 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-300 resize-none"
+              className="w-full text-sm text-gray-600 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
             />
           </div>
           <div className="flex justify-end gap-2 pt-1">
             <Button variant="ghost" size="sm" onClick={cancelEdit} disabled={saving}>
               <X className="h-4 w-4 mr-1" /> Cancel
             </Button>
-            <Button size="sm" onClick={handleSave} disabled={saving} className="bg-violet-600 hover:bg-violet-700 text-white">
+            <Button size="sm" onClick={handleSave} disabled={saving} className="bg-indigo-600 hover:bg-indigo-700 text-white">
               {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Check className="h-4 w-4 mr-1" />}
               Save
             </Button>
@@ -288,7 +288,7 @@ export function OpportunityCard({
     <Card className="bg-white hover:shadow-sm transition-shadow group">
       <CardHeader className="pb-0">
         <div className="flex items-start gap-4">
-          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-violet-50 border border-violet-100 text-violet-600 font-bold text-sm shrink-0 mt-0.5">
+          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-600 font-bold text-sm shrink-0 mt-0.5">
             {index + 1}
           </div>
 

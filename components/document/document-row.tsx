@@ -16,7 +16,7 @@ const STATUS_STYLES: Record<string, string> = {
   PARSING: "bg-blue-50 text-blue-700 border-blue-200",
   CHUNKING: "bg-blue-50 text-blue-700 border-blue-200",
   EMBEDDING: "bg-blue-50 text-blue-700 border-blue-200",
-  EXTRACTING: "bg-violet-50 text-violet-700 border-violet-200",
+  EXTRACTING: "bg-indigo-50 text-indigo-700 border-indigo-200",
 };
 
 function FileIcon({ fileType, sourceType }: { fileType?: string | null; sourceType: string }) {
@@ -29,7 +29,7 @@ function FileIcon({ fileType, sourceType }: { fileType?: string | null; sourceTy
   if (ft.includes("json") || ft.includes("xml") || ft.includes("html") || ft.includes("code"))
     return <div className="flex items-center justify-center w-9 h-9 rounded bg-blue-50"><FileCode className={cn(iconClass, "text-blue-500 h-5 w-5")} /></div>;
   if (sourceType === "SUPPORT_TICKET" || sourceType === "SALES_CALL" || sourceType === "CUSTOMER_INTERVIEW")
-    return <div className="flex items-center justify-center w-9 h-9 rounded bg-violet-50"><FileText className={cn(iconClass, "text-violet-500 h-5 w-5")} /></div>;
+    return <div className="flex items-center justify-center w-9 h-9 rounded bg-indigo-50"><FileText className={cn(iconClass, "text-indigo-500 h-5 w-5")} /></div>;
   return <div className="flex items-center justify-center w-9 h-9 rounded bg-gray-100"><File className={cn(iconClass, "text-gray-400 h-5 w-5")} /></div>;
 }
 
@@ -142,7 +142,7 @@ export function DocumentRow({ doc }: { doc: DocumentRowProps }) {
       <Link href={`/workspaces/${doc.workspaceId}/documents/${doc.id}`} className="flex items-center gap-3 min-w-0">
         <FileIcon fileType={doc.fileType} sourceType={doc.sourceType} />
         <div className="min-w-0">
-          <p className="text-sm font-medium text-gray-900 group-hover:text-violet-700 transition-colors" title={doc.title}>
+          <p className="text-sm font-medium text-gray-900 group-hover:text-indigo-700 transition-colors" title={doc.title}>
             {doc.title}
           </p>
           {doc.uploaderName && (
@@ -182,7 +182,7 @@ export function DocumentRow({ doc }: { doc: DocumentRowProps }) {
       {/* Actions */}
       <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
         {canReextract && (
-          <Button size="sm" variant="ghost" onClick={handleReextract} disabled={reextracting} title="Re-extract insights (keeps chunks & embeddings)" className="h-7 w-7 p-0 text-violet-500 hover:text-violet-700 hover:bg-violet-50">
+          <Button size="sm" variant="ghost" onClick={handleReextract} disabled={reextracting} title="Re-extract insights (keeps chunks & embeddings)" className="h-7 w-7 p-0 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50">
             <Wand2 className={cn("h-3.5 w-3.5", reextracting && "animate-pulse")} />
           </Button>
         )}

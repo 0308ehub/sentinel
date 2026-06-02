@@ -35,7 +35,7 @@ interface TicketsBoardProps {
 const COLUMNS: { key: TicketStatus; label: string; color: string; bg: string }[] = [
   { key: "BACKLOG",     label: "Backlog",      color: "text-gray-500",    bg: "bg-gray-50 border-gray-200" },
   { key: "IN_SPRINT",  label: "Sprint",        color: "text-blue-600",    bg: "bg-blue-50 border-blue-200" },
-  { key: "IN_PROGRESS",label: "In Progress",   color: "text-violet-600",  bg: "bg-violet-50 border-violet-200" },
+  { key: "IN_PROGRESS",label: "In Progress",   color: "text-indigo-600",  bg: "bg-indigo-50 border-indigo-200" },
   { key: "IN_REVIEW",  label: "In Review",     color: "text-amber-600",   bg: "bg-amber-50 border-amber-200" },
   { key: "DONE",       label: "Done",          color: "text-emerald-600", bg: "bg-emerald-50 border-emerald-200" },
 ];
@@ -103,7 +103,7 @@ function TicketCard({
                 href={ticket.externalLinearUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-[10px] flex items-center gap-0.5 text-violet-500 hover:text-violet-700"
+                className="text-[10px] flex items-center gap-0.5 text-indigo-500 hover:text-indigo-700"
               >
                 <ExternalLink className="h-2.5 w-2.5" /> Linear
               </a>
@@ -139,7 +139,7 @@ function TicketCard({
                   <div className="border-t border-gray-100 my-1" />
                   <button
                     onClick={() => { onExportToLinear(ticket.id); setMenuOpen(false); }}
-                    className="w-full text-left px-3 py-1.5 text-xs text-violet-600 hover:bg-violet-50 flex items-center gap-1.5"
+                    className="w-full text-left px-3 py-1.5 text-xs text-indigo-600 hover:bg-indigo-50 flex items-center gap-1.5"
                   >
                     <Zap className="h-3 w-3" /> Export to Linear
                   </button>
@@ -271,7 +271,7 @@ export function TicketsBoard({ workspaceId, initialTickets, hasLinearConnector }
             <p className="text-sm text-gray-400 mt-0.5">
               {totalCount} ticket{totalCount !== 1 ? "s" : ""} · {doneCount} done
               {totalCount > 0 && (
-                <> · <span className="text-violet-600 font-medium">{Math.round((doneCount / totalCount) * 100)}% complete</span></>
+                <> · <span className="text-indigo-600 font-medium">{Math.round((doneCount / totalCount) * 100)}% complete</span></>
               )}
             </p>
           </div>
@@ -290,7 +290,7 @@ export function TicketsBoard({ workspaceId, initialTickets, hasLinearConnector }
                         : p === "HIGH" ? "bg-orange-100 text-orange-700 border-orange-200"
                         : p === "MEDIUM" ? "bg-amber-100 text-amber-700 border-amber-200"
                         : p === "LOW" ? "bg-gray-100 text-gray-600 border-gray-200"
-                        : "bg-violet-600 text-white border-violet-600"
+                        : "bg-indigo-600 text-white border-indigo-600"
                       : "bg-white text-gray-400 border-gray-200 hover:border-gray-300"
                   )}
                 >
@@ -300,7 +300,7 @@ export function TicketsBoard({ workspaceId, initialTickets, hasLinearConnector }
             </div>
             {hasLinearConnector && (
               <span className="text-xs text-gray-400 flex items-center gap-1">
-                <Zap className="h-3 w-3 text-violet-400" /> Linear connected
+                <Zap className="h-3 w-3 text-indigo-400" /> Linear connected
               </span>
             )}
             <Link href={`/workspaces/${workspaceId}/prd`}>
@@ -313,7 +313,7 @@ export function TicketsBoard({ workspaceId, initialTickets, hasLinearConnector }
         {totalCount > 0 && (
           <div className="mt-4 h-1.5 bg-gray-100 rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-violet-500 to-emerald-500 rounded-full transition-all duration-500"
+              className="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 rounded-full transition-all duration-500"
               style={{ width: `${(doneCount / totalCount) * 100}%` }}
             />
           </div>
@@ -324,15 +324,15 @@ export function TicketsBoard({ workspaceId, initialTickets, hasLinearConnector }
       {totalCount === 0 ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center max-w-xs">
-            <div className="w-16 h-16 rounded-2xl bg-violet-50 flex items-center justify-center mx-auto mb-4">
-              <Zap className="h-8 w-8 text-violet-300" />
+            <div className="w-16 h-16 rounded-2xl bg-indigo-50 flex items-center justify-center mx-auto mb-4">
+              <Zap className="h-8 w-8 text-indigo-300" />
             </div>
             <h3 className="font-semibold text-gray-900 mb-1">No tickets yet</h3>
             <p className="text-sm text-gray-400 mb-6">
               Generate engineering tickets from a PRD or opportunity to start planning your sprint.
             </p>
             <Link href={`/workspaces/${workspaceId}/prd`}>
-              <Button className="bg-violet-600 hover:bg-violet-700 text-white">Go to PRDs</Button>
+              <Button className="bg-indigo-600 hover:bg-indigo-700 text-white">Go to PRDs</Button>
             </Link>
           </div>
         </div>

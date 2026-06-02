@@ -52,7 +52,7 @@ const TYPE_ICONS: Record<ActionType, React.ElementType> = {
 const STATUS_CONFIG: Record<ActionStatus, { label: string; icon: React.ElementType; cls: string }> = {
   PENDING_REVIEW: { label: "Needs Review",  icon: Clock,         cls: "bg-amber-50 text-amber-700 border-amber-200" },
   APPROVED:       { label: "Approved",      icon: CheckCircle2,  cls: "bg-blue-50 text-blue-700 border-blue-200" },
-  EXECUTING:      { label: "Running",       icon: Loader2,       cls: "bg-violet-50 text-violet-700 border-violet-200" },
+  EXECUTING:      { label: "Running",       icon: Loader2,       cls: "bg-indigo-50 text-indigo-700 border-indigo-200" },
   COMPLETED:      { label: "Done",          icon: CheckCircle2,  cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
   REJECTED:       { label: "Rejected",      icon: XCircle,       cls: "bg-gray-50 text-gray-400 border-gray-200" },
   FAILED:         { label: "Failed",        icon: XCircle,       cls: "bg-red-50 text-red-700 border-red-200" },
@@ -84,8 +84,8 @@ function ActionCard({
   return (
     <div className={cn("bg-white border rounded-xl p-4 transition-all", isPending ? "border-amber-200 shadow-sm" : "border-gray-200")}>
       <div className="flex items-start gap-3">
-        <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center shrink-0", isPending ? "bg-violet-50" : "bg-gray-50")}>
-          <Icon className={cn("h-4 w-4", isPending ? "text-violet-600" : "text-gray-400")} />
+        <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center shrink-0", isPending ? "bg-indigo-50" : "bg-gray-50")}>
+          <Icon className={cn("h-4 w-4", isPending ? "text-indigo-600" : "text-gray-400")} />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -130,7 +130,7 @@ function ActionCard({
         <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
           <Button
             size="sm"
-            className="bg-violet-600 hover:bg-violet-700 text-white text-xs gap-1.5 h-7"
+            className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs gap-1.5 h-7"
             onClick={() => handle("approve")}
             disabled={!!loading}
           >
@@ -165,7 +165,7 @@ function ToggleSetting({
       </div>
       <button onClick={onToggle} className="shrink-0">
         {value
-          ? <ToggleRight className="h-6 w-6 text-violet-600" />
+          ? <ToggleRight className="h-6 w-6 text-indigo-600" />
           : <ToggleLeft className="h-6 w-6 text-gray-300" />}
       </button>
     </div>
@@ -253,7 +253,7 @@ export function InboxClient({ workspaceId, initialActions, settings: initialSett
               onClick={() => setTab(t)}
               className={cn(
                 "px-4 py-2.5 text-xs font-semibold border-b-2 -mb-px capitalize transition-colors",
-                tab === t ? "border-violet-600 text-violet-700" : "border-transparent text-gray-500 hover:text-gray-700"
+                tab === t ? "border-indigo-600 text-indigo-700" : "border-transparent text-gray-500 hover:text-gray-700"
               )}
             >
               {t}
@@ -273,8 +273,8 @@ export function InboxClient({ workspaceId, initialActions, settings: initialSett
           <div className="space-y-3 max-w-2xl">
             {pendingActions.length === 0 ? (
               <div className="text-center py-16">
-                <div className="w-14 h-14 rounded-2xl bg-violet-50 flex items-center justify-center mx-auto mb-4">
-                  <Bot className="h-7 w-7 text-violet-300" />
+                <div className="w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center mx-auto mb-4">
+                  <Bot className="h-7 w-7 text-indigo-300" />
                 </div>
                 <p className="font-semibold text-gray-700">All caught up</p>
                 <p className="text-sm text-gray-400 mt-1">Sentinel has no pending actions. Click "Scan Now" to check connectors.</p>
@@ -305,7 +305,7 @@ export function InboxClient({ workspaceId, initialActions, settings: initialSett
           <div className="max-w-lg">
             <div className="bg-white border border-gray-200 rounded-xl p-5 mb-6">
               <div className="flex items-center gap-2 mb-4">
-                <Settings className="h-4 w-4 text-violet-500" />
+                <Settings className="h-4 w-4 text-indigo-500" />
                 <h2 className="text-sm font-semibold text-gray-800">Automation Settings</h2>
               </div>
               <ToggleSetting
@@ -328,9 +328,9 @@ export function InboxClient({ workspaceId, initialActions, settings: initialSett
               />
             </div>
 
-            <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 text-xs text-violet-700 leading-relaxed">
+            <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 text-xs text-indigo-700 leading-relaxed">
               <p className="font-semibold mb-1 flex items-center gap-1.5"><Zap className="h-3 w-3" /> How the autonomous loop works</p>
-              <ol className="space-y-1 list-decimal list-inside text-violet-600">
+              <ol className="space-y-1 list-decimal list-inside text-indigo-600">
                 <li>Hourly: Sentinel scans connected Gmail/Slack for new relevant content</li>
                 <li>Found content appears here as "Import" action for your review</li>
                 <li>Approve → content is imported and processed automatically</li>

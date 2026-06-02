@@ -90,7 +90,7 @@ export default function NewWorkspacePage() {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full bg-violet-600 hover:bg-violet-700 text-white"
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
             >
               {loading ? "Creating…" : "Create workspace"}
             </Button>

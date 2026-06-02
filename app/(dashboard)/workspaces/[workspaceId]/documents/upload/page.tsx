@@ -226,7 +226,7 @@ export default function UploadPage() {
                   </div>
                 </details>
 
-                <Button type="submit" disabled={pasteLoading} className="w-full bg-violet-600 hover:bg-violet-700 text-white">
+                <Button type="submit" disabled={pasteLoading} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white">
                   {pasteLoading ? "Uploading…" : "Upload & Process"}
                 </Button>
               </form>
@@ -246,7 +246,7 @@ export default function UploadPage() {
                 onClick={() => document.getElementById("file-input")?.click()}
                 className={cn(
                   "border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-colors",
-                  dragOver ? "border-violet-400 bg-violet-50" : "border-gray-200 hover:border-violet-300"
+                  dragOver ? "border-indigo-400 bg-indigo-50" : "border-gray-200 hover:border-indigo-300"
                 )}
               >
                 <input
@@ -278,7 +278,7 @@ export default function UploadPage() {
                         <p className="text-sm text-gray-800 truncate">{entry.file.name}</p>
                         <p className="text-xs text-gray-400">{(entry.file.size / 1024).toFixed(0)} KB</p>
                       </div>
-                      {entry.status === "uploading" && <Loader2 className="h-4 w-4 text-violet-500 animate-spin shrink-0" />}
+                      {entry.status === "uploading" && <Loader2 className="h-4 w-4 text-indigo-500 animate-spin shrink-0" />}
                       {entry.status === "done" && <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />}
                       {entry.status === "error" && (
                         <div className="flex items-center gap-1">
@@ -317,7 +317,7 @@ export default function UploadPage() {
                   <Button
                     onClick={uploadAll}
                     disabled={uploading || allDone}
-                    className="w-full bg-violet-600 hover:bg-violet-700 text-white"
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
                   >
                     {uploading
                       ? "Uploading…"

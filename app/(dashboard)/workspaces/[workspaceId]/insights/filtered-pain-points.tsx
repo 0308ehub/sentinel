@@ -65,7 +65,7 @@ export function FilteredPainPoints({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search pain points…"
-            className="pl-8 pr-3 py-1.5 text-sm rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-violet-300 w-52"
+            className="pl-8 pr-3 py-1.5 text-sm rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 w-52"
           />
         </div>
 
@@ -76,7 +76,7 @@ export function FilteredPainPoints({
           <select
             value={minSeverity}
             onChange={(e) => setMinSeverity(Number(e.target.value))}
-            className="text-sm rounded-lg border border-gray-200 bg-white px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-300"
+            className="text-sm rounded-lg border border-gray-200 bg-white px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300"
           >
             <option value={0}>Any</option>
             {[3, 5, 7, 8, 9].map((v) => (
@@ -90,7 +90,7 @@ export function FilteredPainPoints({
           <select
             value={selectedSegment}
             onChange={(e) => setSelectedSegment(e.target.value)}
-            className="text-sm rounded-lg border border-gray-200 bg-white px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-300 max-w-[200px]"
+            className="text-sm rounded-lg border border-gray-200 bg-white px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 max-w-[200px]"
           >
             <option value="">All segments</option>
             {allSegments.map((seg) => (

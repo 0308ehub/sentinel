@@ -43,7 +43,7 @@ function severityBadgeClass(score: number) {
 
 function StreamingPainPointCard({ pp }: { pp: StreamingPainPoint }) {
   return (
-    <div className="bg-white rounded-xl border border-violet-200 shadow-sm ring-1 ring-violet-100 animate-in fade-in slide-in-from-bottom-2 duration-300">
+    <div className="bg-white rounded-xl border border-indigo-200 shadow-sm ring-1 ring-indigo-100 animate-in fade-in slide-in-from-bottom-2 duration-300">
       <div className="px-5 pt-4 pb-0">
         <div className="flex items-start justify-between gap-4">
           <h3 className="text-base font-semibold text-gray-900">{pp.title}</h3>
@@ -51,7 +51,7 @@ function StreamingPainPointCard({ pp }: { pp: StreamingPainPoint }) {
             <span className={cn("text-xs font-semibold px-2.5 py-1 rounded-full border", severityBadgeClass(pp.severity))}>
               Severity {Math.round(pp.severity)}/10
             </span>
-            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-violet-100 text-violet-700 border border-violet-200">
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200">
               Urgency {Math.round(pp.urgency)}/10
             </span>
             <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 border border-blue-200">
@@ -91,7 +91,7 @@ export function PainPointsTabContent({
       <div className="space-y-4">
         {streamingPainPoints.length > 0 ? (
           <>
-            <div className="flex items-center gap-2 text-sm text-violet-600 font-medium">
+            <div className="flex items-center gap-2 text-sm text-indigo-600 font-medium">
               <Loader2 className="h-4 w-4 animate-spin" />
               Analyzing clusters… {streamingPainPoints.length} found so far
             </div>

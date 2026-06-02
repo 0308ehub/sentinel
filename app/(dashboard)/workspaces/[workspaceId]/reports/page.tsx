@@ -21,7 +21,7 @@ function formatDate(date: Date) {
 function audienceBadgeClass(audience: string) {
   switch (audience) {
     case "Leadership":
-      return "bg-violet-100 text-violet-700 border-violet-200";
+      return "bg-indigo-100 text-indigo-700 border-indigo-200";
     case "Engineering":
       return "bg-blue-100 text-blue-700 border-blue-200";
     case "Board":
@@ -60,7 +60,7 @@ export default async function ReportsPage({
       <div className="p-8">
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <BarChart2 className="h-6 w-6 text-violet-600" />
+            <BarChart2 className="h-6 w-6 text-indigo-600" />
             Executive Reports
           </h1>
           <p className="text-sm text-gray-500 mt-1">

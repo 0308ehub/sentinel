@@ -79,14 +79,14 @@ export function WorkspaceNav({ workspaceId }: WorkspaceNavProps) {
             className={cn(
               "flex items-center gap-1.5 px-3 py-3 text-xs font-medium border-b-2 -mb-px transition-colors whitespace-nowrap",
               active
-                ? "border-violet-600 text-violet-700 dark:text-violet-400"
+                ? "border-indigo-600 text-indigo-700 dark:text-indigo-400"
                 : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
             )}
           >
             <Icon className="h-3 w-3" />
             {label}
             {badge != null && badge > 0 && (
-              <span className="ml-0.5 inline-flex items-center justify-center h-4 min-w-[16px] px-1 rounded-full bg-violet-600 text-white text-[10px] font-bold leading-none">
+              <span className="ml-0.5 inline-flex items-center justify-center h-4 min-w-[16px] px-1 rounded-full bg-indigo-600 text-white text-[10px] font-bold leading-none">
                 {badge > 99 ? "99+" : badge}
               </span>
             )}

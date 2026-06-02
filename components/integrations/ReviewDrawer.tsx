@@ -137,13 +137,13 @@ export function ReviewDrawer({ connectorId, workspaceId, connectorName, open, on
                 <button
                   key={v}
                   onClick={() => setMinScore(v)}
-                  className={cn("px-2 py-0.5 rounded-full border font-medium transition-all", minScore === v ? "bg-violet-600 text-white border-violet-600" : "border-gray-200 hover:border-gray-400")}
+                  className={cn("px-2 py-0.5 rounded-full border font-medium transition-all", minScore === v ? "bg-indigo-600 text-white border-indigo-600" : "border-gray-200 hover:border-gray-400")}
                 >
                   {v === 0 ? "All" : `${Math.round(v * 100)}%+`}
                 </button>
               ))}
             </div>
-            <button onClick={toggleAll} className="ml-auto text-xs text-violet-600 hover:text-violet-800 font-medium">
+            <button onClick={toggleAll} className="ml-auto text-xs text-indigo-600 hover:text-indigo-800 font-medium">
               {unimported.every((c) => selected.has(c.externalId)) ? "Deselect all" : "Select all"}
             </button>
           </div>
@@ -177,12 +177,12 @@ export function ReviewDrawer({ connectorId, workspaceId, connectorName, open, on
                 c.alreadyImported
                   ? "opacity-40 cursor-default border-gray-100 bg-gray-50"
                   : selected.has(c.externalId)
-                  ? "border-violet-300 bg-violet-50/50 cursor-pointer"
+                  ? "border-indigo-300 bg-indigo-50/50 cursor-pointer"
                   : "border-gray-200 hover:border-gray-300 cursor-pointer"
               )}
             >
               <div className="flex items-start gap-3">
-                <div className="mt-0.5 shrink-0 text-violet-500">
+                <div className="mt-0.5 shrink-0 text-indigo-500">
                   {c.alreadyImported
                     ? <span className="text-xs text-gray-400 font-medium">Imported</span>
                     : selected.has(c.externalId)
@@ -217,7 +217,7 @@ export function ReviewDrawer({ connectorId, workspaceId, connectorName, open, on
               size="sm"
               disabled={selected.size === 0 || importing}
               onClick={handleImport}
-              className="bg-violet-600 hover:bg-violet-700 text-white gap-1.5"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5"
             >
               {importing ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Importing…</> : `Import ${selected.size} email${selected.size !== 1 ? "s" : ""}`}
             </Button>

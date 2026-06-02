@@ -64,7 +64,7 @@ export default async function DashboardPage() {
           <p className="text-gray-500 text-sm mt-0.5">Welcome back, {user.name ?? user.email}</p>
         </div>
         <Link href="/workspaces/new">
-          <Button className="bg-violet-600 hover:bg-violet-700 text-white gap-2">
+          <Button className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2">
             <Plus className="h-4 w-4" /> New Workspace
           </Button>
         </Link>
@@ -82,7 +82,7 @@ export default async function DashboardPage() {
               <FolderKanban className="h-10 w-10 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-500 mb-4">No workspaces yet. Create one to get started.</p>
               <Link href="/workspaces/new">
-                <Button className="bg-violet-600 hover:bg-violet-700 text-white">Create workspace</Button>
+                <Button className="bg-indigo-600 hover:bg-indigo-700 text-white">Create workspace</Button>
               </Link>
             </CardContent>
           </Card>
@@ -90,7 +90,7 @@ export default async function DashboardPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {workspaces.map((ws) => (
               <Link key={ws.id} href={`/workspaces/${ws.id}`}>
-                <Card className="hover:border-violet-300 hover:shadow-sm transition-all cursor-pointer">
+                <Card className="hover:border-indigo-300 hover:shadow-sm transition-all cursor-pointer">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-base font-semibold text-gray-900">{ws.name}</CardTitle>
                     {ws.description && <p className="text-xs text-gray-400 mt-1 line-clamp-1">{ws.description}</p>}
@@ -122,7 +122,7 @@ export default async function DashboardPage() {
             ) : (
               recentDocuments.map((doc) => (
                 <Link key={doc.id} href={`/workspaces/${doc.workspaceId}/documents`}>
-                  <div className="flex items-center justify-between bg-white rounded-lg border px-4 py-3 hover:border-violet-200 transition-colors">
+                  <div className="flex items-center justify-between bg-white rounded-lg border px-4 py-3 hover:border-indigo-200 transition-colors">
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-gray-800 truncate">{doc.title}</p>
                       <p className="text-xs text-gray-400">{doc.sourceType.replace(/_/g, " ")}</p>
@@ -148,9 +148,9 @@ export default async function DashboardPage() {
             ) : (
               topOpportunities.map((opp) => (
                 <Link key={opp.id} href={`/workspaces/${opp.workspaceId}/opportunities/${opp.id}`}>
-                  <div className="flex items-center justify-between bg-white rounded-lg border px-4 py-3 hover:border-violet-200 transition-colors">
+                  <div className="flex items-center justify-between bg-white rounded-lg border px-4 py-3 hover:border-indigo-200 transition-colors">
                     <p className="text-sm font-medium text-gray-800 truncate">{opp.title}</p>
-                    <Badge variant="secondary" className="text-violet-700 bg-violet-50 font-semibold ml-2 shrink-0">
+                    <Badge variant="secondary" className="text-indigo-700 bg-indigo-50 font-semibold ml-2 shrink-0">
                       {opp.totalScore.toFixed(0)}
                     </Badge>
                   </div>

@@ -51,8 +51,8 @@ export function DigestWidget({ workspaceId, lastDigestAction }: Props) {
     <section className="bg-white border border-gray-200 rounded-xl overflow-hidden">
       <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-violet-50 flex items-center justify-center">
-            <Bot className="h-3.5 w-3.5 text-violet-500" />
+          <div className="w-7 h-7 rounded-lg bg-indigo-50 flex items-center justify-center">
+            <Bot className="h-3.5 w-3.5 text-indigo-500" />
           </div>
           <div>
             <p className="text-sm font-semibold text-gray-800">Weekly PM Digest</p>
@@ -101,7 +101,7 @@ export function DigestWidget({ workspaceId, lastDigestAction }: Props) {
       )}
 
       {generating && (
-        <div className="px-5 py-4 flex items-center gap-2 text-xs text-violet-600">
+        <div className="px-5 py-4 flex items-center gap-2 text-xs text-indigo-600">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
           Sentinel is generating your digest…
         </div>

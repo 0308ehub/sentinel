@@ -58,12 +58,12 @@ export function WorkspaceNameEditor({
           onChange={(e) => setName(e.target.value)}
           onKeyDown={handleKeyDown}
           disabled={saving}
-          className="text-xl font-bold text-gray-900 border-b-2 border-violet-400 bg-transparent focus:outline-none w-64"
+          className="text-xl font-bold text-gray-900 border-b-2 border-indigo-400 bg-transparent focus:outline-none w-64"
         />
         <button
           onClick={handleSave}
           disabled={saving || !name.trim()}
-          className="p-1 rounded text-violet-600 hover:bg-violet-50 disabled:opacity-40 transition-colors"
+          className="p-1 rounded text-indigo-600 hover:bg-indigo-50 disabled:opacity-40 transition-colors"
           title="Save"
         >
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}

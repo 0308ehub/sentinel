@@ -70,7 +70,7 @@ export function WorkspaceShell({
               {/* Resize handle */}
               <div
                 onMouseDown={onMouseDown}
-                className="w-1 shrink-0 cursor-col-resize bg-border hover:bg-violet-400 active:bg-violet-500 transition-colors"
+                className="w-1 shrink-0 cursor-col-resize bg-border hover:bg-indigo-400 active:bg-indigo-500 transition-colors"
               />
               {/* Agent panel */}
               <div

@@ -61,9 +61,9 @@ function StreamingOpportunityCard({
   index: number;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-violet-200 ring-1 ring-violet-100 p-5 animate-in fade-in slide-in-from-bottom-2 duration-300">
+    <div className="bg-white rounded-xl border border-indigo-200 ring-1 ring-indigo-100 p-5 animate-in fade-in slide-in-from-bottom-2 duration-300">
       <div className="flex items-start gap-4">
-        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-violet-50 border border-violet-100 text-violet-600 font-bold text-sm shrink-0 mt-0.5">
+        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-600 font-bold text-sm shrink-0 mt-0.5">
           {index + 1}
         </div>
         <div className="flex-1 min-w-0">
@@ -161,7 +161,7 @@ export function OpportunitiesClient({
     return (
       <div className="space-y-4">
         {isRunning && (
-          <div className="flex items-center gap-2 text-sm text-violet-600 font-medium">
+          <div className="flex items-center gap-2 text-sm text-indigo-600 font-medium">
             <Loader2 className="h-4 w-4 animate-spin" />
             Generating… {streamingOpps.length} so far
           </div>
@@ -180,7 +180,7 @@ export function OpportunitiesClient({
     // No committed data to show — render skeleton placeholders.
     return (
       <div className="space-y-4">
-        <div className="flex items-center gap-2 text-sm text-violet-600 font-medium">
+        <div className="flex items-center gap-2 text-sm text-indigo-600 font-medium">
           <Loader2 className="h-4 w-4 animate-spin" />
           Generating opportunities…
         </div>

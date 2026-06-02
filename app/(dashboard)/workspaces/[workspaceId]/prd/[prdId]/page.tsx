@@ -45,7 +45,7 @@ export default async function PRDDetailPage({
       <div className="flex items-center gap-2 mb-6">
         <Link
           href={`/workspaces/${workspaceId}/prd`}
-          className="flex items-center gap-1 text-sm text-gray-400 hover:text-violet-600 transition-colors"
+          className="flex items-center gap-1 text-sm text-gray-400 hover:text-indigo-600 transition-colors"
         >
           <ChevronLeft className="h-4 w-4" />
           PRDs

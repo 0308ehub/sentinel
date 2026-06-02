@@ -27,7 +27,7 @@ export function ProgressStream({
             {step.done ? (
               <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
             ) : isLast ? (
-              <Loader2 className="h-3.5 w-3.5 text-violet-500 animate-spin shrink-0" />
+              <Loader2 className="h-3.5 w-3.5 text-indigo-500 animate-spin shrink-0" />
             ) : (
               <Circle className="h-3.5 w-3.5 text-gray-300 shrink-0" />
             )}

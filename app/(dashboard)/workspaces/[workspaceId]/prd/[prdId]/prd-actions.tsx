@@ -79,7 +79,7 @@ export function PRDActions({
             size="sm"
             onClick={onSave}
             disabled={saving}
-            className="gap-1.5 bg-violet-600 hover:bg-violet-700 text-white"
+            className="gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white"
           >
             {saving ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -120,7 +120,7 @@ export function PRDActions({
             size="sm"
             onClick={onGenerateTickets}
             disabled={generatingTickets}
-            className="gap-1.5 bg-violet-600 hover:bg-violet-700 text-white"
+            className="gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white"
           >
             {generatingTickets ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
