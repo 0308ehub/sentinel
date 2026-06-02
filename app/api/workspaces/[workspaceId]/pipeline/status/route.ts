@@ -86,9 +86,8 @@ export async function GET(
 
     const synthesizeNeedsRun =
       painPointCount === 0 ||
-      (latestCompletedDoc !== null &&
-        maxPainPointAt !== null &&
-        latestCompletedDoc.createdAt > maxPainPointAt);
+      maxPainPointAt === null ||
+      latestCompletedDoc!.createdAt > maxPainPointAt;
 
     const opportunitiesNeedsRun =
       synthesizeNeedsRun || (painPointCount > 0 && opportunityCount === 0);
@@ -116,9 +115,9 @@ export async function GET(
         needsRun: opportunitiesNeedsRun,
         label: "Generate opportunities",
         reason: opportunitiesNeedsRun
-          ? opportunityCount === 0
-            ? "No opportunities yet"
-            : "Will run after synthesis"
+          ? synthesizeNeedsRun
+            ? "Will run after synthesis"
+            : "No opportunities yet"
           : "Already up to date",
       },
       {
@@ -163,6 +162,9 @@ export async function GET(
       latestPrdId: latestPRD?.id ?? null,
     } satisfies PipelineStatusResponse);
   } catch (error) {
+    if (error instanceof Error && error.message === "UNAUTHORIZED") {
+      return new Response("Unauthorized", { status: 401 });
+    }
     console.error("[pipeline/status]", error);
     return new Response("Internal Server Error", { status: 500 });
   }
