@@ -8,9 +8,9 @@ const ThemeContext = createContext<{ theme: Theme; toggle: () => void } | null>(
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
-    if (typeof window === 'undefined') return 'light'
+    if (typeof window === 'undefined') return 'dark'
     const stored = localStorage.getItem('sentinel-theme')
-    return stored === 'dark' ? 'dark' : 'light'
+    return stored === 'light' ? 'light' : 'dark'
   })
 
   useEffect(() => {

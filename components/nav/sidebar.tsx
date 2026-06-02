@@ -59,7 +59,7 @@ export function Sidebar() {
           collapsed ? "px-3.5 py-5 justify-center" : "px-4 py-5"
         )}
       >
-        <span className="text-white shrink-0">
+        <span className="text-sidebar-foreground shrink-0">
           <SentinelMark size={18} />
         </span>
         {!collapsed && (
