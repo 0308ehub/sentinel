@@ -1,6 +1,7 @@
 "use client"
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { UserButton } from '@clerk/nextjs'
 import { SentinelLogo } from './SentinelLogo'
 
 const navLinks = [
@@ -36,9 +37,18 @@ export function MarketingNavClient({ isLoggedIn }: { isLoggedIn: boolean }) {
         <div className="flex items-center gap-3">
           <span className="hidden md:block w-px h-4 bg-white/20" aria-hidden="true" />
           {isLoggedIn ? (
-            <Link href="/dashboard" className="text-[13px] text-[#888] hover:text-white transition-colors cursor-pointer">
-              Dashboard →
-            </Link>
+            <div className="flex items-center gap-3">
+              <Link href="/dashboard" className="text-[13px] text-[#888] hover:text-white transition-colors cursor-pointer">
+                Dashboard
+              </Link>
+              <UserButton
+                appearance={{
+                  elements: {
+                    avatarBox: 'h-7 w-7 rounded-full',
+                  },
+                }}
+              />
+            </div>
           ) : (
             <>
               <Link href="/sign-in" className="text-[13px] text-[#888] hover:text-white transition-colors cursor-pointer">
