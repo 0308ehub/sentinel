@@ -14,7 +14,7 @@ export function MarketingNavClient({ isLoggedIn }: { isLoggedIn: boolean }) {
   const pathname = usePathname()
 
   return (
-    <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-[#0d1117]/90 backdrop-blur-md">
+    <header className="sticky top-0 z-50 border-b border-white/[0.08] bg-[#111827]/90 backdrop-blur-md">
       <nav aria-label="Main navigation" className="max-w-[1200px] mx-auto px-6 h-14 flex items-center justify-between">
         <Link href="/" aria-label="Sentinel home" className="flex items-center gap-2.5 flex-shrink-0">
           <SentinelLogo />
