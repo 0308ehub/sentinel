@@ -48,16 +48,16 @@ export function DigestWidget({ workspaceId, lastDigestAction }: Props) {
   }
 
   return (
-    <section className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+    <section className="bg-card border border-border rounded-xl overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-border">
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-indigo-50 flex items-center justify-center">
-            <Bot className="h-3.5 w-3.5 text-indigo-500" />
+          <div className="w-7 h-7 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+            <Bot className="h-3.5 w-3.5 text-indigo-400" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-gray-800">Weekly PM Digest</p>
+            <p className="text-sm font-semibold text-foreground">Weekly PM Digest</p>
             {currentDigest && (
-              <p className="text-[10px] text-gray-400">
+              <p className="text-[10px] text-muted-foreground">
                 Generated {formatDate(currentDigest.createdAt)}
               </p>
             )}
@@ -67,7 +67,7 @@ export function DigestWidget({ workspaceId, lastDigestAction }: Props) {
           {digestText && (
             <button
               onClick={() => setExpanded((e) => !e)}
-              className="text-xs text-gray-400 hover:text-gray-700 flex items-center gap-1"
+              className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
             >
               {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
               {expanded ? "Collapse" : "Expand"}
@@ -88,7 +88,7 @@ export function DigestWidget({ workspaceId, lastDigestAction }: Props) {
 
       {digestText && expanded && (
         <div className="px-5 py-4">
-          <div className="prose prose-sm max-w-none text-gray-700 whitespace-pre-wrap text-sm leading-relaxed">
+          <div className="prose prose-sm max-w-none text-foreground/80 whitespace-pre-wrap text-sm leading-relaxed">
             {digestText}
           </div>
         </div>
@@ -96,7 +96,7 @@ export function DigestWidget({ workspaceId, lastDigestAction }: Props) {
 
       {!digestText && !generating && (
         <div className="px-5 py-4 text-center">
-          <p className="text-xs text-gray-400">No digest yet. Generate one to get a weekly PM summary of your workspace.</p>
+          <p className="text-xs text-muted-foreground">No digest yet. Generate one to get a weekly PM summary of your workspace.</p>
         </div>
       )}
 

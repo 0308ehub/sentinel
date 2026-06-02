@@ -58,12 +58,12 @@ export function WorkspaceNameEditor({
           onChange={(e) => setName(e.target.value)}
           onKeyDown={handleKeyDown}
           disabled={saving}
-          className="text-xl font-bold text-gray-900 border-b-2 border-indigo-400 bg-transparent focus:outline-none w-64"
+          className="text-xl font-bold text-foreground border-b-2 border-indigo-400 bg-transparent focus:outline-none w-64"
         />
         <button
           onClick={handleSave}
           disabled={saving || !name.trim()}
-          className="p-1 rounded text-indigo-600 hover:bg-indigo-50 disabled:opacity-40 transition-colors"
+          className="p-1 rounded text-indigo-400 hover:bg-indigo-500/10 disabled:opacity-40 transition-colors"
           title="Save"
         >
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
@@ -71,7 +71,7 @@ export function WorkspaceNameEditor({
         <button
           onClick={() => { setName(initialName); setEditing(false); }}
           disabled={saving}
-          className="p-1 rounded text-gray-400 hover:bg-gray-100 transition-colors"
+          className="p-1 rounded text-muted-foreground hover:bg-muted transition-colors"
           title="Cancel"
         >
           <X className="h-4 w-4" />
@@ -82,10 +82,10 @@ export function WorkspaceNameEditor({
 
   return (
     <div className="group flex items-center gap-2">
-      <h1 className="text-xl font-bold text-gray-900">{initialName}</h1>
+      <h1 className="text-xl font-bold text-foreground">{initialName}</h1>
       <button
         onClick={() => setEditing(true)}
-        className="opacity-0 group-hover:opacity-100 p-1 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-all"
+        className="opacity-0 group-hover:opacity-100 p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
         title="Rename workspace"
       >
         <Pencil className="h-3.5 w-3.5" />

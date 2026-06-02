@@ -99,13 +99,13 @@ export default async function WorkspacePage({
   }
 
   const statusColors: Record<string, string> = {
-    COMPLETED: "bg-green-100 text-green-700",
-    PENDING: "bg-yellow-100 text-yellow-700",
-    FAILED: "bg-red-100 text-red-700",
-    PARSING: "bg-blue-100 text-blue-700",
-    CHUNKING: "bg-blue-100 text-blue-700",
-    EMBEDDING: "bg-blue-100 text-blue-700",
-    EXTRACTING: "bg-indigo-100 text-indigo-700",
+    COMPLETED: "bg-green-500/15 text-green-400 border border-green-500/20",
+    PENDING: "bg-yellow-500/15 text-yellow-400 border border-yellow-500/20",
+    FAILED: "bg-red-500/15 text-red-400 border border-red-500/20",
+    PARSING: "bg-blue-500/15 text-blue-400 border border-blue-500/20",
+    CHUNKING: "bg-blue-500/15 text-blue-400 border border-blue-500/20",
+    EMBEDDING: "bg-blue-500/15 text-blue-400 border border-blue-500/20",
+    EXTRACTING: "bg-indigo-500/15 text-indigo-400 border border-indigo-500/20",
   };
 
   return (
@@ -135,10 +135,10 @@ export default async function WorkspacePage({
       <div className="p-8 space-y-8">
         {/* Autonomous suggestion banner */}
         {suggestion && (
-          <div className="bg-card border border-indigo-200 rounded-xl px-5 py-4 flex items-center justify-between gap-4 shadow-sm">
+          <div className="bg-card border border-indigo-500/25 rounded-xl px-5 py-4 flex items-center justify-between gap-4 shadow-sm">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0">
-                <suggestion.icon className="h-4 w-4 text-indigo-600" />
+              <div className="w-9 h-9 rounded-lg bg-indigo-500/10 flex items-center justify-center shrink-0">
+                <suggestion.icon className="h-4 w-4 text-indigo-400" />
               </div>
               <div>
                 <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-0.5">Sentinel Suggests</p>
@@ -156,16 +156,16 @@ export default async function WorkspacePage({
         {/* Pending actions banner */}
         {pendingActionCount > 0 && (
           <Link href={`/workspaces/${workspaceId}/inbox`}>
-            <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-3 flex items-center justify-between gap-4 hover:border-amber-300 transition-colors cursor-pointer">
+            <div className="bg-amber-500/10 border border-amber-500/25 rounded-xl px-5 py-3 flex items-center justify-between gap-4 hover:border-amber-500/40 transition-colors cursor-pointer">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
-                  <Inbox className="h-4 w-4 text-amber-600" />
+                <div className="w-8 h-8 rounded-lg bg-amber-500/15 flex items-center justify-center shrink-0">
+                  <Inbox className="h-4 w-4 text-amber-400" />
                 </div>
-                <p className="text-sm font-medium text-amber-800">
+                <p className="text-sm font-medium text-amber-300">
                   {pendingActionCount} action{pendingActionCount !== 1 ? "s" : ""} waiting for your review in Sentinel Inbox
                 </p>
               </div>
-              <span className="text-xs font-semibold text-amber-600 flex items-center gap-1 shrink-0">
+              <span className="text-xs font-semibold text-amber-400 flex items-center gap-1 shrink-0">
                 Review <ChevronRight className="h-3 w-3" />
               </span>
             </div>
