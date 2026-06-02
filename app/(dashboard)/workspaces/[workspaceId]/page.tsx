@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { DigestWidget } from "./digest-widget";
 import { WorkspaceNameEditor } from "./workspace-name-editor";
+import { PipelineBanner } from "./pipeline-banner";
 import { formatDate, scoreToColor } from "@/lib/utils";
 
 export default async function WorkspacePage({
@@ -171,6 +172,9 @@ export default async function WorkspacePage({
             </div>
           </Link>
         )}
+
+        {/* Autonomous pipeline banner */}
+        <PipelineBanner workspaceId={workspaceId} />
 
         {/* Stats row */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
