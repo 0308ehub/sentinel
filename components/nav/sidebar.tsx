@@ -6,7 +6,6 @@ import { UserButton } from "@clerk/nextjs";
 import {
   LayoutDashboard,
   FolderKanban,
-  Sparkles,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -18,6 +17,18 @@ const nav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/workspaces", label: "Projects", icon: FolderKanban },
 ];
+
+function SentinelMark({ size = 18 }: { size?: number }) {
+  const height = Math.round(size * 60 / 44);
+  return (
+    <svg width={size} height={height} viewBox="0 0 44 60" fill="none" aria-hidden="true">
+      <polygon points="22,1 28,7 22,13 16,7" fill="currentColor" />
+      <rect x="13" y="13" width="18" height="9" fill="currentColor" />
+      <polygon points="13,22 31,22 34,54 10,54" fill="currentColor" />
+      <rect x="3" y="54" width="38" height="6" fill="currentColor" />
+    </svg>
+  );
+}
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -37,22 +48,22 @@ export function Sidebar() {
   return (
     <div
       className={cn(
-        "flex flex-col shrink-0 transition-all duration-200 bg-gray-950 border-r border-gray-800",
+        "flex flex-col shrink-0 transition-all duration-200 bg-sidebar border-r border-sidebar-border",
         collapsed ? "w-14" : "w-52"
       )}
     >
       {/* Logo */}
       <div
         className={cn(
-          "flex items-center gap-2.5 border-b border-gray-800",
+          "flex items-center gap-2.5 border-b border-sidebar-border",
           collapsed ? "px-3.5 py-5 justify-center" : "px-4 py-5"
         )}
       >
-        <div className="w-6 h-6 rounded-md bg-indigo-500 flex items-center justify-center shrink-0">
-          <Sparkles className="h-3.5 w-3.5 text-white" />
-        </div>
+        <span className="text-white shrink-0">
+          <SentinelMark size={18} />
+        </span>
         {!collapsed && (
-          <span className="font-semibold text-base text-white tracking-tight">Sentinel</span>
+          <span className="font-semibold text-base text-sidebar-foreground tracking-tight">Sentinel</span>
         )}
       </div>
 
@@ -70,7 +81,7 @@ export function Sidebar() {
                 collapsed && "justify-center px-2",
                 active
                   ? "bg-indigo-500/15 text-indigo-400 border border-indigo-500/20"
-                  : "text-gray-400 hover:bg-gray-800 hover:text-gray-100 border border-transparent"
+                  : "text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-foreground border border-transparent"
               )}
             >
               <Icon className="h-4 w-4 shrink-0" />
@@ -87,14 +98,14 @@ export function Sidebar() {
             <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-pulse" />
             <span className="text-xs font-medium text-indigo-300">AI Agent Active</span>
           </div>
-          <p className="text-xs text-gray-500 mt-1 leading-snug">Monitoring 3 projects</p>
+          <p className="text-xs text-sidebar-foreground/40 mt-1 leading-snug">Monitoring 3 projects</p>
         </div>
       )}
 
       {/* Footer */}
       <div
         className={cn(
-          "p-3 border-t border-gray-800 flex items-center",
+          "p-3 border-t border-sidebar-border flex items-center",
           collapsed ? "flex-col gap-3 justify-center" : "justify-between"
         )}
       >
@@ -106,10 +117,10 @@ export function Sidebar() {
           }}
         />
         <div className={cn("flex items-center", collapsed ? "flex-col gap-2" : "gap-1")}>
-          <ThemeToggle className="text-gray-600 hover:text-gray-300 hover:bg-gray-800 [&_svg]:h-3.5 [&_svg]:w-3.5" />
+          <ThemeToggle className="text-sidebar-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent [&_svg]:h-3.5 [&_svg]:w-3.5" />
           <button
             onClick={toggle}
-            className="p-1 rounded-md text-gray-600 hover:text-gray-300 hover:bg-gray-800 transition-colors"
+            className="p-1 rounded-md text-sidebar-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
             title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
