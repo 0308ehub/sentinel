@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
   FileText,
   Lightbulb,
@@ -16,6 +16,8 @@ import {
   Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { usePipelineContext } from "@/app/(dashboard)/workspaces/[workspaceId]/pipeline-context";
+import type { PipelineStepKey } from "@/app/(dashboard)/workspaces/[workspaceId]/pipeline-context";
 
 interface WorkspaceNavProps {
   workspaceId: string;
@@ -25,6 +27,7 @@ export function WorkspaceNav({ workspaceId }: WorkspaceNavProps) {
   const pathname = usePathname();
   const base = `/workspaces/${workspaceId}`;
   const [pendingCount, setPendingCount] = useState(0);
+  const pipeline = usePipelineContext();
 
   // Track exact PRD-section URL so the nav link returns to wherever the user
   // actually left — the list, a specific PRD, etc.
@@ -54,23 +57,31 @@ export function WorkspaceNav({ workspaceId }: WorkspaceNavProps) {
     return () => { cancelled = true; clearInterval(id); };
   }, [workspaceId]);
 
-  const links = [
-    { href: base,                         activeHref: base,                         label: "Overview",       icon: BookOpen,         exact: true },
-    { href: `${base}/documents`,          activeHref: `${base}/documents`,          label: "Documents",      icon: FileText },
-    { href: `${base}/insights`,           activeHref: `${base}/insights`,           label: "Insights",       icon: Lightbulb },
-    { href: `${base}/opportunities`,      activeHref: `${base}/opportunities`,      label: "Opportunities",  icon: Target },
-    { href: prdHref,                      activeHref: `${base}/prd`,                label: "PRDs",           icon: FileText },
-    { href: `${base}/tickets`,            activeHref: `${base}/tickets`,            label: "Tickets",        icon: Kanban },
-    { href: `${base}/search`,             activeHref: `${base}/search`,             label: "Search",         icon: Search },
-    { href: `${base}/reports`,            activeHref: `${base}/reports`,            label: "Reports",        icon: BarChart2 },
+  const links: Array<{
+    href: string;
+    activeHref: string;
+    label: string;
+    icon: React.ElementType;
+    exact?: boolean;
+    badge?: number;
+    pipelineKey?: PipelineStepKey;
+  }> = [
+    { href: base,                         activeHref: base,                         label: "Overview",        icon: BookOpen,          exact: true },
+    { href: `${base}/documents`,          activeHref: `${base}/documents`,          label: "Documents",       icon: FileText },
+    { href: `${base}/insights`,           activeHref: `${base}/insights`,           label: "Insights",        icon: Lightbulb,         pipelineKey: "synthesize" },
+    { href: `${base}/opportunities`,      activeHref: `${base}/opportunities`,      label: "Opportunities",   icon: Target,            pipelineKey: "opportunities" },
+    { href: prdHref,                      activeHref: `${base}/prd`,                label: "PRDs",            icon: FileText,          pipelineKey: "prd" },
+    { href: `${base}/tickets`,            activeHref: `${base}/tickets`,            label: "Tickets",         icon: Kanban,            pipelineKey: "tickets" },
+    { href: `${base}/search`,             activeHref: `${base}/search`,             label: "Search",          icon: Search },
+    { href: `${base}/reports`,            activeHref: `${base}/reports`,            label: "Reports",         icon: BarChart2,         pipelineKey: "summary" },
     { href: `${base}/interview-guide`,    activeHref: `${base}/interview-guide`,    label: "Interview Guide", icon: MessageSquarePlus },
-    { href: `${base}/inbox`,              activeHref: `${base}/inbox`,              label: "Inbox",          icon: Inbox,            badge: pendingCount },
-    { href: `${base}/integrations`,       activeHref: `${base}/integrations`,       label: "Integrations",   icon: Plug },
+    { href: `${base}/inbox`,              activeHref: `${base}/inbox`,              label: "Inbox",           icon: Inbox,             badge: pendingCount },
+    { href: `${base}/integrations`,       activeHref: `${base}/integrations`,       label: "Integrations",    icon: Plug },
   ];
 
   return (
     <nav className="flex items-center gap-0.5 border-b border-border px-4 bg-card shrink-0 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-      {links.map(({ href, activeHref, label, icon: Icon, exact, badge }) => {
+      {links.map(({ href, activeHref, label, icon: Icon, exact, badge, pipelineKey }) => {
         const active = exact ? pathname === activeHref : pathname.startsWith(activeHref);
         return (
           <Link
@@ -89,6 +100,9 @@ export function WorkspaceNav({ workspaceId }: WorkspaceNavProps) {
               <span className="ml-0.5 inline-flex items-center justify-center h-4 min-w-[16px] px-1 rounded-full bg-indigo-600 text-white text-[10px] font-bold leading-none">
                 {badge > 99 ? "99+" : badge}
               </span>
+            )}
+            {pipelineKey && pipeline.currentStep === pipelineKey && (
+              <span className="ml-0.5 w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse shrink-0" />
             )}
           </Link>
         );
