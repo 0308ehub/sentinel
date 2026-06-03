@@ -90,7 +90,8 @@ export function PipelineBanner({ workspaceId }: { workspaceId: string }) {
   if (
     !previewChecking &&
     previewCanRun === false &&
-    previewBlockedReason === "Everything is up to date"
+    (previewBlockedReason === "Everything is up to date" ||
+      previewBlockedReason === "Upload documents first")
   ) {
     return null;
   }
