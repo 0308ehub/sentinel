@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Ticket, Loader2, Pencil } from "lucide-react";
+import { Ticket, Loader2, Pencil, Trash2, Check, X } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
 import { PRDActions } from "./prd-actions";
@@ -23,6 +23,8 @@ interface CommittedTicket {
   estimate: string | null;
 }
 
+const PRIORITIES = ["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const;
+
 const priorityColors: Record<string, string> = {
   CRITICAL: "bg-red-100 text-red-700",
   HIGH: "bg-orange-100 text-orange-700",
@@ -32,30 +34,148 @@ const priorityColors: Record<string, string> = {
 
 function TicketCard({
   ticket,
+  workspaceId,
   streaming,
+  onUpdate,
+  onDelete,
 }: {
   ticket: CommittedTicket | StreamingTicket;
+  workspaceId: string;
   streaming?: boolean;
+  onUpdate?: (id: string, updates: { title?: string; priority?: string }) => Promise<void>;
+  onDelete?: (id: string) => Promise<void>;
 }) {
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState(ticket.title);
+  const [editPriority, setEditPriority] = useState(ticket.priority);
+  const [saving, setSaving] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleSave() {
+    if (!onUpdate) return;
+    setSaving(true);
+    try {
+      await onUpdate(ticket.id, { title: editTitle, priority: editPriority });
+      setEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleCancelEdit() {
+    setEditTitle(ticket.title);
+    setEditPriority(ticket.priority);
+    setEditing(false);
+  }
+
+  async function handleDelete() {
+    if (!confirmingDelete) {
+      setConfirmingDelete(true);
+      return;
+    }
+    if (!onDelete) return;
+    setDeleting(true);
+    try {
+      await onDelete(ticket.id);
+    } finally {
+      setDeleting(false);
+      setConfirmingDelete(false);
+    }
+  }
+
+  const canEdit = !streaming && !!onUpdate && !!onDelete;
+
+  if (editing) {
+    return (
+      <div className="bg-white rounded-lg border border-indigo-200 ring-1 ring-indigo-100 px-3 py-2.5 animate-in fade-in duration-100">
+        <textarea
+          autoFocus
+          value={editTitle}
+          onChange={(e) => setEditTitle(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleSave();
+            if (e.key === "Escape") handleCancelEdit();
+          }}
+          className="w-full text-xs font-medium text-gray-800 leading-snug resize-none outline-none mb-2 min-h-[2.5rem]"
+          rows={2}
+        />
+        <div className="flex items-center justify-between gap-2">
+          <select
+            value={editPriority}
+            onChange={(e) => setEditPriority(e.target.value)}
+            className="text-xs border rounded px-1.5 py-0.5 bg-white text-gray-700 outline-none cursor-pointer"
+          >
+            {PRIORITIES.map((p) => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={handleCancelEdit}
+              className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving || !editTitle.trim()}
+              className="p-1 rounded hover:bg-green-50 text-green-600 disabled:opacity-40 transition-colors"
+            >
+              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
-        "bg-white rounded-lg border px-3 py-2.5 animate-in fade-in slide-in-from-bottom-1 duration-200",
+        "group bg-white rounded-lg border px-3 py-2.5 animate-in fade-in slide-in-from-bottom-1 duration-200",
         streaming && "border-indigo-200 ring-1 ring-indigo-100"
       )}
     >
       <div className="flex items-start justify-between gap-2 mb-1">
-        <p className="text-xs font-medium text-gray-800 leading-snug">
+        <p className="text-xs font-medium text-gray-800 leading-snug flex-1">
           {ticket.title}
         </p>
-        <span
-          className={cn(
-            "text-xs px-1.5 py-0.5 rounded font-medium shrink-0",
-            priorityColors[ticket.priority] ?? "bg-gray-100 text-gray-600"
+        <div className="flex items-center gap-1 shrink-0">
+          <span
+            className={cn(
+              "text-xs px-1.5 py-0.5 rounded font-medium",
+              priorityColors[ticket.priority] ?? "bg-gray-100 text-gray-600"
+            )}
+          >
+            {ticket.priority}
+          </span>
+          {canEdit && (
+            <>
+              <button
+                onClick={() => setEditing(true)}
+                className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-all"
+              >
+                <Pencil className="h-3 w-3" />
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                onBlur={() => setConfirmingDelete(false)}
+                className={cn(
+                  "opacity-0 group-hover:opacity-100 p-0.5 rounded transition-all",
+                  confirmingDelete
+                    ? "opacity-100 text-red-600 hover:bg-red-50"
+                    : "text-gray-400 hover:text-red-500 hover:bg-red-50"
+                )}
+              >
+                {deleting
+                  ? <Loader2 className="h-3 w-3 animate-spin" />
+                  : <Trash2 className="h-3 w-3" />}
+              </button>
+            </>
           )}
-        >
-          {ticket.priority}
-        </span>
+        </div>
       </div>
       {(ticket.ticketType || ticket.estimate) && (
         <div className="flex gap-2">
@@ -66,6 +186,9 @@ function TicketCard({
             <span className="text-xs text-gray-400">· {ticket.estimate}</span>
           )}
         </div>
+      )}
+      {confirmingDelete && (
+        <p className="text-xs text-red-500 mt-1.5">Click trash again to confirm delete</p>
       )}
     </div>
   );
@@ -103,6 +226,10 @@ export function PRDPageClient({ prd, workspaceId }: PRDPageClientProps) {
   const [workingContent, setWorkingContent] = useState(prd.content);
   // Active diff state (null when no diff pending)
   const [diffState, setDiffState] = useState<DiffState | null>(null);
+
+  // Local ticket list for optimistic updates
+  const [localTickets, setLocalTickets] = useState<CommittedTicket[]>(prd.tickets);
+  useEffect(() => { setLocalTickets(prd.tickets); }, [prd.tickets]);
 
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(prd.content);
@@ -193,7 +320,7 @@ export function PRDPageClient({ prd, workspaceId }: PRDPageClientProps) {
   }
 
   const showStreaming = generatingTickets || streamingTickets.length > 0;
-  const tickets = showStreaming ? streamingTickets : prd.tickets;
+  const tickets = showStreaming ? streamingTickets : localTickets;
 
   function handleGenerateTickets() {
     startJob(
@@ -225,6 +352,37 @@ export function PRDPageClient({ prd, workspaceId }: PRDPageClientProps) {
       );
     } finally {
       setClearingTickets(false);
+    }
+  }
+
+  async function handleUpdateTicket(ticketId: string, updates: { title?: string; priority?: string }) {
+    const prev = localTickets;
+    setLocalTickets((curr) => curr.map((t) => t.id === ticketId ? { ...t, ...updates } : t));
+    const res = await fetch(`/api/workspaces/${workspaceId}/tickets/${ticketId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates),
+    });
+    if (!res.ok) {
+      setLocalTickets(prev);
+      toast.error("Failed to update ticket");
+    } else {
+      router.refresh();
+    }
+  }
+
+  async function handleDeleteTicket(ticketId: string) {
+    const prev = localTickets;
+    setLocalTickets((curr) => curr.filter((t) => t.id !== ticketId));
+    const res = await fetch(`/api/workspaces/${workspaceId}/tickets/${ticketId}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) {
+      setLocalTickets(prev);
+      toast.error("Failed to delete ticket");
+    } else {
+      toast.success("Ticket deleted");
+      router.refresh();
     }
   }
 
@@ -274,10 +432,10 @@ export function PRDPageClient({ prd, workspaceId }: PRDPageClientProps) {
             <span className="text-xs text-gray-400">
               Created {formatDate(prd.createdAt)}
             </span>
-            {prd.tickets.length > 0 && (
+            {localTickets.length > 0 && (
               <span className="flex items-center gap-1 text-xs text-gray-500">
                 <Ticket className="h-3.5 w-3.5" />
-                {prd.tickets.length} ticket{prd.tickets.length !== 1 ? "s" : ""}
+                {localTickets.length} ticket{localTickets.length !== 1 ? "s" : ""}
               </span>
             )}
           </div>
@@ -386,7 +544,10 @@ export function PRDPageClient({ prd, workspaceId }: PRDPageClientProps) {
                   <TicketCard
                     key={ticket.id}
                     ticket={ticket}
+                    workspaceId={workspaceId}
                     streaming={showStreaming}
+                    onUpdate={showStreaming ? undefined : handleUpdateTicket}
+                    onDelete={showStreaming ? undefined : handleDeleteTicket}
                   />
                 ))}
               </div>
