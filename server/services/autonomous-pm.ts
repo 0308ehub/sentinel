@@ -243,7 +243,7 @@ export async function executeAction(actionId: string) {
             });
 
             const { dispatchIngestion } = await import("@/server/jobs/dispatch");
-            dispatchIngestion(document.id).catch(() => {});
+            dispatchIngestion(document.id);
             imported++;
           }
         }

@@ -35,27 +35,24 @@ export async function POST(
     const buffer = Buffer.from(bytes);
     const fileExt = file.name.split(".").pop() ?? "txt";
 
-    // For MVP, store text inline. Production would use object storage.
-    const rawText = fileExt === "pdf" ? undefined : buffer.toString("utf-8");
-    const storageKey = fileExt === "pdf" ? file.name : undefined;
-
     let metadata: Record<string, unknown> = {};
     if (metadataRaw) {
       try { metadata = JSON.parse(metadataRaw); } catch { /* ignore */ }
     }
 
+    // Create document record with metadata only — raw content is handed off to
+    // the background worker so we never block the HTTP response on a large DB write.
     const document = await createDocument({
       workspaceId,
       uploadedById: user.id,
       title: title || file.name,
       sourceType,
       fileType: fileExt,
-      rawText,
-      storageKey,
       metadata,
     });
 
-    await dispatchIngestion(document.id);
+    // Fire-and-forget: passes the buffer so the worker skips the DB read.
+    dispatchIngestion(document.id, buffer);
 
     return Response.json(apiSuccess({ documentId: document.id, status: "PENDING" }), { status: 201 });
   } catch (error) {

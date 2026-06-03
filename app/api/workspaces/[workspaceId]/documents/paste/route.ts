@@ -32,17 +32,19 @@ export async function POST(
     const body = await request.json();
     const { title, text, sourceType, metadata } = PasteSchema.parse(body);
 
+    // Create document record without rawText so the HTTP response is never
+    // blocked on a large DB write — text is passed directly to the background worker.
     const document = await createDocument({
       workspaceId,
       uploadedById: user.id,
       title,
       sourceType: sourceType as DocumentSourceType,
       fileType: "txt",
-      rawText: text,
       metadata,
     });
 
-    await dispatchIngestion(document.id);
+    // Fire-and-forget: passes the text so the worker skips the DB read.
+    dispatchIngestion(document.id, text);
 
     return Response.json(apiSuccess({ documentId: document.id, status: "PENDING" }), { status: 201 });
   } catch (error) {

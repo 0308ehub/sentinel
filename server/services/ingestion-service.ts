@@ -5,7 +5,7 @@ import { ai } from "@/lib/ai/provider";
 import { updateDocumentStatus } from "./document-service";
 import { extractDocumentInsights } from "./extraction-service";
 
-export async function processDocument(documentId: string): Promise<void> {
+export async function processDocument(documentId: string, rawInput?: Buffer | string): Promise<void> {
   try {
     const document = await prisma.document.findUniqueOrThrow({
       where: { id: documentId },
@@ -13,28 +13,34 @@ export async function processDocument(documentId: string): Promise<void> {
 
     // PARSING
     await updateDocumentStatus(documentId, "PARSING");
-    let rawText = document.rawText ?? "";
 
-    if (!rawText && document.storageKey) {
-      // In production, fetch from storage. For MVP, storageKey IS the text.
-      rawText = document.storageKey;
-    }
+    let parsedText: string;
 
-    const parsed = await parseDocumentContent(
-      rawText,
-      document.fileType ?? "txt"
-    );
-
-    if (!document.rawText) {
+    if (rawInput !== undefined) {
+      // Fast path: content was passed directly from the upload route — no DB read needed.
+      const parsed = await parseDocumentContent(rawInput, document.fileType ?? "txt");
+      parsedText = parsed.text;
+      // Persist rawText so reprocess and search can use it later.
       await prisma.document.update({
         where: { id: documentId },
-        data: { rawText: parsed.text },
+        data: { rawText: parsedText },
       });
+    } else {
+      // Reprocess path: read content that was previously stored.
+      const stored = document.rawText ?? document.storageKey ?? "";
+      const parsed = await parseDocumentContent(stored, document.fileType ?? "txt");
+      parsedText = parsed.text;
+      if (!document.rawText) {
+        await prisma.document.update({
+          where: { id: documentId },
+          data: { rawText: parsedText },
+        });
+      }
     }
 
     // CHUNKING
     await updateDocumentStatus(documentId, "CHUNKING");
-    const textChunks = chunkText(parsed.text ?? rawText);
+    const textChunks = chunkText(parsedText);
 
     // EMBEDDING
     await updateDocumentStatus(documentId, "EMBEDDING");

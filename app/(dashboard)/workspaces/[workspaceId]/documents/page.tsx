@@ -38,7 +38,7 @@ export default async function DocumentsPage({
       data: { status: "PENDING" },
     });
     for (const doc of stuckDocs) {
-      dispatchIngestion(doc.id).catch(() => {});
+      dispatchIngestion(doc.id);
     }
     documents.splice(
       0,
