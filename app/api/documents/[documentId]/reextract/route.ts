@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requireUser } from "@/lib/auth/helpers";
 import { apiSuccess, apiError } from "@/types";
@@ -32,8 +33,7 @@ export async function POST(
 
     await updateDocumentStatus(documentId, "EXTRACTING");
 
-    // Run inline (same pattern as dispatchIngestion in dev)
-    ;(async () => {
+    after(async () => {
       try {
         await extractDocumentInsights(documentId);
         await updateDocumentStatus(documentId, "COMPLETED");
@@ -41,7 +41,7 @@ export async function POST(
         console.error(`[reextract] failed for ${documentId}:`, err);
         await updateDocumentStatus(documentId, "FAILED", String(err));
       }
-    })();
+    });
 
     return Response.json(apiSuccess({ documentId, status: "EXTRACTING" }));
   } catch {
