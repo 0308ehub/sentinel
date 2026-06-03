@@ -316,9 +316,10 @@ model PRD {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  opportunity Opportunity? @relation(fields: [opportunityId], references: [id])
-  tickets     EngineeringTicket[]
+  workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  opportunity   Opportunity?   @relation(fields: [opportunityId], references: [id])
+  tickets       EngineeringTicket[]
+  conversations Conversation[]
 }
 
 model EngineeringTicket {
@@ -366,13 +367,17 @@ model Conversation {
   id          String   @id @default(cuid())
   workspaceId String
   userId      String
+  prdId       String?
   title       String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  user      User      @relation(fields: [userId], references: [id])
+  workspace Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User         @relation(fields: [userId], references: [id])
+  prd       PRD?         @relation(fields: [prdId], references: [id], onDelete: Cascade)
   messages  Message[]
+
+  @@index([prdId])
 }
 
 model Message {
