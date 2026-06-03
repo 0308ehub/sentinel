@@ -378,6 +378,7 @@ model Conversation {
   messages  Message[]
 
   @@index([prdId])
+  @@unique([prdId, userId])
 }
 
 model Message {

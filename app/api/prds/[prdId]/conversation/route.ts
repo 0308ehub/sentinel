@@ -23,22 +23,17 @@ export async function GET(
       return Response.json(apiError("NOT_FOUND", "PRD not found"), { status: 404 });
     }
 
-    let conversation = await prisma.conversation.findFirst({
-      where: { prdId, userId: user.id },
+    const conversation = await prisma.conversation.upsert({
+      where: { prdId_userId: { prdId, userId: user.id } },
+      create: {
+        workspaceId: prd.workspaceId,
+        userId: user.id,
+        prdId,
+        title: `PRD: ${prd.title}`,
+      },
+      update: {},
       include: { messages: { orderBy: { createdAt: "asc" } } },
     });
-
-    if (!conversation) {
-      conversation = await prisma.conversation.create({
-        data: {
-          workspaceId: prd.workspaceId,
-          userId: user.id,
-          prdId,
-          title: `PRD: ${prd.title}`,
-        },
-        include: { messages: { orderBy: { createdAt: "asc" } } },
-      });
-    }
 
     return Response.json(
       apiSuccess({
@@ -51,7 +46,10 @@ export async function GET(
         })),
       })
     );
-  } catch {
-    return Response.json(apiError("UNAUTHORIZED", "Not authorized"), { status: 401 });
+  } catch (error) {
+    if (error instanceof Error && error.message.toLowerCase().includes("unauthorized")) {
+      return Response.json(apiError("UNAUTHORIZED", "Not authorized"), { status: 401 });
+    }
+    return Response.json(apiError("INTERNAL_ERROR", "Internal server error"), { status: 500 });
   }
 }
