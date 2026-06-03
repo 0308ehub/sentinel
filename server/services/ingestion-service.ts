@@ -72,19 +72,15 @@ export async function processDocument(documentId: string, rawInput?: Buffer | st
       `;
     }
 
-    // EXTRACTING — non-fatal: if AI extraction times out or fails, still complete
-    await updateDocumentStatus(documentId, "EXTRACTING");
-    try {
-      const extractionTimeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Extraction timeout after 90s")), 90_000)
-      );
-      await Promise.race([extractDocumentInsights(documentId), extractionTimeout]);
-    } catch (extractErr) {
-      console.error(`[ingestion] Extraction failed for ${documentId} (non-fatal):`, extractErr);
-    }
-
-    // COMPLETED
+    // COMPLETED — mark as soon as embeddings are stored so users can synthesize immediately
     await updateDocumentStatus(documentId, "COMPLETED");
+
+    // Extraction runs after completion (non-blocking for the user).
+    // The after() context in dispatch.ts keeps the process alive so this still
+    // finishes and populates insights — it just no longer gates synthesis.
+    extractDocumentInsights(documentId).catch((extractErr) =>
+      console.error(`[ingestion] Extraction failed for ${documentId} (non-fatal):`, extractErr)
+    );
 
     // Track event
     await prisma.productEvent.create({

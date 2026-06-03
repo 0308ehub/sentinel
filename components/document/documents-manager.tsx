@@ -45,7 +45,6 @@ const STATUS_STYLES: Record<string, string> = {
   PARSING: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-400 dark:border-blue-800",
   CHUNKING: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-400 dark:border-blue-800",
   EMBEDDING: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-400 dark:border-blue-800",
-  EXTRACTING: "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950 dark:text-indigo-400 dark:border-indigo-800",
 };
 
 function FileIcon({ fileType, sourceType }: { fileType?: string | null; sourceType: string }) {
@@ -68,7 +67,7 @@ function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
     : <ArrowDown className="h-3 w-3 text-indigo-500" />;
 }
 
-const STATUS_FILTER_OPTIONS = ["All", "COMPLETED", "FAILED", "PENDING", "EXTRACTING", "EMBEDDING"] as const;
+const STATUS_FILTER_OPTIONS = ["All", "COMPLETED", "FAILED", "PENDING", "EMBEDDING"] as const;
 
 interface DocRowProps {
   doc: DocumentItem;
@@ -113,7 +112,7 @@ function DocRow({ doc, selected, onToggle }: DocRowProps) {
     finally { setDeleting(false); setConfirming(false); }
   };
 
-  const canReprocess = ["FAILED", "COMPLETED", "PENDING", "EXTRACTING"].includes(doc.status);
+  const canReprocess = ["FAILED", "COMPLETED", "PENDING"].includes(doc.status);
   const canReextract = doc.status === "COMPLETED";
 
   return (
