@@ -78,6 +78,7 @@ model Workspace {
   sentinelActions  SentinelAction[]
   settings         WorkspaceSettings?
   digests          Digest[]
+  interviewGuides  InterviewGuide[]
 }
 
 // ─── Documents ────────────────────────────────────────────────────────────────
@@ -360,6 +361,73 @@ enum TicketStatus {
   IN_PROGRESS
   IN_REVIEW
   DONE
+}
+
+// ─── Interview Guides ─────────────────────────────────────────────────────────
+
+model InterviewGuide {
+  id               String   @id @default(cuid())
+  workspaceId      String
+  title            String
+  customerSegment  String
+  interviewType    String
+  focusArea        String?
+  openingStatement String
+  closingStatement String
+  synthesis        Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  workspace Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  questions InterviewQuestion[]
+  sessions  InterviewSession[]
+
+  @@index([workspaceId])
+}
+
+model InterviewQuestion {
+  id       String  @id @default(cuid())
+  guideId  String
+  theme    String
+  question String
+  probe    String?
+  order    Int
+
+  guide InterviewGuide @relation(fields: [guideId], references: [id], onDelete: Cascade)
+  notes SessionNote[]
+
+  @@index([guideId])
+}
+
+model InterviewSession {
+  id                 String   @id @default(cuid())
+  guideId            String
+  intervieweeName    String
+  intervieweeRole    String?
+  intervieweeCompany String?
+  date               DateTime
+  generalNotes       String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  guide InterviewGuide @relation(fields: [guideId], references: [id], onDelete: Cascade)
+  notes SessionNote[]
+
+  @@index([guideId])
+}
+
+model SessionNote {
+  id         String   @id @default(cuid())
+  sessionId  String
+  questionId String
+  content    String
+  updatedAt  DateTime @updatedAt
+
+  session  InterviewSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  question InterviewQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, questionId])
+  @@index([sessionId])
 }
 
 // ─── Digests ──────────────────────────────────────────────────────────────────
