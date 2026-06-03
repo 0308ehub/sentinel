@@ -73,7 +73,7 @@ export function WorkspaceNav({ workspaceId }: WorkspaceNavProps) {
     { href: prdHref,                      activeHref: `${base}/prd`,                label: "PRDs",            icon: FileText,          pipelineKey: "prd" },
     { href: `${base}/tickets`,            activeHref: `${base}/tickets`,            label: "Tickets",         icon: Kanban,            pipelineKey: "tickets" },
     { href: `${base}/search`,             activeHref: `${base}/search`,             label: "Search",          icon: Search },
-    { href: `${base}/reports`,            activeHref: `${base}/reports`,            label: "Reports",         icon: BarChart2,         pipelineKey: "summary" },
+    { href: `${base}/digests`,             activeHref: `${base}/digests`,            label: "Digests",         icon: BarChart2,         pipelineKey: "summary" },
     { href: `${base}/interview-guide`,    activeHref: `${base}/interview-guide`,    label: "Interview Guide", icon: MessageSquarePlus },
     { href: `${base}/inbox`,              activeHref: `${base}/inbox`,              label: "Inbox",           icon: Inbox,             badge: pendingCount },
     { href: `${base}/integrations`,       activeHref: `${base}/integrations`,       label: "Integrations",    icon: Plug },

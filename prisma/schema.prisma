@@ -77,6 +77,7 @@ model Workspace {
   connectors       Connector[]
   sentinelActions  SentinelAction[]
   settings         WorkspaceSettings?
+  digests          Digest[]
 }
 
 // ─── Documents ────────────────────────────────────────────────────────────────
@@ -361,6 +362,28 @@ enum TicketStatus {
   DONE
 }
 
+// ─── Digests ──────────────────────────────────────────────────────────────────
+
+enum DigestType {
+  DAILY
+  WEEKLY
+  MANUAL
+}
+
+model Digest {
+  id          String     @id @default(cuid())
+  workspaceId String
+  type        DigestType @default(DAILY)
+  content     String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  conversations Conversation[]
+
+  @@index([workspaceId])
+}
+
 // ─── Chat ─────────────────────────────────────────────────────────────────────
 
 model Conversation {
@@ -368,6 +391,7 @@ model Conversation {
   workspaceId String
   userId      String
   prdId       String?
+  digestId    String?
   title       String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -375,10 +399,13 @@ model Conversation {
   workspace Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   user      User         @relation(fields: [userId], references: [id])
   prd       PRD?         @relation(fields: [prdId], references: [id], onDelete: Cascade)
+  digest    Digest?      @relation(fields: [digestId], references: [id], onDelete: Cascade)
   messages  Message[]
 
   @@index([prdId])
+  @@index([digestId])
   @@unique([prdId, userId])
+  @@unique([digestId, userId])
 }
 
 model Message {

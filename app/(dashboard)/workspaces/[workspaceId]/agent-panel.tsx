@@ -438,7 +438,7 @@ function SessionTabs({ onClose }: { onClose: () => void }) {
       >
         {sessions.map((session) => {
           const active = session.id === activeSessionId;
-          const Icon = session.prdId ? FileText : Bot;
+          const Icon = session.prdId ?? session.digestId ? FileText : Bot;
           return (
             <div
               key={session.id}
@@ -502,12 +502,17 @@ function ChatBody({ workspaceId }: { workspaceId: string }) {
     getPRDWorkingContent,
     prdProposals,
     setPRDProposal,
+    digestProposals,
+    setDigestProposal,
   } = useWorkspace();
 
   const activeSession = sessions.find((s) => s.id === activeSessionId) ?? sessions[0];
   const isPRDSession = !!activeSession?.prdId;
+  const isDigestSession = !!activeSession?.digestId;
   const diffPending = isPRDSession
     ? prdProposals.has(activeSession.prdId!)
+    : isDigestSession
+    ? digestProposals.has(activeSession.digestId!)
     : false;
 
   const [input, setInput] = useState("");
@@ -596,6 +601,39 @@ function ChatBody({ workspaceId }: { workspaceId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSession?.id]);
 
+  // Load digest conversation history on first render of a digest session
+  useEffect(() => {
+    if (!activeSession?.digestId) return;
+    if (activeSession.historyLoaded) return;
+
+    const sessionId = activeSession.id;
+    const digestId = activeSession.digestId;
+
+    setHistoryError(null);
+
+    fetch(`/api/workspaces/${workspaceId}/digests/${digestId}/conversation`)
+      .then(async (res) => {
+        const json = await res.json();
+        if (!res.ok || !json.ok) throw new Error(json.error?.message ?? "Failed to load conversation");
+
+        const historyMessages: AgentMessage[] = json.data.messages.map(
+          (m: { id: string; role: string; content: string }) => ({
+            id: m.id,
+            role: m.role === "USER" ? "user" : "assistant",
+            content: m.content,
+            toolCalls: [],
+            isStreaming: false,
+          })
+        );
+
+        loadSessionHistory(sessionId, historyMessages, json.data.conversationId);
+      })
+      .catch((err) => {
+        setHistoryError(err instanceof Error ? err.message : "Failed to load conversation");
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSession?.id]);
+
   const sendMessage = useCallback(
     async (text: string) => {
       if (!text.trim() || isLoading || diffPending) return;
@@ -625,7 +663,22 @@ function ChatBody({ workspaceId }: { workspaceId: string }) {
             }),
             signal: ctrl.signal,
           });
-        } else if (!isPRDSession) {
+        } else if (isDigestSession && activeSession?.digestId && activeSession.conversationId) {
+          // Digest session: hit the digest chat endpoint
+          res = await fetch(
+            `/api/workspaces/${workspaceId}/digests/${activeSession.digestId}/chat`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                message: text.trim(),
+                conversationId: activeSession.conversationId,
+                currentContent: "",
+              }),
+              signal: ctrl.signal,
+            }
+          );
+        } else if (!isPRDSession && !isDigestSession) {
           // Regular agent session
           const history = messages.map((m) => ({
             role: m.role,
@@ -644,7 +697,7 @@ function ChatBody({ workspaceId }: { workspaceId: string }) {
             signal: ctrl.signal,
           });
         } else {
-          // PRD session but conversationId not yet loaded — guard
+          // Session but conversationId not yet loaded — guard
           setIsLoading(false);
           return;
         }
@@ -675,6 +728,8 @@ function ChatBody({ workspaceId }: { workspaceId: string }) {
                 for (const ch of event.content) textQueueRef.current.push(ch);
               } else if (event.type === "prd_edit" && event.proposedContent && activeSession?.prdId) {
                 setPRDProposal(activeSession.prdId, event.proposedContent);
+              } else if (event.type === "digest_edit" && event.proposedContent && activeSession?.digestId) {
+                setDigestProposal(activeSession.digestId, event.proposedContent);
               } else if (event.type === "tool_start" && event.id && event.name) {
                 addToolCall({
                   id: event.id,
@@ -722,6 +777,7 @@ function ChatBody({ workspaceId }: { workspaceId: string }) {
       isLoading,
       diffPending,
       isPRDSession,
+      isDigestSession,
       activeSession,
       messages,
       workspaceId,
@@ -733,6 +789,7 @@ function ChatBody({ workspaceId }: { workspaceId: string }) {
       finishAssistantMessage,
       getPRDWorkingContent,
       setPRDProposal,
+      setDigestProposal,
     ]
   );
 
@@ -743,8 +800,8 @@ function ChatBody({ workspaceId }: { workspaceId: string }) {
     }
   };
 
-  // Loading skeleton while fetching PRD conversation history
-  if (isPRDSession && !activeSession?.historyLoaded) {
+  // Loading skeleton while fetching PRD or digest conversation history
+  if ((isPRDSession || isDigestSession) && !activeSession?.historyLoaded) {
     if (historyError) {
       return (
         <div className="flex flex-col flex-1 items-center justify-center p-6 text-center">
@@ -794,6 +851,18 @@ function ChatBody({ workspaceId }: { workspaceId: string }) {
                 </p>
                 <p className="text-xs text-muted-foreground max-w-[240px]">
                   {`I'm reviewing this PRD with you. Ask me to add sections, sharpen requirements, adjust scope, or clarify anything.`}
+                </p>
+              </>
+            ) : isDigestSession ? (
+              <>
+                <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center mb-3">
+                  <FileText className="h-6 w-6 text-indigo-500" />
+                </div>
+                <p className="text-sm font-medium text-foreground mb-1">
+                  {activeSession?.digestTitle ?? "Digest"}
+                </p>
+                <p className="text-xs text-muted-foreground max-w-[240px]">
+                  Ask Sentinel to update this digest, add missing context, or rewrite any section.
                 </p>
               </>
             ) : (
@@ -864,6 +933,8 @@ function ChatBody({ workspaceId }: { workspaceId: string }) {
             placeholder={
               diffPending
                 ? "Resolve pending changes to continue"
+                : isDigestSession
+                ? "Ask Sentinel to update this digest… (↵ to send)"
                 : "Ask Sentinel… (↵ to send, ⇧↵ for newline)"
             }
             className="resize-none text-sm min-h-[60px] max-h-[120px] flex-1"
@@ -890,6 +961,8 @@ function ChatBody({ workspaceId }: { workspaceId: string }) {
           <p className="text-[10px] text-muted-foreground/60 mt-1.5 text-center">
             {isPRDSession
               ? "Changes will be proposed as a diff for your review"
+              : isDigestSession
+              ? "Proposed rewrites appear in the digest viewer for your review"
               : "Sentinel has access to all workspace data"}
           </p>
         )}

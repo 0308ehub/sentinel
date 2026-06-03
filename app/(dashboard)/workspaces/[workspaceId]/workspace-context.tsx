@@ -44,6 +44,9 @@ export interface ChatSession {
   // PRD session fields — undefined for regular agent sessions
   prdId?: string;
   prdTitle?: string;
+  // Digest session fields — undefined for non-digest sessions
+  digestId?: string;
+  digestTitle?: string;
   conversationId?: string;
   historyLoaded?: boolean;
 }
@@ -85,6 +88,14 @@ interface WorkspaceContextValue {
   prdProposals: Map<string, string>;
   setPRDProposal: (prdId: string, proposedContent: string) => void;
   clearPRDProposal: (prdId: string) => void;
+
+  // Digest tab management:
+  openDigestTab: (digestId: string, digestTitle: string) => void;
+
+  // Pending AI digest proposals (set by panel, read by digest page):
+  digestProposals: Map<string, string>;
+  setDigestProposal: (digestId: string, proposedContent: string) => void;
+  clearDigestProposal: (digestId: string) => void;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
@@ -97,6 +108,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   // No re-render needed for working content — ChatBody reads it synchronously on send
   const prdWorkingContentRef = useRef<Map<string, string>>(new Map());
   const [prdProposals, setPrdProposals] = useState<Map<string, string>>(new Map());
+  const [digestProposals, setDigestProposals] = useState<Map<string, string>>(new Map());
 
   const activeSession = sessions.find((s) => s.id === activeSessionId) ?? sessions[0];
   const messages = activeSession?.messages ?? [];
@@ -250,6 +262,28 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  // ── Digest tab management ──────────────────────────────────────────────────
+
+  const openDigestTab = useCallback((digestId: string, digestTitle: string) => {
+    setSessions((prev) => {
+      const existing = prev.find((s) => s.digestId === digestId);
+      if (existing) {
+        setActiveSessionId(existing.id);
+        return prev;
+      }
+      const newSession: ChatSession = {
+        id: crypto.randomUUID(),
+        label: `Digest: ${digestTitle}`,
+        messages: [],
+        digestId,
+        digestTitle,
+        historyLoaded: false,
+      };
+      setActiveSessionId(newSession.id);
+      return [...prev, newSession];
+    });
+  }, []);
+
   const loadSessionHistory = useCallback(
     (sessionId: string, msgs: AgentMessage[], conversationId: string) => {
       setSessions((prev) =>
@@ -288,6 +322,20 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  // ── Digest proposals ───────────────────────────────────────────────────────
+
+  const setDigestProposal = useCallback((digestId: string, proposedContent: string) => {
+    setDigestProposals((prev) => new Map(prev).set(digestId, proposedContent));
+  }, []);
+
+  const clearDigestProposal = useCallback((digestId: string) => {
+    setDigestProposals((prev) => {
+      const next = new Map(prev);
+      next.delete(digestId);
+      return next;
+    });
+  }, []);
+
   return (
     <WorkspaceContext.Provider
       value={{
@@ -311,6 +359,10 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
         prdProposals,
         setPRDProposal,
         clearPRDProposal,
+        openDigestTab,
+        digestProposals,
+        setDigestProposal,
+        clearDigestProposal,
       }}
     >
       {children}

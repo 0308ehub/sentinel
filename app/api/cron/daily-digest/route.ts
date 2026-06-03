@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { queueAction } from "@/server/services/autonomous-pm";
+import { generateWorkspaceDigest } from "@/server/services/digest-service";
 
 export const maxDuration = 300;
 
@@ -16,19 +16,9 @@ export async function GET(req: NextRequest) {
   });
 
   const results = await Promise.allSettled(
-    workspaces.map((w) =>
-      queueAction({
-        workspaceId: w.id,
-        type: "GENERATE_DIGEST",
-        title: "Weekly PM Digest",
-        description: "Weekly automated digest of workspace activity, pain points, opportunities, and sprint progress.",
-        payload: {},
-        triggeredBy: "cron-weekly",
-        autoApprove: true,
-      })
-    )
+    workspaces.map((w) => generateWorkspaceDigest(w.id, "DAILY"))
   );
 
   const succeeded = results.filter((r) => r.status === "fulfilled").length;
-  return Response.json({ queued: workspaces.length, succeeded });
+  return Response.json({ generated: workspaces.length, succeeded });
 }
