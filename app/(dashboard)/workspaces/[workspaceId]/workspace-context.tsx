@@ -41,6 +41,11 @@ export interface ChatSession {
   id: string;
   label: string;
   messages: AgentMessage[];
+  // PRD session fields — undefined for regular agent sessions
+  prdId?: string;
+  prdTitle?: string;
+  conversationId?: string;
+  historyLoaded?: boolean;
 }
 
 function makeSession(index: number): ChatSession {
@@ -54,6 +59,7 @@ interface WorkspaceContextValue {
   createSession: () => void;
   removeSession: (id: string) => void;
   renameSession: (id: string, label: string) => void;
+
   // Operate on the active session:
   messages: AgentMessage[];
   addUserMessage: (content: string) => void;
@@ -62,6 +68,23 @@ interface WorkspaceContextValue {
   addToolCall: (toolCall: ToolCallState) => void;
   updateToolCall: (id: string, updates: Partial<ToolCallState>) => void;
   finishAssistantMessage: () => void;
+
+  // PRD tab management:
+  openPRDTab: (prdId: string, prdTitle: string) => void;
+  loadSessionHistory: (
+    sessionId: string,
+    messages: AgentMessage[],
+    conversationId: string
+  ) => void;
+
+  // Working content (updated as hunks are accepted/rejected — not yet saved):
+  setPRDWorkingContent: (prdId: string, content: string) => void;
+  getPRDWorkingContent: (prdId: string) => string | undefined;
+
+  // Pending AI proposals (set by panel, read by PRD page):
+  prdProposals: Map<string, string>;
+  setPRDProposal: (prdId: string, proposedContent: string) => void;
+  clearPRDProposal: (prdId: string) => void;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
@@ -71,7 +94,10 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [sessions, setSessions] = useState<ChatSession[]>([makeSession(1)]);
   const [activeSessionId, setActiveSessionId] = useState<string>(() => sessions[0].id);
 
-  // Always derive messages from the active session
+  // No re-render needed for working content — ChatBody reads it synchronously on send
+  const prdWorkingContentRef = useRef<Map<string, string>>(new Map());
+  const [prdProposals, setPrdProposals] = useState<Map<string, string>>(new Map());
+
   const activeSession = sessions.find((s) => s.id === activeSessionId) ?? sessions[0];
   const messages = activeSession?.messages ?? [];
 
@@ -87,7 +113,6 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const removeSession = useCallback((id: string) => {
     setSessions((prev) => {
       if (prev.length === 1) {
-        // Reset to a single blank session instead of zero
         sessionCounter.current += 1;
         const fresh = makeSession(sessionCounter.current);
         setActiveSessionId(fresh.id);
@@ -103,7 +128,6 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, label } : s)));
   }, []);
 
-  // Helpers that mutate the active session's messages
   const updateActiveMessages = useCallback(
     (updater: (msgs: AgentMessage[]) => AgentMessage[]) => {
       setSessions((prev) =>
@@ -117,12 +141,12 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 
   const addUserMessage = useCallback(
     (content: string) => {
-      // Auto-label the session after the first user message
       setSessions((prev) =>
         prev.map((s) => {
           if (s.id !== activeSessionId) return s;
+          // Preserve the label for PRD sessions; auto-label regular sessions from first message
           const label =
-            s.messages.length === 0
+            !s.prdId && s.messages.length === 0
               ? content.slice(0, 28) + (content.length > 28 ? "…" : "")
               : s.label;
           const msg: AgentMessage = {
@@ -142,7 +166,13 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const startAssistantMessage = useCallback(() => {
     updateActiveMessages((msgs) => [
       ...msgs,
-      { id: crypto.randomUUID(), role: "assistant", content: "", toolCalls: [], isStreaming: true },
+      {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: "",
+        toolCalls: [],
+        isStreaming: true,
+      },
     ]);
   }, [updateActiveMessages]);
 
@@ -162,7 +192,10 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       updateActiveMessages((msgs) => {
         const last = msgs[msgs.length - 1];
         if (!last || last.role !== "assistant") return msgs;
-        return [...msgs.slice(0, -1), { ...last, toolCalls: [...last.toolCalls, toolCall] }];
+        return [
+          ...msgs.slice(0, -1),
+          { ...last, toolCalls: [...last.toolCalls, toolCall] },
+        ];
       });
     },
     [updateActiveMessages]
@@ -175,7 +208,12 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
         if (!last || last.role !== "assistant") return msgs;
         return [
           ...msgs.slice(0, -1),
-          { ...last, toolCalls: last.toolCalls.map((tc) => (tc.id === id ? { ...tc, ...updates } : tc)) },
+          {
+            ...last,
+            toolCalls: last.toolCalls.map((tc) =>
+              tc.id === id ? { ...tc, ...updates } : tc
+            ),
+          },
         ];
       });
     },
@@ -189,6 +227,66 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       return [...msgs.slice(0, -1), { ...last, isStreaming: false }];
     });
   }, [updateActiveMessages]);
+
+  // ── PRD tab management ─────────────────────────────────────────────────────
+
+  const openPRDTab = useCallback((prdId: string, prdTitle: string) => {
+    setSessions((prev) => {
+      const existing = prev.find((s) => s.prdId === prdId);
+      if (existing) {
+        setActiveSessionId(existing.id);
+        return prev;
+      }
+      const newSession: ChatSession = {
+        id: crypto.randomUUID(),
+        label: `PRD: ${prdTitle}`,
+        messages: [],
+        prdId,
+        prdTitle,
+        historyLoaded: false,
+      };
+      setActiveSessionId(newSession.id);
+      return [...prev, newSession];
+    });
+  }, []);
+
+  const loadSessionHistory = useCallback(
+    (sessionId: string, msgs: AgentMessage[], conversationId: string) => {
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === sessionId
+            ? { ...s, messages: msgs, conversationId, historyLoaded: true }
+            : s
+        )
+      );
+    },
+    []
+  );
+
+  // ── Working content ────────────────────────────────────────────────────────
+
+  const setPRDWorkingContent = useCallback((prdId: string, content: string) => {
+    prdWorkingContentRef.current.set(prdId, content);
+  }, []);
+
+  const getPRDWorkingContent = useCallback(
+    (prdId: string) => prdWorkingContentRef.current.get(prdId),
+    []
+  );
+
+  // ── PRD proposals ──────────────────────────────────────────────────────────
+
+  const setPRDProposal = useCallback((prdId: string, proposedContent: string) => {
+    setPrdProposals((prev) => new Map(prev).set(prdId, proposedContent));
+  }, []);
+
+  const clearPRDProposal = useCallback((prdId: string) => {
+    setPrdProposals((prev) => {
+      const next = new Map(prev);
+      next.delete(prdId);
+      return next;
+    });
+  }, []);
 
   return (
     <WorkspaceContext.Provider
@@ -206,6 +304,13 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
         addToolCall,
         updateToolCall,
         finishAssistantMessage,
+        openPRDTab,
+        loadSessionHistory,
+        setPRDWorkingContent,
+        getPRDWorkingContent,
+        prdProposals,
+        setPRDProposal,
+        clearPRDProposal,
       }}
     >
       {children}
