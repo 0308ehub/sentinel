@@ -96,6 +96,8 @@ export async function POST(
     { role: "user" as const, content: message },
   ];
 
+  const abortController = new AbortController();
+
   const stream = new ReadableStream({
     async start(controller) {
       const encoder = new TextEncoder();
@@ -116,7 +118,7 @@ export async function POST(
           system: systemPrompt,
           messages: anthropicMessages,
           stream: true,
-        });
+        }, { signal: abortController.signal });
 
         for await (const event of response) {
           if (event.type !== "content_block_delta") continue;
@@ -199,6 +201,9 @@ export async function POST(
       } finally {
         controller.close();
       }
+    },
+    cancel() {
+      abortController.abort();
     },
   });
 
