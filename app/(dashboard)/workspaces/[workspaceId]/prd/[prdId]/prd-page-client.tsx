@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,10 @@ import { cn, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
 import { PRDActions } from "./prd-actions";
 import { useJob, type StreamingTicket } from "../../workspace-jobs-context";
+import { useWorkspace } from "../../workspace-context";
+import { computeHunks, applyHunks } from "@/lib/diff/prd-diff";
+import type { DiffState } from "@/lib/diff/prd-diff";
+import { PRDDiffViewer } from "@/components/prd/prd-diff-viewer";
 
 interface CommittedTicket {
   id: string;
@@ -80,8 +84,6 @@ interface PRDPageClientProps {
 }
 
 export function PRDPageClient({ prd, workspaceId }: PRDPageClientProps) {
-  // Ticket-generation state lives in the workspace-level context so it
-  // survives tab navigation while the stream is in flight.
   const jobKey = `tickets:${prd.id}`;
   const {
     running: generatingTickets,
@@ -89,12 +91,106 @@ export function PRDPageClient({ prd, workspaceId }: PRDPageClientProps) {
     startJob,
   } = useJob(jobKey);
 
-  // Edit / save / clear state is local — no need to persist across navigation.
+  const {
+    openPRDTab,
+    setPRDWorkingContent,
+    getPRDWorkingContent,
+    prdProposals,
+    clearPRDProposal,
+  } = useWorkspace();
+
+  // Working content tracks the PRD as hunks are accepted/rejected
+  const [workingContent, setWorkingContent] = useState(prd.content);
+  // Active diff state (null when no diff pending)
+  const [diffState, setDiffState] = useState<DiffState | null>(null);
+
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(prd.content);
   const [saving, setSaving] = useState(false);
+  const [savingDiff, setSavingDiff] = useState(false);
   const [clearingTickets, setClearingTickets] = useState(false);
   const router = useRouter();
+
+  // Register PRD tab in agent panel and seed working content on mount
+  useEffect(() => {
+    openPRDTab(prd.id, prd.title);
+    setPRDWorkingContent(prd.id, prd.content);
+    return () => clearPRDProposal(prd.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prd.id, prd.title]);
+
+  // Keep working content in sync with context so ChatBody gets the latest version
+  useEffect(() => {
+    setPRDWorkingContent(prd.id, workingContent);
+  }, [prd.id, workingContent, setPRDWorkingContent]);
+
+  // Watch for AI proposals arriving from the agent panel
+  useEffect(() => {
+    const proposed = prdProposals.get(prd.id);
+    if (!proposed) return;
+    const hunks = computeHunks(workingContent, proposed);
+    setDiffState({ proposedContent: proposed, hunks });
+    clearPRDProposal(prd.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prdProposals]);
+
+  function acceptHunk(hunkId: string) {
+    setDiffState((prev) => {
+      if (!prev) return null;
+      const updated = prev.hunks.map((h) =>
+        h.id === hunkId ? { ...h, status: "accepted" as const } : h
+      );
+      const newContent = applyHunks(prd.content, updated);
+      setWorkingContent(newContent);
+      return { ...prev, hunks: updated };
+    });
+  }
+
+  function rejectHunk(hunkId: string) {
+    setDiffState((prev) => {
+      if (!prev) return null;
+      const updated = prev.hunks.map((h) =>
+        h.id === hunkId ? { ...h, status: "rejected" as const } : h
+      );
+      const newContent = applyHunks(prd.content, updated);
+      setWorkingContent(newContent);
+      return { ...prev, hunks: updated };
+    });
+  }
+
+  function acceptAll() {
+    setDiffState((prev) => {
+      if (!prev) return null;
+      const updated = prev.hunks.map((h) => ({ ...h, status: "accepted" as const }));
+      setWorkingContent(applyHunks(prd.content, updated));
+      return { ...prev, hunks: updated };
+    });
+  }
+
+  function rejectAll() {
+    setDiffState(null);
+    setWorkingContent(prd.content);
+  }
+
+  async function handleSaveDiff() {
+    setSavingDiff(true);
+    try {
+      const res = await fetch(`/api/prds/${prd.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: workingContent }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error?.message ?? "Failed to save PRD");
+      toast.success("PRD updated successfully");
+      setDiffState(null);
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setSavingDiff(false);
+    }
+  }
 
   const showStreaming = generatingTickets || streamingTickets.length > 0;
   const tickets = showStreaming ? streamingTickets : prd.tickets;
@@ -119,11 +215,14 @@ export function PRDPageClient({ prd, workspaceId }: PRDPageClientProps) {
     try {
       const res = await fetch(`/api/prds/${prd.id}/tickets`, { method: "DELETE" });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error?.message ?? "Failed to clear tickets");
+      if (!res.ok)
+        throw new Error(data.error?.message ?? "Failed to clear tickets");
       toast.success("Tickets cleared");
       router.refresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to clear tickets");
+      toast.error(
+        err instanceof Error ? err.message : "Failed to clear tickets"
+      );
     } finally {
       setClearingTickets(false);
     }
@@ -149,9 +248,13 @@ export function PRDPageClient({ prd, workspaceId }: PRDPageClientProps) {
     }
   }
 
+  // Determine render mode
+  const inDiffMode = diffState !== null && !editing;
+  const currentPRDContent = getPRDWorkingContent(prd.id) ?? prd.content;
+
   return (
     <>
-      {/* Header: title + meta on left, action buttons on right */}
+      {/* Header */}
       <div className="flex items-start justify-between gap-6 mb-8">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">{prd.title}</h1>
@@ -174,15 +277,14 @@ export function PRDPageClient({ prd, workspaceId }: PRDPageClientProps) {
             {prd.tickets.length > 0 && (
               <span className="flex items-center gap-1 text-xs text-gray-500">
                 <Ticket className="h-3.5 w-3.5" />
-                {prd.tickets.length} ticket
-                {prd.tickets.length !== 1 ? "s" : ""}
+                {prd.tickets.length} ticket{prd.tickets.length !== 1 ? "s" : ""}
               </span>
             )}
           </div>
         </div>
 
         <PRDActions
-          prd={{ id: prd.id, content: prd.content, title: prd.title }}
+          prd={{ id: prd.id, content: currentPRDContent, title: prd.title }}
           generatingTickets={generatingTickets}
           hasTickets={tickets.length > 0}
           onGenerateTickets={handleGenerateTickets}
@@ -190,7 +292,13 @@ export function PRDPageClient({ prd, workspaceId }: PRDPageClientProps) {
           clearingTickets={clearingTickets}
           editing={editing}
           saving={saving}
-          onEdit={() => setEditing(true)}
+          onEdit={() => {
+            if (inDiffMode) {
+              toast.warning("Resolve pending changes before editing.");
+              return;
+            }
+            setEditing(true);
+          }}
           onCancelEdit={() => {
             setEditContent(prd.content);
             setEditing(false);
@@ -201,7 +309,7 @@ export function PRDPageClient({ prd, workspaceId }: PRDPageClientProps) {
 
       {/* Main grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left column: PRD viewer or inline editor */}
+        {/* Left column: PRD viewer, inline editor, or diff viewer */}
         <div className="lg:col-span-2">
           {editing ? (
             <div className="bg-white rounded-xl border overflow-hidden">
@@ -217,6 +325,17 @@ export function PRDPageClient({ prd, workspaceId }: PRDPageClientProps) {
                 className="min-h-[60vh] text-sm rounded-none border-0 focus-visible:ring-0 resize-none p-6 leading-relaxed font-mono"
               />
             </div>
+          ) : inDiffMode ? (
+            <PRDDiffViewer
+              originalContent={prd.content}
+              diffState={diffState}
+              onAcceptHunk={acceptHunk}
+              onRejectHunk={rejectHunk}
+              onAcceptAll={acceptAll}
+              onRejectAll={rejectAll}
+              onSave={handleSaveDiff}
+              isSaving={savingDiff}
+            />
           ) : (
             <div className="bg-white rounded-xl border overflow-hidden">
               <div className="border-b px-5 py-3 bg-gray-50 flex items-center gap-2">
@@ -258,9 +377,7 @@ export function PRDPageClient({ prd, workspaceId }: PRDPageClientProps) {
                     <p className="text-xs text-gray-400">Generating tickets…</p>
                   </div>
                 ) : (
-                  <p className="text-xs text-gray-400">
-                    No tickets generated yet.
-                  </p>
+                  <p className="text-xs text-gray-400">No tickets generated yet.</p>
                 )}
               </div>
             ) : (
