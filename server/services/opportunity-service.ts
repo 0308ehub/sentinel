@@ -8,6 +8,17 @@ import { calculateTotalScore } from "@/lib/scoring/opportunity-scorer";
 import { repopulateInsightsFromExtractions } from "./extraction-service";
 import type { PainPointCluster } from "@/types";
 
+/**
+ * Applies a recency multiplier to opportunity scores based on creation date.
+ * Evidence from today: 1.0x multiplier
+ * Evidence from 30 days ago: ~0.81x multiplier
+ * Evidence from 90 days ago: ~0.70x multiplier (floor)
+ */
+function recencyMultiplier(date: Date): number {
+  const daysSince = Math.max(0, (Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
+  return 0.7 + 0.3 * Math.exp(-daysSince / 30);
+}
+
 export interface StreamingOpportunity {
   title: string;
   description: string;
@@ -156,5 +167,9 @@ export async function generateOpportunities(
     },
   });
 
-  return created.sort((a, b) => b.totalScore - a.totalScore);
+  return created.sort(
+    (a, b) =>
+      b.totalScore * recencyMultiplier(b.createdAt) -
+      a.totalScore * recencyMultiplier(a.createdAt)
+  );
 }

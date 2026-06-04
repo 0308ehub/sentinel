@@ -5,7 +5,7 @@ import {
   ClusterLabelSchema,
 } from "@/prompts/label-pain-point-cluster";
 import { generateOpportunities } from "./opportunity-service";
-import { repopulateInsightsFromExtractions } from "./extraction-service";
+import { repopulateInsightsFromExtractions, extractDocumentInsights } from "./extraction-service";
 import type { StreamingInsight } from "./extraction-service";
 import type { StreamingOpportunity } from "./opportunity-service";
 import type { PainPointCluster } from "@/types";
@@ -21,6 +21,23 @@ export interface StreamingPainPoint {
   affectedSegments: string[];
 }
 
+export async function extractRawInsightsFromPendingDocs(
+  workspaceId: string
+): Promise<void> {
+  const pendingDocs = await prisma.document.findMany({
+    where: {
+      workspaceId,
+      status: { notIn: ["COMPLETED", "FAILED"] },
+      rawText: { not: null },
+    },
+    select: { id: true, rawText: true },
+    take: 5,
+  });
+
+  const eligible = pendingDocs.filter((d) => (d.rawText?.length ?? 0) >= 100);
+  await Promise.allSettled(eligible.map((d) => extractDocumentInsights(d.id)));
+}
+
 export async function synthesizeWorkspace(
   workspaceId: string,
   onProgress?: (step: string) => void,
@@ -29,6 +46,10 @@ export async function synthesizeWorkspace(
   onOpportunity?: (opp: StreamingOpportunity) => void,
   onInsightsDone?: () => void
 ) {
+  // Fast-path: extract insights from any docs that have rawText but haven't
+  // been processed yet, so synthesis isn't blocked on the background pipeline.
+  await extractRawInsightsFromPendingDocs(workspaceId);
+
   onProgress?.("Loading pain points...");
   // Fetch all pain points for this workspace
   let painPoints = await prisma.painPoint.findMany({
@@ -155,6 +176,11 @@ export async function synthesizeWorkspace(
         opportunityCount: opportunities.length,
       },
     },
+  });
+
+  await prisma.workspace.update({
+    where: { id: workspaceId },
+    data: { lastSynthesizedAt: new Date() },
   });
 
   return { painPoints: updatedPainPoints, opportunities };
