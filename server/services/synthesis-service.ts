@@ -24,6 +24,7 @@ export interface StreamingPainPoint {
 export async function extractRawInsightsFromPendingDocs(
   workspaceId: string
 ): Promise<void> {
+  // Pending docs: ingestion not finished yet but rawText is available
   const pendingDocs = await prisma.document.findMany({
     where: {
       workspaceId,
@@ -34,7 +35,21 @@ export async function extractRawInsightsFromPendingDocs(
     take: 5,
   });
 
-  const eligible = pendingDocs.filter((d) => (d.rawText?.length ?? 0) >= 100);
+  // Completed docs that never got an extraction (orphaned by after() context closing early)
+  const completedNoExtraction = await prisma.document.findMany({
+    where: {
+      workspaceId,
+      status: "COMPLETED",
+      extractions: { none: {} },
+      rawText: { not: null },
+    },
+    select: { id: true, rawText: true },
+    take: 5,
+  });
+
+  const eligible = [...pendingDocs, ...completedNoExtraction].filter(
+    (d) => (d.rawText?.length ?? 0) >= 100
+  );
   await Promise.allSettled(eligible.map((d) => extractDocumentInsights(d.id)));
 }
 

@@ -75,10 +75,10 @@ export async function processDocument(documentId: string, rawInput?: Buffer | st
     // COMPLETED — mark as soon as embeddings are stored so users can synthesize immediately
     await updateDocumentStatus(documentId, "COMPLETED");
 
-    // Extraction runs after completion (non-blocking for the user).
-    // The after() context in dispatch.ts keeps the process alive so this still
-    // finishes and populates insights — it just no longer gates synthesis.
-    extractDocumentInsights(documentId).catch((extractErr) =>
+    // Await extraction so it completes within the after() context window.
+    // Fire-and-forget was silently dropping extractions when the serverless
+    // function exited after processDocument returned.
+    await extractDocumentInsights(documentId).catch((extractErr) =>
       console.error(`[ingestion] Extraction failed for ${documentId} (non-fatal):`, extractErr)
     );
 
