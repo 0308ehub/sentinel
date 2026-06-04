@@ -2,7 +2,6 @@ import { prisma } from "@/lib/db/prisma";
 import { requireWorkspaceAccess } from "@/lib/auth/helpers";
 import { apiSuccess, apiError } from "@/types";
 import { generateWorkspaceDigest } from "@/server/services/digest-service";
-import { after } from "next/server";
 
 export async function GET(
   _req: Request,
@@ -26,27 +25,45 @@ export async function GET(
   }
 }
 
+const SSE_HEADERS = {
+  "Content-Type": "text/event-stream",
+  "Cache-Control": "no-cache",
+  Connection: "keep-alive",
+  "X-Accel-Buffering": "no",
+};
+
 export async function POST(
   _req: Request,
   { params }: { params: Promise<{ workspaceId: string }> }
 ) {
+  const { workspaceId } = await params;
+
   try {
-    const { workspaceId } = await params;
     await requireWorkspaceAccess(workspaceId);
-
-    let digest: Awaited<ReturnType<typeof generateWorkspaceDigest>> | null = null;
-
-    after(async () => {
-      // No fire-and-forget needed here; we return the result directly.
-    });
-
-    digest = await generateWorkspaceDigest(workspaceId, "MANUAL");
-
-    return Response.json(apiSuccess(digest), { status: 201 });
-  } catch (error) {
-    if (error instanceof Error && error.message.toLowerCase().includes("unauthorized")) {
-      return Response.json(apiError("UNAUTHORIZED", "Not authorized"), { status: 401 });
-    }
-    return Response.json(apiError("INTERNAL_ERROR", "Failed to generate digest"), { status: 500 });
+  } catch {
+    return new Response("Unauthorized", { status: 401 });
   }
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      const encoder = new TextEncoder();
+      const emit = (data: object) =>
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+
+      try {
+        const digest = await generateWorkspaceDigest(workspaceId, "MANUAL", (step) =>
+          emit({ type: "step", step })
+        );
+        emit({ type: "done", id: digest.id });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to generate digest";
+        console.error("[digest-generate]", err);
+        emit({ type: "error", message });
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, { headers: SSE_HEADERS });
 }
