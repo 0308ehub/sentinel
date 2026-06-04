@@ -8,11 +8,14 @@ export interface GeneratePRDInput {
   opportunityId?: string;
   userInstruction?: string;
   userId?: string;
+  onStep?: (step: string) => void;
 }
 
 export async function generatePRD(input: GeneratePRDInput) {
-  const { workspaceId, opportunityId, userInstruction } = input;
+  const { workspaceId, opportunityId, userInstruction, onStep } = input;
+  const step = (text: string) => onStep?.(text);
 
+  step("Loading opportunity");
   let opportunity = null;
   if (opportunityId) {
     opportunity = await prisma.opportunity.findUnique({
@@ -26,6 +29,7 @@ export async function generatePRD(input: GeneratePRDInput) {
     ? `${opportunity.title}: ${opportunity.problemStatement}`
     : userInstruction ?? "product features";
 
+  step("Retrieving evidence");
   const context = await retrieveWorkspaceContext({ workspaceId, query, limit: 10 });
 
   const contextText = [
@@ -43,6 +47,7 @@ export async function generatePRD(input: GeneratePRDInput) {
     .filter(Boolean)
     .join("\n");
 
+  step("Generating document");
   const content = await ai.generateText({
     system: GENERATE_PRD_PROMPT,
     messages: [{ role: "user", content: contextText }],
@@ -54,6 +59,7 @@ export async function generatePRD(input: GeneratePRDInput) {
     ? `PRD: ${opportunity.title}`
     : extractTitleFromMarkdown(content);
 
+  step("Saving");
   const prd = await prisma.pRD.create({
     data: {
       workspaceId,
