@@ -7,6 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Sparkles, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useJob } from "../workspace-jobs-context";
+import { ProgressStream } from "@/components/ui/progress-stream";
 
 interface Opportunity {
   id: string;
@@ -26,31 +28,25 @@ export function GeneratePRDForm({
 }: GeneratePRDFormProps) {
   const [opportunityId, setOpportunityId] = useState(defaultOpportunityId ?? "");
   const [userInstruction, setUserInstruction] = useState("");
-  const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const { running, steps, startJob } = useJob("generate-prd");
 
-  async function handleGenerate(e: React.FormEvent) {
+  function handleGenerate(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/workspaces/${workspaceId}/prds/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+    startJob(
+      `/api/workspaces/${workspaceId}/prds/generate`,
+      (result) => {
+        toast.success("PRD generated successfully!");
+        router.push(`/workspaces/${workspaceId}/prd/${result.id as string}`);
+      },
+      (msg) => toast.error(msg),
+      {
         body: JSON.stringify({
           opportunityId: opportunityId || undefined,
           userInstruction: userInstruction || undefined,
         }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error?.message ?? "Failed to generate PRD");
-
-      toast.success("PRD generated successfully!");
-      router.push(`/workspaces/${workspaceId}/prd/${data.data.id}`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Generation failed");
-      setLoading(false);
-    }
+      }
+    );
   }
 
   return (
@@ -101,10 +97,10 @@ export function GeneratePRDForm({
 
           <Button
             type="submit"
-            disabled={loading}
+            disabled={running}
             className="w-full gap-2 bg-indigo-600 hover:bg-indigo-700 text-white"
           >
-            {loading ? (
+            {running ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Generating PRD…
@@ -117,11 +113,7 @@ export function GeneratePRDForm({
             )}
           </Button>
 
-          {loading && (
-            <p className="text-xs text-gray-400 text-center">
-              This may take 30–60 seconds while Sentinel synthesizes your evidence…
-            </p>
-          )}
+          {steps.length > 0 && <ProgressStream steps={steps} />}
         </form>
       </CardContent>
     </Card>
