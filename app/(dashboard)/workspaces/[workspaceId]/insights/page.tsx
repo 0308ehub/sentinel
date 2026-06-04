@@ -9,6 +9,7 @@ import { PainPointsCountBadge } from "./pain-points-count-badge";
 import { InsightCountBadge } from "./insight-count-badge";
 import { InsightTabContent } from "./insight-tab-content";
 import { Lightbulb, AlertTriangle, Users, Workflow, Swords, Quote } from "lucide-react";
+import { SynthesisUpdateWatcher } from "./synthesis-update-watcher";
 
 export default async function InsightsPage({
   params,
@@ -23,7 +24,7 @@ export default async function InsightsPage({
     redirect("/sign-in");
   }
 
-  const [insights, painPoints] = await Promise.all([
+  const [insights, painPoints, workspace, pendingDocCount] = await Promise.all([
     prisma.insight.findMany({
       where: { workspaceId },
       orderBy: { confidence: "desc" },
@@ -32,7 +33,24 @@ export default async function InsightsPage({
       where: { workspaceId, status: "ACTIVE" },
       orderBy: [{ severity: "desc" }, { urgency: "desc" }],
     }),
+    prisma.workspace.findUnique({
+      where: { id: workspaceId },
+      select: { lastSynthesizedAt: true },
+    }),
+    prisma.document.count({
+      where: { workspaceId, status: { notIn: ["COMPLETED", "FAILED"] } },
+    }),
   ]);
+
+  const newDocsSinceLastSynthesis = workspace?.lastSynthesizedAt
+    ? await prisma.document.count({
+        where: {
+          workspaceId,
+          status: "COMPLETED",
+          updatedAt: { gt: workspace.lastSynthesizedAt },
+        },
+      })
+    : 0;
 
   const byType = (types: InsightType[]) =>
     insights.filter((i) => types.includes(i.type));
@@ -53,7 +71,18 @@ export default async function InsightsPage({
               {insights.length} insights synthesized from your evidence
             </p>
           </div>
-          <SynthesizeButton workspaceId={workspaceId} />
+          <div className="flex items-center gap-4">
+            <SynthesisUpdateWatcher
+              workspaceId={workspaceId}
+              initialStatus={{
+                lastSynthesizedAt: workspace?.lastSynthesizedAt?.toISOString() ?? null,
+                painPointCount: painPoints.length,
+                pendingDocCount,
+                newDocsSinceLastSynthesis,
+              }}
+            />
+            <SynthesizeButton workspaceId={workspaceId} />
+          </div>
         </div>
 
         <Tabs defaultValue="pain-points">
