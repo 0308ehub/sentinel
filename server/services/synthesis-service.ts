@@ -21,33 +21,24 @@ export interface StreamingPainPoint {
   affectedSegments: string[];
 }
 
+// Fast-path synthesis: extract insights inline from rawText for any document
+// that has text but no extraction yet. Status doesn't matter — rawText is
+// available as soon as the upload is parsed, before chunking/embedding finish.
 export async function extractRawInsightsFromPendingDocs(
   workspaceId: string
 ): Promise<void> {
-  // Pending docs: ingestion not finished yet but rawText is available
-  const pendingDocs = await prisma.document.findMany({
+  const docsNeedingExtraction = await prisma.document.findMany({
     where: {
       workspaceId,
-      status: { notIn: ["COMPLETED", "FAILED"] },
+      status: { not: "FAILED" },
       rawText: { not: null },
-    },
-    select: { id: true, rawText: true },
-    take: 5,
-  });
-
-  // Completed docs that never got an extraction (orphaned by after() context closing early)
-  const completedNoExtraction = await prisma.document.findMany({
-    where: {
-      workspaceId,
-      status: "COMPLETED",
       extractions: { none: {} },
-      rawText: { not: null },
     },
     select: { id: true, rawText: true },
-    take: 5,
+    take: 10,
   });
 
-  const eligible = [...pendingDocs, ...completedNoExtraction].filter(
+  const eligible = docsNeedingExtraction.filter(
     (d) => (d.rawText?.length ?? 0) >= 100
   );
   await Promise.allSettled(eligible.map((d) => extractDocumentInsights(d.id)));

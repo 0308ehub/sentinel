@@ -1,8 +1,9 @@
-import { z } from "zod";
 import { requireWorkspaceAccess } from "@/lib/auth/helpers";
 import { createDocument } from "@/server/services/document-service";
 import { apiSuccess, apiError } from "@/types";
 import { dispatchIngestion } from "@/server/jobs/dispatch";
+import { parseDocumentContent } from "@/lib/ingestion/parse-document";
+import { prisma } from "@/lib/db/prisma";
 import type { DocumentSourceType } from "@prisma/client";
 
 export async function POST(
@@ -40,8 +41,6 @@ export async function POST(
       try { metadata = JSON.parse(metadataRaw); } catch { /* ignore */ }
     }
 
-    // Create document record with metadata only — raw content is handed off to
-    // the background worker so we never block the HTTP response on a large DB write.
     const document = await createDocument({
       workspaceId,
       uploadedById: user.id,
@@ -51,7 +50,23 @@ export async function POST(
       metadata,
     });
 
-    // Fire-and-forget: passes the buffer so the worker skips the DB read.
+    // Parse and persist rawText synchronously so synthesis can read it immediately
+    // without waiting for the background ingestion (chunking/embedding) to finish.
+    // This is the "fast path" — synthesis reads rawText directly; the knowledge
+    // base (vector chunks) is built in the background via after().
+    try {
+      const parsed = await parseDocumentContent(buffer, fileExt);
+      if (parsed.text.length >= 100) {
+        await prisma.document.update({
+          where: { id: document.id },
+          data: { rawText: parsed.text },
+        });
+      }
+    } catch {
+      // Non-fatal: ingestion will re-parse in the after() context
+    }
+
+    // Background: chunk and embed for the queryable knowledge base.
     dispatchIngestion(document.id, buffer);
 
     return Response.json(apiSuccess({ documentId: document.id, status: "PENDING" }), { status: 201 });

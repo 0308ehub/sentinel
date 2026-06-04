@@ -17,14 +17,15 @@ export async function processDocument(documentId: string, rawInput?: Buffer | st
     let parsedText: string;
 
     if (rawInput !== undefined) {
-      // Fast path: content was passed directly from the upload route — no DB read needed.
       const parsed = await parseDocumentContent(rawInput, document.fileType ?? "txt");
       parsedText = parsed.text;
-      // Persist rawText so reprocess and search can use it later.
-      await prisma.document.update({
-        where: { id: documentId },
-        data: { rawText: parsedText },
-      });
+      // Only write rawText if the upload route hasn't already stored it.
+      if (!document.rawText) {
+        await prisma.document.update({
+          where: { id: documentId },
+          data: { rawText: parsedText },
+        });
+      }
     } else {
       // Reprocess path: read content that was previously stored.
       const stored = document.rawText ?? document.storageKey ?? "";
