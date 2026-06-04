@@ -5,8 +5,11 @@ import type { Digest, DigestType } from "@prisma/client";
 
 export async function generateWorkspaceDigest(
   workspaceId: string,
-  type: DigestType = "DAILY"
+  type: DigestType = "DAILY",
+  onStep?: (step: string) => void
 ): Promise<Digest> {
+  const step = (text: string) => onStep?.(text);
+  step("Loading workspace data");
   const lookbackMs =
     type === "WEEKLY"
       ? 7 * 24 * 60 * 60 * 1000
@@ -106,6 +109,7 @@ Top 3 opportunities + recommended immediate actions. Include the opportunity sco
 
 Be direct, data-driven, and no longer than 400 words total.`;
 
+  step("Analyzing activity");
   const response = await getAnthropicClient().messages.create({
     model: MODELS.fast,
     max_tokens: 1024,
@@ -115,6 +119,8 @@ Be direct, data-driven, and no longer than 400 words total.`;
   const content =
     response.content[0].type === "text" ? response.content[0].text : "";
 
+  step("Writing digest");
+  step("Saving");
   const digest = await prisma.digest.create({
     data: {
       workspaceId,
