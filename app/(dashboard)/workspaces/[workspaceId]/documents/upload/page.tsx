@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Upload, FileText, X, CheckCircle2, Loader2, AlertCircle } from "lucide-react";
+import { Upload, FileText, CheckCircle2, Loader2, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const pasteSchema = z.object({
@@ -53,12 +53,16 @@ export default function UploadPage() {
   const params = useParams<{ workspaceId: string }>();
   const workspaceId = params.workspaceId;
 
-  const [tab, setTab] = useState<"paste" | "upload">("paste");
+  const [tab, setTab] = useState<"paste" | "upload">("upload");
   const [pasteLoading, setPasteLoading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [uploadSourceType, setUploadSourceType] = useState("UPLOAD");
   const [uploading, setUploading] = useState(false);
+  const filesRef = useRef<FileEntry[]>([]);
+  const uploadSourceTypeRef = useRef("UPLOAD");
+  useEffect(() => { filesRef.current = files; }, [files]);
+  useEffect(() => { uploadSourceTypeRef.current = uploadSourceType; }, [uploadSourceType]);
 
   const { register, handleSubmit, setValue, formState: { errors } } = useForm<PasteForm>({
     resolver: zodResolver(pasteSchema),
@@ -89,43 +93,30 @@ export default function UploadPage() {
     }
   };
 
-  const addFiles = useCallback((incoming: File[]) => {
+  const addAndUpload = useCallback(async (incoming: File[]) => {
     const valid = incoming.filter((f) => /\.(txt|md|pdf|csv)$/i.test(f.name));
     if (valid.length < incoming.length) {
       toast.error("Some files skipped — only .txt, .md, .pdf, .csv are supported");
     }
-    setFiles((prev) => {
-      const existing = new Set(prev.map((e) => e.file.name + e.file.size));
-      const fresh = valid.filter((f) => !existing.has(f.name + f.size));
-      return [...prev, ...fresh.map((f) => ({ file: f, status: "pending" as FileStatus }))];
+    if (valid.length === 0) return;
+
+    const fresh = valid.filter((f) => {
+      const key = f.name + f.size;
+      return !filesRef.current.some((e) => e.file.name + e.file.size === key);
     });
-  }, []);
+    if (fresh.length === 0) return;
 
-  const onDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
-    addFiles(Array.from(e.dataTransfer.files));
-  }, [addFiles]);
-
-  const removeFile = (idx: number) => {
-    setFiles((prev) => prev.filter((_, i) => i !== idx));
-  };
-
-  const uploadAll = async () => {
-    if (files.length === 0) return toast.error("Please select at least one file");
+    const newEntries: FileEntry[] = fresh.map((f) => ({ file: f, status: "uploading" as FileStatus }));
+    setFiles((prev) => [...prev, ...newEntries]);
     setUploading(true);
 
     let anyFailed = false;
-    for (let i = 0; i < files.length; i++) {
-      if (files[i].status === "done") continue;
-
-      setFiles((prev) => prev.map((e, idx) => idx === i ? { ...e, status: "uploading" } : e));
-
+    for (const file of fresh) {
       try {
         const formData = new FormData();
-        formData.append("file", files[i].file);
-        formData.append("title", files[i].file.name.replace(/\.[^.]+$/, ""));
-        formData.append("sourceType", uploadSourceType);
+        formData.append("file", file);
+        formData.append("title", file.name.replace(/\.[^.]+$/, ""));
+        formData.append("sourceType", uploadSourceTypeRef.current);
 
         const res = await fetch(`/api/workspaces/${workspaceId}/documents/upload`, {
           method: "POST",
@@ -134,24 +125,28 @@ export default function UploadPage() {
         const json = await res.json();
         if (!json.ok) throw new Error(json.error?.message ?? "Upload failed");
 
-        setFiles((prev) => prev.map((e, idx) => idx === i ? { ...e, status: "done" } : e));
+        setFiles((prev) => prev.map((e) => e.file === file ? { ...e, status: "done" } : e));
       } catch (err) {
         anyFailed = true;
-        setFiles((prev) => prev.map((e, idx) => idx === i ? { ...e, status: "error", error: err instanceof Error ? err.message : "Failed" } : e));
+        setFiles((prev) => prev.map((e) => e.file === file ? { ...e, status: "error", error: err instanceof Error ? err.message : "Failed" } : e));
       }
     }
 
     setUploading(false);
-
     if (!anyFailed) {
-      toast.success(`${files.length} file${files.length > 1 ? "s" : ""} uploaded successfully`);
+      toast.success(`${fresh.length} file${fresh.length > 1 ? "s" : ""} uploaded successfully`);
       router.push(`/workspaces/${workspaceId}/documents`);
     } else {
       toast.error("Some files failed to upload — check the list");
     }
-  };
+  }, [workspaceId, router]);
 
-  const allDone = files.length > 0 && files.every((f) => f.status === "done");
+  const onDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    addAndUpload(Array.from(e.dataTransfer.files));
+  }, [addAndUpload]);
+
 
   return (
     <div className="p-8 max-w-2xl">
@@ -256,7 +251,7 @@ export default function UploadPage() {
                   accept=".txt,.md,.pdf,.csv"
                   multiple
                   onChange={(e) => {
-                    if (e.target.files) addFiles(Array.from(e.target.files));
+                    if (e.target.files) addAndUpload(Array.from(e.target.files));
                     e.target.value = "";
                   }}
                 />
@@ -286,47 +281,27 @@ export default function UploadPage() {
                           <span className="text-xs text-red-500 truncate max-w-[100px]">{entry.error}</span>
                         </div>
                       )}
-                      {entry.status === "pending" && !uploading && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); removeFile(i); }}
-                          className="text-gray-400 hover:text-red-500 transition-colors"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      )}
                     </div>
                   ))}
                 </div>
               )}
 
-              {/* Source type + Upload button */}
-              {files.length > 0 && (
-                <div className="space-y-4">
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium text-gray-700">Source type for all files</label>
-                    <Select onValueChange={(v) => setUploadSourceType(v ?? "UPLOAD")} defaultValue="UPLOAD">
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {SOURCE_TYPES.map((s) => (
-                          <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <Button
-                    onClick={uploadAll}
-                    disabled={uploading || allDone}
-                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
-                  >
-                    {uploading
-                      ? "Uploading…"
-                      : allDone
-                      ? "All uploaded"
-                      : `Upload ${files.length} file${files.length > 1 ? "s" : ""}`}
-                  </Button>
-                </div>
-              )}
+              {/* Source type — always visible so it can be set before choosing files */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-gray-700">Source type</label>
+                <Select
+                  value={uploadSourceType}
+                  onValueChange={(v) => setUploadSourceType(v ?? "UPLOAD")}
+                  disabled={uploading}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {SOURCE_TYPES.map((s) => (
+                      <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
