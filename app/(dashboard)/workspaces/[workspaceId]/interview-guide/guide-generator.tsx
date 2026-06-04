@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Sparkles, Loader2, MessageSquarePlus } from "lucide-react";
 import { toast } from "sonner";
+import { useJob } from "../workspace-jobs-context";
+import { ProgressStream } from "@/components/ui/progress-stream";
 
 type InterviewType = "Discovery" | "Validation" | "Churn Exit" | "Onboarding";
 
@@ -26,7 +28,7 @@ export function InterviewGuideGenerator({ workspaceId }: InterviewGuideGenerator
   const [interviewType, setInterviewType] = useState<InterviewType>("Discovery");
   const [questionCount, setQuestionCount] = useState(10);
   const [focusArea, setFocusArea] = useState("");
-  const [loading, setLoading] = useState(false);
+  const { running, steps, startJob } = useJob("generate-interview-guide");
 
   useEffect(() => {
     async function loadSegments() {
@@ -50,33 +52,28 @@ export function InterviewGuideGenerator({ workspaceId }: InterviewGuideGenerator
 
   const effectiveSegment = customerSegment === "__custom__" ? customSegment : customerSegment;
 
-  async function handleGenerate(e: React.FormEvent) {
+  function handleGenerate(e: React.FormEvent) {
     e.preventDefault();
     if (!effectiveSegment.trim()) {
       toast.error("Please enter or select a customer segment.");
       return;
     }
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/workspaces/${workspaceId}/interview-guide`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+    startJob(
+      `/api/workspaces/${workspaceId}/interview-guide`,
+      (result) => {
+        toast.success("Interview guide saved!");
+        router.push(`/workspaces/${workspaceId}/interview-guide/${result.id as string}`);
+      },
+      (msg) => toast.error(msg),
+      {
         body: JSON.stringify({
           customerSegment: effectiveSegment.trim(),
           interviewType,
           questionCount,
           focusArea: focusArea.trim() || undefined,
         }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.ok) throw new Error(data.error?.message ?? "Failed to generate guide");
-      toast.success("Interview guide saved!");
-      router.push(`/workspaces/${workspaceId}/interview-guide/${data.data.id}`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Generation failed");
-    } finally {
-      setLoading(false);
-    }
+      }
+    );
   }
 
   return (
@@ -165,9 +162,15 @@ export function InterviewGuideGenerator({ workspaceId }: InterviewGuideGenerator
             />
           </div>
 
-          <Button type="submit" disabled={loading} className="w-full gap-2 bg-indigo-600 hover:bg-indigo-700 text-white">
-            {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Generating and saving…</> : <><Sparkles className="h-4 w-4" /> Generate Guide</>}
+          <Button type="submit" disabled={running} className="w-full gap-2 bg-indigo-600 hover:bg-indigo-700 text-white">
+            {running ? (
+              <><Loader2 className="h-4 w-4 animate-spin" /> Generating…</>
+            ) : (
+              <><Sparkles className="h-4 w-4" /> Generate Guide</>
+            )}
           </Button>
+
+          {steps.length > 0 && <ProgressStream steps={steps} />}
         </form>
       </CardContent>
     </Card>
