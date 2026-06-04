@@ -41,7 +41,8 @@ export async function GET(
       JOIN "Document" d ON d.id = dc."documentId"
       WHERE dc."workspaceId" = ${workspaceId}
         AND d.status = 'COMPLETED'
-        AND 1 - (dc.embedding <=> ${vectorStr}::vector) > 0.3
+        AND dc.embedding IS NOT NULL
+        AND 1 - (dc.embedding <=> ${vectorStr}::vector) > 0.1
       ORDER BY dc.embedding <=> ${vectorStr}::vector
       LIMIT ${limit}
     `;
