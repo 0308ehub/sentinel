@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -68,12 +68,16 @@ function TicketCard({
   hasLinearConnector,
   onStatusChange,
   onExportToLinear,
+  onDragStart,
+  dragging,
 }: {
   ticket: Ticket;
   workspaceId: string;
   hasLinearConnector: boolean;
   onStatusChange: (id: string, status: TicketStatus) => void;
   onExportToLinear: (id: string) => void;
+  onDragStart: (id: string) => void;
+  dragging: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -81,7 +85,17 @@ function TicketCard({
   const statusOptions = COLUMNS.filter((c) => c.key !== ticket.status);
 
   return (
-    <div className="bg-card border border-border rounded-lg p-3 hover:border-border/80 hover:shadow-md transition-all group">
+    <div
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = "move";
+        onDragStart(ticket.id);
+      }}
+      className={cn(
+        "bg-card border border-border rounded-lg p-3 hover:border-border/80 hover:shadow-md transition-all group cursor-grab active:cursor-grabbing",
+        dragging && "opacity-40 scale-95"
+      )}
+    >
       {/* Header */}
       <div className="flex items-start gap-2">
         <PriorityDot priority={ticket.priority} />
@@ -192,6 +206,9 @@ function TicketCard({
 export function TicketsBoard({ workspaceId, initialTickets, hasLinearConnector }: TicketsBoardProps) {
   const router = useRouter();
   const [tickets, setTickets] = useState<Ticket[]>(initialTickets);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverCol, setDragOverCol] = useState<TicketStatus | null>(null);
+  const dragCounter = useRef<Partial<Record<TicketStatus, number>>>({});
 
   const handleStatusChange = useCallback(async (ticketId: string, newStatus: TicketStatus) => {
     setTickets((prev) =>
@@ -342,6 +359,9 @@ export function TicketsBoard({ workspaceId, initialTickets, hasLinearConnector }
           <div className="flex gap-4 h-full p-6 min-w-max">
             {COLUMNS.map((col) => {
               const colTickets = byStatus(col.key);
+              const isOver = dragOverCol === col.key && draggingId !== null;
+              const draggingTicket = tickets.find((t) => t.id === draggingId);
+              const isDifferentCol = draggingTicket?.status !== col.key;
               return (
                 <div key={col.key} className="flex flex-col w-72 shrink-0">
                   {/* Column header */}
@@ -362,11 +382,45 @@ export function TicketsBoard({ workspaceId, initialTickets, hasLinearConnector }
                     </div>
                   </div>
 
-                  {/* Cards */}
-                  <div className={cn("flex-1 overflow-y-auto rounded-b-lg border border-t-0 p-2 space-y-2", col.bg)}>
+                  {/* Cards — drop zone */}
+                  <div
+                    className={cn(
+                      "flex-1 overflow-y-auto rounded-b-lg border border-t-0 p-2 space-y-2 transition-colors duration-150",
+                      col.bg,
+                      isOver && isDifferentCol && "ring-2 ring-inset ring-indigo-400 brightness-105"
+                    )}
+                    onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; }}
+                    onDragEnter={() => {
+                      dragCounter.current[col.key] = (dragCounter.current[col.key] ?? 0) + 1;
+                      setDragOverCol(col.key);
+                    }}
+                    onDragLeave={() => {
+                      dragCounter.current[col.key] = (dragCounter.current[col.key] ?? 1) - 1;
+                      if ((dragCounter.current[col.key] ?? 0) <= 0) {
+                        dragCounter.current[col.key] = 0;
+                        setDragOverCol((prev) => (prev === col.key ? null : prev));
+                      }
+                    }}
+                    onDrop={() => {
+                      dragCounter.current[col.key] = 0;
+                      setDragOverCol(null);
+                      if (draggingId && draggingTicket?.status !== col.key) {
+                        handleStatusChange(draggingId, col.key);
+                      }
+                      setDraggingId(null);
+                    }}
+                    onDragEnd={() => {
+                      setDraggingId(null);
+                      setDragOverCol(null);
+                      dragCounter.current = {};
+                    }}
+                  >
                     {colTickets.length === 0 ? (
-                      <div className="h-16 flex items-center justify-center text-[11px] text-gray-300 italic">
-                        No tickets
+                      <div className={cn(
+                        "h-16 flex items-center justify-center text-[11px] italic transition-colors",
+                        isOver && isDifferentCol ? "text-indigo-400" : "text-gray-300"
+                      )}>
+                        {isOver && isDifferentCol ? "Drop here" : "No tickets"}
                       </div>
                     ) : (
                       colTickets.map((ticket) => (
@@ -377,6 +431,8 @@ export function TicketsBoard({ workspaceId, initialTickets, hasLinearConnector }
                           hasLinearConnector={hasLinearConnector}
                           onStatusChange={handleStatusChange}
                           onExportToLinear={handleExportToLinear}
+                          onDragStart={setDraggingId}
+                          dragging={draggingId === ticket.id}
                         />
                       ))
                     )}
