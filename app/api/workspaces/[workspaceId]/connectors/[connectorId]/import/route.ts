@@ -8,7 +8,8 @@ export async function POST(
   { params }: { params: Promise<{ workspaceId: string; connectorId: string }> }
 ) {
   const { workspaceId, connectorId } = await params;
-  try { await requireWorkspaceAccess(workspaceId); } catch { return unauthorizedResponse(); }
+  let userId: string;
+  try { ({ user: { id: userId } } = await requireWorkspaceAccess(workspaceId)); } catch { return unauthorizedResponse(); }
 
   const connector = await prisma.connector.findFirst({ where: { id: connectorId, workspaceId } });
   if (!connector) return notFoundResponse("Connector");
@@ -38,7 +39,7 @@ export async function POST(
         const created = await prisma.document.create({
           data: {
             workspaceId,
-            uploadedById: connector.id, // connector as uploader placeholder
+            uploadedById: userId,
             title: doc.title,
             sourceType: "EMAIL",
             fileType: "txt",
