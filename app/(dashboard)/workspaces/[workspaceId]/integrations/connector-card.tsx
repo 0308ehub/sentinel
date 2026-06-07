@@ -69,19 +69,19 @@ export function ConnectorCard({ connector, meta, workspaceId }: { connector: Con
       <div className={cn("rounded-2xl border p-5 flex flex-col gap-4", meta.color)}>
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-background shadow-sm flex items-center justify-center p-1.5">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-background shadow-sm flex items-center justify-center p-1.5 shrink-0">
               <ConnectorIcon type={connector.type} className="w-full h-full" />
             </div>
-            <div>
-              <p className="font-semibold text-foreground text-sm leading-tight">{connector.name}</p>
+            <div className="min-w-0">
+              <p className="font-semibold text-foreground text-sm leading-tight truncate">{connector.name}</p>
               <div className="flex items-center gap-1 mt-0.5">
-                <StatusIcon className={cn("h-3 w-3", s.color)} />
+                <StatusIcon className={cn("h-3 w-3 shrink-0", s.color)} />
                 <span className={cn("text-xs font-medium", s.color)}>{s.label}</span>
               </div>
             </div>
           </div>
-          <button onClick={handleDelete} disabled={deleting} className="text-gray-300 hover:text-red-400 transition-colors p-1 rounded-lg">
+          <button onClick={handleDelete} disabled={deleting} className="text-gray-300 hover:text-red-400 transition-colors p-1 rounded-lg shrink-0">
             {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
           </button>
         </div>

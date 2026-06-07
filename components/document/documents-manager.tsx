@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -213,6 +213,8 @@ function DocRow({ doc, selected, onToggle }: DocRowProps) {
   );
 }
 
+const IN_PROGRESS_STATUSES = new Set(["PENDING", "PARSING", "CHUNKING", "EMBEDDING", "EXTRACTING"]);
+
 export function DocumentsManager({
   documents,
   workspaceId,
@@ -222,6 +224,13 @@ export function DocumentsManager({
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  const hasInProgress = documents.some((d) => IN_PROGRESS_STATUSES.has(d.status));
+  useEffect(() => {
+    if (!hasInProgress) return;
+    const id = setInterval(() => router.refresh(), 3000);
+    return () => clearInterval(id);
+  }, [hasInProgress, router]);
   const [sortKey, setSortKey] = useState<SortKey>("createdAt");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [statusFilter, setStatusFilter] = useState<string>("All");

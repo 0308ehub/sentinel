@@ -122,7 +122,7 @@ export default async function IntegrationsPage({
         {connected && !setup && (
           <div className="mb-6 flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg px-4 py-3 text-sm font-medium">
             <CheckCircle2 className="h-4 w-4 shrink-0" />
-            Successfully connected {connected.charAt(0).toUpperCase() + connected.slice(1)}! Click &quot;Sync Now&quot; to import your first batch of data.
+            Successfully connected {connected.charAt(0).toUpperCase() + connected.slice(1)}! Click &quot;Review &amp; Import&quot; to import your first batch of data.
           </div>
         )}
         {error && (

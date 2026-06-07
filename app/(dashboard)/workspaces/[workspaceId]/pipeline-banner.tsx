@@ -39,6 +39,7 @@ export function PipelineBanner({ workspaceId }: { workspaceId: string }) {
     done,
     failed,
     steps,
+    currentStepMessage,
     errorMessage,
     statusError,
     dismissed,
@@ -215,19 +216,25 @@ export function PipelineBanner({ workspaceId }: { workspaceId: string }) {
           </div>
           <div className="space-y-1.5">
             {steps.map((step) => (
-              <div
-                key={step.key}
-                className={cn(
-                  "flex items-center gap-2 text-xs",
-                  step.status === "running" && "text-foreground animate-pulse",
-                  step.status === "done" && "text-muted-foreground",
-                  step.status === "skipped" && "text-muted-foreground/40",
-                  step.status === "failed" && "text-red-400",
-                  step.status === "pending" && "text-muted-foreground/50"
+              <div key={step.key} className="flex flex-col gap-0.5">
+                <div
+                  className={cn(
+                    "flex items-center gap-2 text-xs",
+                    step.status === "running" && "text-foreground",
+                    step.status === "done" && "text-muted-foreground",
+                    step.status === "skipped" && "text-muted-foreground/40",
+                    step.status === "failed" && "text-red-400",
+                    step.status === "pending" && "text-muted-foreground/50"
+                  )}
+                >
+                  <StepIcon status={step.status} />
+                  {step.label}
+                </div>
+                {step.status === "running" && currentStepMessage && (
+                  <p className="text-[10px] text-indigo-400/80 pl-5 animate-pulse">
+                    {currentStepMessage}
+                  </p>
                 )}
-              >
-                <StepIcon status={step.status} />
-                {step.label}
               </div>
             ))}
           </div>

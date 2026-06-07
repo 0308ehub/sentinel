@@ -28,6 +28,7 @@ export interface PipelineContextValue {
   failed: boolean;
   steps: PipelineStep[];
   currentStep: PipelineStepKey | null;
+  currentStepMessage: string | undefined;
   errorMessage: string | undefined;
   statusError: boolean;
   canRun: boolean;
@@ -54,7 +55,7 @@ export function PipelineProvider({
 }) {
   const router = useRouter();
   const synthesizeJob = useJob("synthesize");
-  const opportunitiesJob = useJob("opportunities");
+  const opportunitiesJob = useJob("generate-opportunities");
   const ticketsJob = useJob("tickets");
 
   const [idle, setIdle] = useState(true);
@@ -64,6 +65,15 @@ export function PipelineProvider({
   const [failed, setFailed] = useState(false);
   const [steps, setSteps] = useState<PipelineStep[]>([]);
   const [currentStep, setCurrentStep] = useState<PipelineStepKey | null>(null);
+
+  const currentStepMessage = (() => {
+    const activeSteps =
+      currentStep === "synthesize" ? synthesizeJob.steps :
+      currentStep === "opportunities" ? opportunitiesJob.steps :
+      currentStep === "tickets" ? ticketsJob.steps : [];
+    const active = [...activeSteps].reverse().find((s) => !s.done);
+    return active?.text;
+  })();
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
   const [statusError, setStatusError] = useState(false);
   const [canRun, setCanRun] = useState(false);
@@ -287,6 +297,7 @@ export function PipelineProvider({
         failed,
         steps,
         currentStep,
+        currentStepMessage,
         errorMessage,
         statusError,
         canRun,

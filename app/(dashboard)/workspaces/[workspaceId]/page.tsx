@@ -43,6 +43,7 @@ export default async function WorkspacePage({
   const [
     documentCount,
     activePainPointCount,
+    opportunityCount,
     opportunities,
     tickets,
     recentDocs,
@@ -51,6 +52,7 @@ export default async function WorkspacePage({
   ] = await Promise.all([
     prisma.document.count({ where: { workspaceId } }),
     prisma.painPoint.count({ where: { workspaceId, status: "ACTIVE" } }),
+    prisma.opportunity.count({ where: { workspaceId } }),
     prisma.opportunity.findMany({
       where: { workspaceId },
       orderBy: { totalScore: "desc" },
@@ -181,7 +183,7 @@ export default async function WorkspacePage({
           {[
             { label: "Documents",    value: documentCount,           href: "documents",    color: "text-foreground" },
             { label: "Pain Points",  value: activePainPointCount,    href: "insights",     color: "text-amber-600" },
-            { label: "Opportunities",value: opportunities.length,    href: "opportunities",color: "text-blue-600" },
+            { label: "Opportunities",value: opportunityCount,         href: "opportunities",color: "text-blue-600" },
             { label: "In Sprint",    value: inSprintTickets.length,  href: "tickets",      color: "text-indigo-600" },
             { label: "Done",         value: doneTickets.length,      href: "tickets",      color: "text-emerald-600" },
           ].map(({ label, value, href, color }) => (
