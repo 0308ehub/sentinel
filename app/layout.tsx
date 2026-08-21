@@ -9,9 +9,9 @@ const inter = Inter({ variable: "--font-inter", subsets: ["latin"], display: "sw
 const jetbrainsMono = JetBrains_Mono({ variable: "--font-mono", subsets: ["latin"], display: "swap" });
 
 export const metadata: Metadata = {
-  title: "Sentinel — The Autonomous PM",
+  title: "Sentinel — An AI Mentor for Children",
   description:
-    "Sentinel scans your connectors, surfaces insights, and autonomously manages your product backlog.",
+    "An AI mentor that learns how your child thinks, adapts to how they learn, and grows with them over time.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

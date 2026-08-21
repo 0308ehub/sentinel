@@ -1,20 +1,23 @@
-import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/db/prisma'
+import { prisma } from "@/lib/db/prisma";
+import { apiError, apiSuccess } from "@/types";
 
-export async function POST(req: Request) {
+export async function POST(request: Request) {
   try {
-    const body = await req.json()
-    const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : ''
-    if (!email || !email.includes('@')) {
-      return NextResponse.json({ error: 'Invalid email' }, { status: 400 })
+    const body = await request.json();
+    const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
+
+    if (!email || !email.includes("@")) {
+      return Response.json(apiError("VALIDATION_ERROR", "Invalid email"), { status: 400 });
     }
-    await prisma.waitlistEntry.upsert({
+
+    const entry = await prisma.waitlistEntry.upsert({
       where: { email },
       update: {},
       create: { email },
-    })
-    return NextResponse.json({ success: true })
+    });
+
+    return Response.json(apiSuccess(entry));
   } catch {
-    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+    return Response.json(apiError("INTERNAL_ERROR", "Server error"), { status: 500 });
   }
 }

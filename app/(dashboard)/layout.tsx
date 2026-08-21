@@ -1,12 +1,19 @@
+import { UserButton } from "@clerk/nextjs";
 import { Providers } from "@/components/providers";
-import { Sidebar } from "@/components/nav/sidebar";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <Providers>
-      <div className="flex h-screen overflow-hidden bg-background">
-        <Sidebar />
-        <main className="flex-1 min-w-0 h-full overflow-hidden flex flex-col">{children}</main>
+      <div className="min-h-screen bg-background">
+        <header className="flex h-16 items-center justify-between border-b px-6">
+          <span className="font-semibold">Sentinel</span>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <UserButton />
+          </div>
+        </header>
+        <main>{children}</main>
       </div>
     </Providers>
   );
