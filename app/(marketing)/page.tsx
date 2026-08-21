@@ -1,18 +1,11 @@
-import Image from "next/image";
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
+import { SentinelMark } from "@/components/brand/sentinel-logo";
 
 export default function LandingPage() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-8 p-6 text-center">
-      <Image
-        src="/sentinel-logo.png"
-        alt="Sentinel"
-        width={96}
-        height={96}
-        priority
-        className="dark:invert"
-      />
+      <SentinelMark size={56} className="text-foreground" />
 
       <div className="space-y-4">
         <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">Sentinel</h1>
