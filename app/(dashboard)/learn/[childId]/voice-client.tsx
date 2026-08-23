@@ -176,8 +176,8 @@ export function VoiceClient({ childId, childName }: { childId: string; childName
       <div className="flex items-center justify-between gap-4 border-b py-4">
         <div className="flex min-w-0 items-center gap-3">
           <Link
-            href="/dashboard"
-            aria-label="Back to your children"
+            href={`/children/${childId}`}
+            aria-label={`Back to ${childName}`}
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
