@@ -39,8 +39,12 @@ const IDLE_NUDGE_MS = 18_000;
 const REVEAL_TICK_MS = 50;
 /** Roughly conversational pace for the voice at speed 1.0. */
 const CHARS_PER_SECOND = 15;
-/** If we fall a long way behind the audio, catch up rather than lag visibly. */
-const BACKLOG_CATCHUP_CHARS = 180;
+/**
+ * Only catch up once the backlog is genuinely large. The model finishes composing
+ * long before the voice finishes speaking, so a full buffer is the normal state —
+ * treating it as "behind" made the text sprint ahead and finish early.
+ */
+const BACKLOG_CATCHUP_CHARS = 600;
 
 /**
  * Transcribers still occasionally emit filler on non-speech audio. If we never saw
@@ -79,6 +83,14 @@ export function useRealtime({
   const revealTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   /** Guards against stopped and cleared both finalising the same turn. */
   const finalisedRef = useRef(true);
+  /** True once audio playback has actually begun for the current response. */
+  const playbackStartedRef = useRef(false);
+  /** Safety net for the case where no playback events arrive at all. */
+  const finaliseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** The opening greeting must happen exactly once per connection. */
+  const greetedRef = useRef(false);
+  /** Prevents a second connection attempt racing the first. */
+  const connectingRef = useRef(false);
   const nudgeCountRef = useRef(0);
   /** True while the mentor is generating — never stack a nudge on top of a reply. */
   const responseActiveRef = useRef(false);
@@ -98,7 +110,7 @@ export function useRealtime({
       const base = Math.max(1, Math.round((CHARS_PER_SECOND * REVEAL_TICK_MS) / 1000));
       // Speak-ahead happens; if the buffer is deep the audio is long, so hurry.
       const overflow = Math.max(0, pendingRef.current.length - BACKLOG_CATCHUP_CHARS);
-      const take = base + Math.ceil(overflow / 20);
+      const take = base + Math.ceil(overflow / 120);
       const chunk = pendingRef.current.slice(0, take);
       pendingRef.current = pendingRef.current.slice(take);
       spokenRef.current += chunk;
@@ -123,6 +135,7 @@ export function useRealtime({
       if (!dc || dc.readyState !== "open") return;
       // A reply is already on its way — nudging now produces the stray fragments.
       if (responseActiveRef.current) return;
+      if (!playbackStartedRef.current && !finalisedRef.current) return;
       nudgeCountRef.current += 1;
       dc.send(
         JSON.stringify({
@@ -165,7 +178,9 @@ export function useRealtime({
   }, []);
 
   const start = useCallback(async () => {
-    if (!sessionId || pcRef.current) return;
+    if (!sessionId || pcRef.current || connectingRef.current) return;
+    connectingRef.current = true;
+    greetedRef.current = false;
     setError(null);
     setState("connecting");
 
@@ -204,8 +219,11 @@ export function useRealtime({
       const dc = pc.createDataChannel("oai-events");
       dcRef.current = dc;
 
-      // The mentor opens the conversation. A child will not start it.
+      // The mentor opens the conversation. A child will not start it — but exactly
+      // once: a re-opened channel or a second mount must not greet again.
       dc.onopen = () => {
+        if (greetedRef.current) return;
+        greetedRef.current = true;
         dc.send(JSON.stringify({ type: "response.create" }));
       };
 
@@ -219,6 +237,8 @@ export function useRealtime({
             pendingRef.current = "";
             spokenRef.current = "";
             finalisedRef.current = false;
+            playbackStartedRef.current = false;
+            if (finaliseTimerRef.current) clearTimeout(finaliseTimerRef.current);
             // Open the bubble now so text streams into a slot that already exists,
             // instead of appearing, vanishing, then reappearing committed.
             onTutorStart();
@@ -226,12 +246,14 @@ export function useRealtime({
 
           // Playback lifecycle — the only reliable signal for what was HEARD.
           case "output_audio_buffer.started":
+            playbackStartedRef.current = true;
             setState("speaking");
             startReveal();
             break;
 
           case "output_audio_buffer.stopped":
             // Finished naturally: everything generated was spoken.
+            if (finaliseTimerRef.current) clearTimeout(finaliseTimerRef.current);
             if (!finalisedRef.current) {
               finalisedRef.current = true;
               stopReveal();
@@ -242,12 +264,14 @@ export function useRealtime({
               }
               lastTutorRef.current = spokenRef.current.trim();
               onTutorTurn(lastTutorRef.current);
+              armIdleNudge();
             }
             setState("listening");
             break;
 
           case "output_audio_buffer.cleared":
             // Cut off. Anything not yet revealed was never spoken — drop it.
+            if (finaliseTimerRef.current) clearTimeout(finaliseTimerRef.current);
             if (!finalisedRef.current) {
               finalisedRef.current = true;
               stopReveal();
@@ -286,8 +310,18 @@ export function useRealtime({
             // output_audio_buffer.stopped/cleared decides what was actually said.
             break;
           case "response.done":
+            // Generation finished — the voice is very likely still speaking.
+            // Flushing here is what made the text teleport to the end mid-sentence.
             responseActiveRef.current = false;
-            if (!finalisedRef.current) {
+            if (playbackStartedRef.current) {
+              // Let output_audio_buffer.stopped/cleared close the turn.
+              break;
+            }
+            // No playback events seen. Give them a moment, then finish anyway so a
+            // silent or event-less response cannot strand the turn open.
+            if (finaliseTimerRef.current) clearTimeout(finaliseTimerRef.current);
+            finaliseTimerRef.current = setTimeout(() => {
+              if (finalisedRef.current) return;
               finalisedRef.current = true;
               stopReveal();
               if (pendingRef.current) {
@@ -297,9 +331,8 @@ export function useRealtime({
               }
               lastTutorRef.current = spokenRef.current.trim();
               onTutorTurn(lastTutorRef.current);
-            }
-            // Start counting silence only once the mentor has finished talking.
-            armIdleNudge();
+              armIdleNudge();
+            }, 1500);
             break;
 
           // Barge-in: the child started talking over the mentor.
@@ -332,9 +365,11 @@ export function useRealtime({
 
       await pc.setRemoteDescription({ type: "answer", sdp: await sdpRes.text() });
       setState("listening");
+      connectingRef.current = false;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start voice");
       setState("error");
+      connectingRef.current = false;
       stop();
     }
   }, [
