@@ -50,10 +50,13 @@ export async function POST(req: Request) {
     session: {
       type: "realtime",
       model: REALTIME_MODEL,
-      // A hard ceiling on one spoken turn. Enough for a four or five sentence
-      // demonstration, not enough to run through several exchanges in one breath
-      // and invent the child's replies along the way.
-      max_output_tokens: 320,
+      // Bounds a runaway monologue without clipping a normal turn. NOTE: in the
+      // Realtime API this counts AUDIO tokens, which accrue at roughly 50 per
+      // second of speech — 320 was about six seconds and was cutting explanations
+      // off mid-sentence. This is roughly half a minute, comfortably more than any
+      // single turn should need, while still stopping the model running through
+      // several exchanges in one breath.
+      max_output_tokens: 1500,
       instructions: buildRealtimeInstructions(context, stage, undefined, {
         isFirstEver,
         lastSessionSummary: lastSession?.summary ?? null,

@@ -310,6 +310,15 @@ export function useRealtime({
             // output_audio_buffer.stopped/cleared decides what was actually said.
             break;
           case "response.done":
+            // A reply stopped by the token ceiling ends mid-sentence, in text and
+            // in audio. Surface it rather than leaving it to be guessed at.
+            if (evt.response?.status === "incomplete") {
+              const why = evt.response?.status_details?.reason ?? "unknown";
+              console.warn(`[realtime] reply ended early: ${why}`);
+              if (why === "max_output_tokens") {
+                setError("That reply was cut short — the turn limit was reached.");
+              }
+            }
             // Generation finished — the voice is very likely still speaking.
             // Flushing here is what made the text teleport to the end mid-sentence.
             responseActiveRef.current = false;
