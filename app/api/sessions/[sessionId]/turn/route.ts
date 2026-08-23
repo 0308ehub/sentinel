@@ -36,6 +36,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ session
   const stream = new ReadableStream({
     async start(controller) {
       try {
+        // Open the stream immediately so the client can show feedback while the
+        // planner runs — that step takes seconds and used to be dead silence.
+        controller.enqueue(sse({ type: "thinking" }));
+
         const turn = await processChildTurn(sessionId, text);
 
         // Surface the pedagogical decision so the UI can show the reasoning.
@@ -48,6 +52,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ session
             observation: turn.planner.observation,
             reason: turn.planner.reason,
             blocked: turn.blocked ?? null,
+            mentorName: turn.context.mentorName,
           })
         );
 

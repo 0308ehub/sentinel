@@ -110,6 +110,18 @@ export async function processChildTurn(sessionId: string, childText: string): Pr
     },
   });
 
+  // 6b. The child named their mentor — a one-time, irreversible-feeling moment.
+  if (planner.mentor_name && !context.mentorName) {
+    const clean = planner.mentor_name.trim().slice(0, 30);
+    if (clean) {
+      await prisma.mentorProfile.update({
+        where: { childId: session.childId },
+        data: { mentorName: clean, mentorNamedAt: new Date() },
+      });
+      context.mentorName = clean;
+    }
+  }
+
   // 7. Grow the knowledge graph. A memory write failure must not lose the turn.
   try {
     await persistMemories(session.childId, planner);

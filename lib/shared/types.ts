@@ -80,6 +80,8 @@ export const plannerOutputSchema = z.object({
   response_goal: z.string().default("Continue the activity naturally."),
   /** Validated individually in the planner so one bad entry cannot discard the turn. */
   memory_updates: z.array(z.unknown()).default([]),
+  /** Set only when the child has just chosen a name for their mentor. */
+  mentor_name: z.string().max(30).nullable().optional(),
 });
 type RawPlannerOutput = z.infer<typeof plannerOutputSchema>;
 export type PlannerOutput = Omit<RawPlannerOutput, "memory_updates"> & {
@@ -123,6 +125,8 @@ export interface StrategyView {
 export interface LearnerContext {
   childId: string;
   childName: string;
+  /** Null until the child names their mentor. */
+  mentorName: string | null;
   ageYears: number;
   gradeLabel: string | null;
   interests: string[];

@@ -23,7 +23,10 @@ export async function POST(req: Request) {
   const parsed = startSessionSchema.safeParse(await req.json());
   if (!parsed.success) return Response.json(apiError("INVALID_INPUT", "childId is required"), { status: 400 });
 
-  const child = await prisma.child.findUnique({ where: { id: parsed.data.childId } });
+  const child = await prisma.child.findUnique({
+    where: { id: parsed.data.childId },
+    include: { mentorProfile: true },
+  });
   if (!child || child.parentId !== user.id) {
     return Response.json(apiError("NOT_FOUND", "Child not found"), { status: 404 });
   }
@@ -65,6 +68,11 @@ export async function POST(req: Request) {
   });
 
   return Response.json(
-    apiSuccess({ session, messages, resumed: Boolean(existing) })
+    apiSuccess({
+      session,
+      messages,
+      resumed: Boolean(existing),
+      mentorName: child.mentorProfile?.mentorName ?? null,
+    })
   );
 }

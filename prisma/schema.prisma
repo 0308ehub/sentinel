@@ -60,7 +60,9 @@ model Child {
 model MentorProfile {
   id         String @id @default(cuid())
   childId    String @unique
-  mentorName String @default("Nova")
+  /// Null until the child chooses a name for their mentor during the first session.
+  mentorName    String?
+  mentorNamedAt DateTime?
 
   /// Layer 4 — narrative of development over months. Updated rarely.
   longitudinalNarrative String?

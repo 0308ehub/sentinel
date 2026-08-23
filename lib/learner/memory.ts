@@ -23,7 +23,10 @@ export async function buildLearnerContext(
   sessionId?: string,
   focusConceptIds: string[] = []
 ): Promise<LearnerContext> {
-  const child = await prisma.child.findUniqueOrThrow({ where: { id: childId } });
+  const child = await prisma.child.findUniqueOrThrow({
+    where: { id: childId },
+    include: { mentorProfile: true },
+  });
 
   const [skillStates, hypotheses, memories, interventions, messages] = await Promise.all([
     prisma.learnerSkillState.findMany({
@@ -97,6 +100,7 @@ export async function buildLearnerContext(
   return {
     childId,
     childName: child.name,
+    mentorName: child.mentorProfile?.mentorName ?? null,
     ageYears: child.ageYears,
     gradeLabel: child.gradeLabel,
     interests: child.interests,
