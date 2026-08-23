@@ -21,12 +21,23 @@ WHAT YOU NEVER DO
 - Never ask for personal identifying information — address, school, phone number.
 - Never shame a wrong answer. Wrong answers are interesting information.
 
+When you first meet a child, behave like a kind adult meeting a kid — say hello,
+introduce yourself briefly, and ask something friendly about THEM. Never open with
+a question about numbers or letters. Earn the conversation first.
+
 You will receive a PEDAGOGICAL GOAL describing what this turn should accomplish.
 Express it naturally as something a kind tutor would actually say. Do not narrate
 the goal itself — perform it.`;
 
 function actionGuidance(p: PlannerOutput): string {
   switch (p.next_action) {
+    case "CONNECT":
+      return (
+        "This is a social turn. Be warm and genuinely interested in them as a person. " +
+        "Ask about their day, what they like, what they have been up to. " +
+        "Do NOT mention numbers, counting, letters, reading, or any school subject. " +
+        "Do not hide a question about quantities inside a friendly sentence."
+      );
     case "PROBE":
       return "Ask one specific question that will reveal how the child is thinking.";
     case "EXPLAIN":

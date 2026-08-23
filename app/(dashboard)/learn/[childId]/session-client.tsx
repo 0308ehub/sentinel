@@ -12,6 +12,9 @@ interface Turn {
   observation?: string;
   reason?: string;
   target?: string | null;
+  /** Marks the first turn of a session, so we can show a divider. */
+  sessionId?: string;
+  createdAt?: string;
 }
 
 export function SessionClient({ childId, childName }: { childId: string; childName: string }) {
@@ -19,6 +22,7 @@ export function SessionClient({ childId, childName }: { childId: string; childNa
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [showThinking, setShowThinking] = useState(true);
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -30,13 +34,28 @@ export function SessionClient({ childId, childName }: { childId: string; childNa
     })
       .then((r) => r.json())
       .then((b) => {
-        if (b.ok) setSessionId(b.data.id);
-      });
+        if (!b.ok) return;
+        setSessionId(b.data.session.id);
+        setTurns(
+          b.data.messages
+            .filter((m: { role: string }) => m.role !== "SYSTEM")
+            .map((m: Record<string, string | null>) => ({
+              role: m.role as "TUTOR" | "CHILD",
+              text: m.content ?? "",
+              action: m.action ?? undefined,
+              reason: m.rationale ?? undefined,
+              target: m.targetConcept ?? undefined,
+              sessionId: m.sessionId ?? undefined,
+              createdAt: m.createdAt ?? undefined,
+            }))
+        );
+      })
+      .finally(() => setLoading(false));
   }, [childId]);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [turns]);
+    endRef.current?.scrollIntoView({ behavior: loading ? "auto" : "smooth" });
+  }, [turns, loading]);
 
   async function send(text: string) {
     if (!sessionId || !text.trim() || busy) return;
@@ -123,7 +142,7 @@ export function SessionClient({ childId, childName }: { childId: string; childNa
       </div>
 
       <div className="flex-1 space-y-4 overflow-y-auto pr-1">
-        {turns.length === 0 && (
+        {!loading && turns.length === 0 && (
           <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
             Say hello to start. Try{" "}
             <button className="underline" onClick={() => send("hi")}>
@@ -136,8 +155,24 @@ export function SessionClient({ childId, childName }: { childId: string; childNa
           </div>
         )}
 
-        {turns.map((t, i) => (
+        {turns.map((t, i) => {
+          const prev = turns[i - 1];
+          const newSession =
+            i > 0 && t.sessionId && prev?.sessionId && t.sessionId !== prev.sessionId;
+          return (
           <div key={i}>
+            {newSession && (
+              <div className="my-6 flex items-center gap-3 text-[11px] uppercase tracking-wide text-muted-foreground">
+                <span className="h-px flex-1 bg-border" />
+                {t.createdAt
+                  ? new Date(t.createdAt).toLocaleDateString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                    })
+                  : "Earlier"}
+                <span className="h-px flex-1 bg-border" />
+              </div>
+            )}
             {showThinking && t.action && (
               <div className="mb-1 rounded-md border-l-2 border-foreground/20 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
                 <span className="font-mono font-medium text-foreground/70">{t.action}</span>
@@ -156,7 +191,8 @@ export function SessionClient({ childId, childName }: { childId: string; childNa
               {t.text || <span className="opacity-50">…</span>}
             </div>
           </div>
-        ))}
+          );
+        })}
         <div ref={endRef} />
       </div>
 

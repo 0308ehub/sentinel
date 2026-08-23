@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const TUTOR_ACTIONS = [
+  "CONNECT",
   "PROBE",
   "EXPLAIN",
   "GIVE_EXAMPLE",

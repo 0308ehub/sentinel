@@ -8,6 +8,10 @@ const startSessionSchema = z.object({
   variant: z.enum(["PRIMER", "CONTROL"]).default("PRIMER"),
 });
 
+/** An active session older than this is considered finished. */
+const RESUME_WINDOW_MS = 12 * 60 * 60 * 1000;
+const HISTORY_LIMIT = 100;
+
 export async function POST(req: Request) {
   let user;
   try {
@@ -24,11 +28,43 @@ export async function POST(req: Request) {
     return Response.json(apiError("NOT_FOUND", "Child not found"), { status: 404 });
   }
   if (!child.consentGrantedAt) {
-    return Response.json(apiError("CONSENT_REQUIRED", "Parental consent is required before a session"), { status: 403 });
+    return Response.json(apiError("CONSENT_REQUIRED", "Parental consent is required"), { status: 403 });
   }
 
-  const session = await prisma.session.create({
-    data: { childId: child.id, variant: parsed.data.variant },
+  // Resume the session in progress rather than starting a blank one on every visit.
+  const existing = await prisma.session.findFirst({
+    where: {
+      childId: child.id,
+      status: "ACTIVE",
+      startedAt: { gte: new Date(Date.now() - RESUME_WINDOW_MS) },
+    },
+    orderBy: { startedAt: "desc" },
   });
-  return Response.json(apiSuccess(session));
+
+  const session =
+    existing ??
+    (await prisma.session.create({
+      data: { childId: child.id, variant: parsed.data.variant },
+    }));
+
+  // The child's conversation so far, across sessions — continuity is the product.
+  const messages = await prisma.message.findMany({
+    where: { session: { childId: child.id } },
+    orderBy: { createdAt: "asc" },
+    take: HISTORY_LIMIT,
+    select: {
+      id: true,
+      role: true,
+      content: true,
+      action: true,
+      targetConcept: true,
+      rationale: true,
+      sessionId: true,
+      createdAt: true,
+    },
+  });
+
+  return Response.json(
+    apiSuccess({ session, messages, resumed: Boolean(existing) })
+  );
 }

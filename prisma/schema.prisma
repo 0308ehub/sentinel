@@ -304,6 +304,8 @@ model Hypothesis {
 // ─── Teaching ────────────────────────────────────────────────────────────────
 
 enum TutorAction {
+  /// Social/rapport turn — get to know the child, no academic content.
+  CONNECT
   PROBE
   EXPLAIN
   GIVE_EXAMPLE

@@ -37,7 +37,24 @@ Critical distinction you must make when a child answers incorrectly:
 - attention failure
 These demand different responses. Diagnose before you teach.
 
+SESSION STAGES — this matters more than anything else early on.
+You will be told the current STAGE. Obey it.
+
+STAGE 1 (MEET): The child has just arrived. You are meeting a person, not
+  assessing a student. Be warm and genuinely curious about THEM. Ask about their
+  day, what they like, what they have been doing. NO numbers. NO letters. NO
+  academic content of ANY kind. Do not smuggle a maths question inside a friendly
+  sentence. Use next_action CONNECT and set target to null.
+  A placement test disguised as small talk is the single worst way to begin.
+
+STAGE 2 (WARM UP): Still mostly social, but you may weave ONE light reasoning or
+  everyday-quantity question into whatever the child already told you they like.
+  It should feel like curiosity about their world, not a test. CONNECT or PROBE.
+
+STAGE 3 (LEARN): Normal diagnostic teaching. Everything below applies fully.
+
 Actions available:
+CONNECT — a social turn: get to know the child, respond to what they shared
 PROBE — ask a discriminating question to test between hypotheses
 EXPLAIN — teach the idea directly
 GIVE_EXAMPLE — offer a worked example
@@ -151,13 +168,33 @@ export interface PlannerInput {
   goal?: string;
   /** Concepts the caller already believes are in play this turn. */
   focusConceptIds?: string[];
+  stage?: SessionStage;
+}
+
+export type SessionStage = 1 | 2 | 3;
+
+/** Rapport first. Diagnosis only once the child is actually talking (spec §2, §4). */
+export function stageForTurn(childTurnCount: number, isFirstEverSession: boolean): SessionStage {
+  if (!isFirstEverSession) return childTurnCount < 1 ? 1 : 3;
+  if (childTurnCount < 2) return 1;
+  if (childTurnCount < 4) return 2;
+  return 3;
+}
+
+function stageLabel(stage: SessionStage): string {
+  return stage === 1
+    ? "1 (MEET — social only, absolutely no academic content)"
+    : stage === 2
+      ? "2 (WARM UP — mostly social, at most one light question)"
+      : "3 (LEARN — full diagnostic teaching)";
 }
 
 function renderContext(
   ctx: LearnerContext,
   goal: string,
   childResponse: string,
-  focusConceptIds: string[] = []
+  focusConceptIds: string[] = [],
+  stage: SessionStage = 3
 ): string {
   const mastered = ctx.activeSkills.filter((s) => s.masteryProbability > 0.8).map((s) => s.conceptId);
   // The frontier, plus anything already in play, plus explicit focus — a child can
@@ -171,6 +208,7 @@ function renderContext(
   ).slice(0, 10);
 
   const lines: string[] = [];
+  lines.push(`STAGE: ${stageLabel(stage)}`);
   lines.push(`GOAL: ${goal}`);
   lines.push(`\nCHILD: ${ctx.childName}, age ${ctx.ageYears}${ctx.gradeLabel ? `, ${ctx.gradeLabel}` : ""}`);
   if (ctx.interests.length) lines.push(`INTERESTS: ${ctx.interests.join(", ")}`);
@@ -233,10 +271,21 @@ function renderContext(
 
 export async function runPlanner(input: PlannerInput): Promise<PlannerOutput> {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const stage = input.stage ?? 3;
   const goal =
     input.goal ??
-    "Learn how this child thinks. Diagnose before teaching. Choose the highest-information next step.";
-  const prompt = renderContext(input.context, goal, input.childResponse, input.focusConceptIds ?? []);
+    (stage === 1
+      ? "Meet this child and make them feel welcome. Learn who they are, not what they know."
+      : stage === 2
+        ? "Keep them talking about their world. Follow their interests."
+        : "Learn how this child thinks. Diagnose before teaching. Choose the highest-information next step.");
+  const prompt = renderContext(
+    input.context,
+    goal,
+    input.childResponse,
+    input.focusConceptIds ?? [],
+    stage
+  );
 
   const call = async () => {
     const res = await client.messages.create({
@@ -268,11 +317,20 @@ export async function runPlanner(input: PlannerInput): Promise<PlannerOutput> {
 
   // Planner failed twice — degrade to a safe, information-seeking default
   // rather than blocking the session.
-  const fallback = plannerOutputSchema.parse({
-    observation: "Planner output could not be parsed.",
-    next_action: "ASK_CHILD_TO_EXPLAIN",
-    reason: "Falling back to eliciting the child's reasoning after a planner failure.",
-    response_goal: "Ask the child to describe how they worked it out.",
-  });
+  const fallback = plannerOutputSchema.parse(
+    stage === 3
+      ? {
+          observation: "Planner output could not be parsed.",
+          next_action: "ASK_CHILD_TO_EXPLAIN",
+          reason: "Falling back to eliciting the child's reasoning after a planner failure.",
+          response_goal: "Ask the child to describe how they worked it out.",
+        }
+      : {
+          observation: "Planner output could not be parsed.",
+          next_action: "CONNECT",
+          reason: "Early in the session — stay social rather than risk an academic cold open.",
+          response_goal: "Ask the child something friendly about themselves or their day.",
+        }
+  );
   return { ...fallback, memory_updates: [] };
 }

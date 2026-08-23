@@ -26,7 +26,9 @@ async function main() {
   const session = await prisma.session.create({ data: { childId: child.id } });
   console.log("child:", child.name, "| session:", session.id, "\n");
 
-  const inputs = ["17 minus 9 is 10", "I did 9 take away 7 and then put the 1 back on"];
+  const inputs = process.env.SMOKE_INPUTS
+    ? JSON.parse(process.env.SMOKE_INPUTS)
+    : ["17 minus 9 is 10", "I did 9 take away 7 and then put the 1 back on"];
 
   for (const text of inputs) {
     console.log(`\n${"=".repeat(70)}\nCHILD: ${text}`);

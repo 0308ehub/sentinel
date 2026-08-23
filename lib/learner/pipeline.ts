@@ -2,7 +2,7 @@ import { prisma } from "@/lib/db/prisma";
 import { buildLearnerContext } from "./memory";
 import { updateHypotheses } from "./hypothesis-engine";
 import { updateSkillState } from "./mastery";
-import { runPlanner } from "@/lib/ai/planner";
+import { runPlanner, stageForTurn } from "@/lib/ai/planner";
 import { checkChildInput } from "@/lib/ai/safety";
 import { embedText } from "@/lib/ai/openai-embeddings";
 import type { LearnerContext, PlannerOutput } from "@/lib/shared/types";
@@ -56,8 +56,15 @@ export async function processChildTurn(sessionId: string, childText: string): Pr
     };
   }
 
-  // 2. Plan.
-  const planner = await runPlanner({ context, childResponse: childText });
+  // 2. Plan. Early turns stay social — a placement test disguised as a greeting is
+  // the worst possible first impression (spec §2).
+  const [childTurnCount, priorSessions] = await Promise.all([
+    prisma.message.count({ where: { sessionId, role: "CHILD" } }),
+    prisma.session.count({ where: { childId: session.childId } }),
+  ]);
+  const stage = stageForTurn(childTurnCount - 1, priorSessions <= 1);
+
+  const planner = await runPlanner({ context, childResponse: childText, stage });
 
   // 3. Record the raw evidence.
   const lastTutor = [...context.recentTranscript].reverse().find((m) => m.role === "TUTOR");
@@ -78,7 +85,12 @@ export async function processChildTurn(sessionId: string, childText: string): Pr
   await updateHypotheses(session.childId, observation.id, planner.updated_hypotheses);
 
   // 5. Update mastery when the turn actually tested a concept.
-  if (planner.target && planner.correctness !== null && planner.correctness !== undefined) {
+  if (
+    planner.next_action !== "CONNECT" &&
+    planner.target &&
+    planner.correctness !== null &&
+    planner.correctness !== undefined
+  ) {
     await updateSkillState(session.childId, planner.target, {
       correct: planner.correctness,
       independent: planner.next_action !== "EXPLAIN" && planner.next_action !== "GIVE_EXAMPLE",
