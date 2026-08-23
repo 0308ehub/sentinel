@@ -31,6 +31,18 @@ const OPENAI_REALTIME_URL = "https://api.openai.com/v1/realtime/calls";
 const IDLE_NUDGE_MS = 18_000;
 
 /**
+ * Transcript deltas arrive as the model GENERATES, which runs well ahead of the
+ * audio the child actually hears. Revealing them directly makes text race the
+ * voice, and leaves text on screen that was never spoken when a reply is cut off.
+ * So we buffer the transcript and reveal it in step with playback instead.
+ */
+const REVEAL_TICK_MS = 50;
+/** Roughly conversational pace for the voice at speed 1.0. */
+const CHARS_PER_SECOND = 15;
+/** If we fall a long way behind the audio, catch up rather than lag visibly. */
+const BACKLOG_CATCHUP_CHARS = 180;
+
+/**
  * Transcribers still occasionally emit filler on non-speech audio. If we never saw
  * the VAD report speech, treat the transcript as phantom and drop it.
  */
@@ -60,11 +72,39 @@ export function useRealtime({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const lastTutorRef = useRef("");
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Generated but not yet spoken — revealed as the audio plays. */
+  const pendingRef = useRef("");
+  /** What the child has actually heard so far this turn. */
+  const spokenRef = useRef("");
+  const revealTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  /** Guards against stopped and cleared both finalising the same turn. */
+  const finalisedRef = useRef(true);
   const nudgeCountRef = useRef(0);
   /** True while the mentor is generating — never stack a nudge on top of a reply. */
   const responseActiveRef = useRef(false);
   /** Did the VAD actually detect speech since the last transcript? */
   const sawSpeechRef = useRef(false);
+
+  const stopReveal = useCallback(() => {
+    if (revealTimerRef.current) clearInterval(revealTimerRef.current);
+    revealTimerRef.current = null;
+  }, []);
+
+  /** Reveals buffered transcript at roughly the pace the voice is speaking. */
+  const startReveal = useCallback(() => {
+    if (revealTimerRef.current) return;
+    revealTimerRef.current = setInterval(() => {
+      if (!pendingRef.current) return;
+      const base = Math.max(1, Math.round((CHARS_PER_SECOND * REVEAL_TICK_MS) / 1000));
+      // Speak-ahead happens; if the buffer is deep the audio is long, so hurry.
+      const overflow = Math.max(0, pendingRef.current.length - BACKLOG_CATCHUP_CHARS);
+      const take = base + Math.ceil(overflow / 20);
+      const chunk = pendingRef.current.slice(0, take);
+      pendingRef.current = pendingRef.current.slice(take);
+      spokenRef.current += chunk;
+      onTutorDelta(chunk);
+    }, REVEAL_TICK_MS);
+  }, [onTutorDelta]);
 
   const clearIdle = useCallback(() => {
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
@@ -97,10 +137,13 @@ export function useRealtime({
         })
       );
     }, IDLE_NUDGE_MS);
-  }, [clearIdle]);
+  }, [clearIdle, stopReveal]);
 
   const stop = useCallback(() => {
     clearIdle();
+    stopReveal();
+    pendingRef.current = "";
+    spokenRef.current = "";
     dcRef.current?.close();
     pcRef.current?.close();
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -173,9 +216,46 @@ export function useRealtime({
           case "response.created":
             responseActiveRef.current = true;
             clearIdle();
+            pendingRef.current = "";
+            spokenRef.current = "";
+            finalisedRef.current = false;
             // Open the bubble now so text streams into a slot that already exists,
             // instead of appearing, vanishing, then reappearing committed.
             onTutorStart();
+            break;
+
+          // Playback lifecycle — the only reliable signal for what was HEARD.
+          case "output_audio_buffer.started":
+            setState("speaking");
+            startReveal();
+            break;
+
+          case "output_audio_buffer.stopped":
+            // Finished naturally: everything generated was spoken.
+            if (!finalisedRef.current) {
+              finalisedRef.current = true;
+              stopReveal();
+              if (pendingRef.current) {
+                spokenRef.current += pendingRef.current;
+                onTutorDelta(pendingRef.current);
+                pendingRef.current = "";
+              }
+              lastTutorRef.current = spokenRef.current.trim();
+              onTutorTurn(lastTutorRef.current);
+            }
+            setState("listening");
+            break;
+
+          case "output_audio_buffer.cleared":
+            // Cut off. Anything not yet revealed was never spoken — drop it.
+            if (!finalisedRef.current) {
+              finalisedRef.current = true;
+              stopReveal();
+              pendingRef.current = "";
+              lastTutorRef.current = spokenRef.current.trim();
+              onTutorTurn(lastTutorRef.current);
+            }
+            setState("listening");
             break;
           // Child speech, transcribed as they go.
           case "conversation.item.input_audio_transcription.delta":
@@ -194,24 +274,35 @@ export function useRealtime({
 
           // Mentor speech.
           case "response.output_audio_transcript.delta":
-            setState("speaking");
-            onTutorDelta(evt.delta ?? "");
+            // Buffer only. The reveal loop pushes it out in time with the audio.
+            pendingRef.current += evt.delta ?? "";
             break;
-          case "response.output_audio_transcript.done": {
-            const finalText = (evt.transcript ?? "").trim();
-            lastTutorRef.current = finalText;
-            onTutorTurn(finalText);
+          case "response.output_audio_transcript.done":
+            // Generation finished, but playback has not. Do not render this —
+            // output_audio_buffer.stopped/cleared decides what was actually said.
             break;
-          }
           case "response.done":
             responseActiveRef.current = false;
-            setState("listening");
+            if (!finalisedRef.current) {
+              finalisedRef.current = true;
+              stopReveal();
+              if (pendingRef.current) {
+                spokenRef.current += pendingRef.current;
+                onTutorDelta(pendingRef.current);
+                pendingRef.current = "";
+              }
+              lastTutorRef.current = spokenRef.current.trim();
+              onTutorTurn(lastTutorRef.current);
+            }
             // Start counting silence only once the mentor has finished talking.
             armIdleNudge();
             break;
 
           // Barge-in: the child started talking over the mentor.
           case "input_audio_buffer.speech_started":
+            // Barge-in. Stop revealing immediately; the rest was never heard.
+            stopReveal();
+            pendingRef.current = "";
             // The child is talking — cancel any pending nudge.
             clearIdle();
             sawSpeechRef.current = true;
@@ -252,6 +343,8 @@ export function useRealtime({
     stop,
     armIdleNudge,
     clearIdle,
+    startReveal,
+    stopReveal,
   ]);
 
   return { state, error, liveChild, start, stop, applyInstructions };
