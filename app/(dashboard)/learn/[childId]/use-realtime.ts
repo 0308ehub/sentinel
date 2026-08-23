@@ -337,10 +337,9 @@ export function useRealtime({
 
           // Barge-in: the child started talking over the mentor.
           case "input_audio_buffer.speech_started":
-            // Barge-in. Stop revealing immediately; the rest was never heard.
-            stopReveal();
-            pendingRef.current = "";
-            // The child is talking — cancel any pending nudge.
+            // The mentor is no longer interrupted mid-reply, so its sentence keeps
+            // playing and the text must keep pace with it. Only a genuine
+            // output_audio_buffer.cleared truncates what we show.
             clearIdle();
             sawSpeechRef.current = true;
             nudgeCountRef.current = 0;

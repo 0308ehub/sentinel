@@ -323,7 +323,7 @@ export function VoiceClient({ childId, childName }: { childId: string; childName
             : state === "listening"
               ? "Listening"
               : state === "speaking"
-                ? "Speaking — you can interrupt"
+                ? "Speaking"
                 : state === "error"
                   ? "Something went wrong"
                   : "Microphone off"}

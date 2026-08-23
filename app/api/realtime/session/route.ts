@@ -75,8 +75,12 @@ export async function POST(req: Request) {
           turn_detection: {
             type: "semantic_vad",
             eagerness: "medium",
-            // The child talking over the mentor should always win.
-            interrupt_response: true,
+            // Deliberately NOT interrupting mid-reply. On laptop speakers the
+            // mentor's own voice returns through the mic and trips the detector,
+            // which cut sentences in half. Turns are capped short, so finishing
+            // the sentence costs at most a second or two and the child is heard
+            // immediately afterwards.
+            interrupt_response: false,
             create_response: true,
           },
           noise_reduction: { type: "near_field" },
