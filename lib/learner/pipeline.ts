@@ -133,7 +133,7 @@ export async function processChildTurn(sessionId: string, childText: string): Pr
 }
 
 /** Writes memory candidates, merging into existing nodes when semantically close. */
-async function persistMemories(childId: string, planner: PlannerOutput): Promise<void> {
+export async function persistMemories(childId: string, planner: PlannerOutput): Promise<void> {
   for (const update of planner.memory_updates) {
     let embedding: number[] | null = null;
     try {

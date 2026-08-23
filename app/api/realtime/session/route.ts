@@ -1,0 +1,64 @@
+import OpenAI from "openai";
+import { prisma } from "@/lib/db/prisma";
+import { requireUser } from "@/lib/auth/helpers";
+import { buildLearnerContext } from "@/lib/learner/memory";
+import { stageForTurn } from "@/lib/ai/planner";
+import { buildRealtimeInstructions, REALTIME_MODEL, REALTIME_VOICE } from "@/lib/ai/realtime";
+import { apiSuccess, apiError } from "@/types";
+
+export async function POST(req: Request) {
+  let user;
+  try {
+    user = await requireUser();
+  } catch {
+    return Response.json(apiError("UNAUTHORIZED", "Sign in required"), { status: 401 });
+  }
+
+  const { sessionId } = (await req.json()) as { sessionId?: string };
+  if (!sessionId) return Response.json(apiError("INVALID_INPUT", "sessionId required"), { status: 400 });
+
+  const session = await prisma.session.findUnique({
+    where: { id: sessionId },
+    include: { child: true },
+  });
+  if (!session || session.child.parentId !== user.id) {
+    return Response.json(apiError("NOT_FOUND", "Session not found"), { status: 404 });
+  }
+
+  const [context, childTurns, priorSessions] = await Promise.all([
+    buildLearnerContext(session.childId, sessionId),
+    prisma.message.count({ where: { sessionId, role: "CHILD" } }),
+    prisma.session.count({ where: { childId: session.childId } }),
+  ]);
+  const stage = stageForTurn(childTurns, priorSessions <= 1);
+
+  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const secret = await client.realtime.clientSecrets.create({
+    expires_after: { anchor: "created_at", seconds: 600 },
+    session: {
+      type: "realtime",
+      model: REALTIME_MODEL,
+      instructions: buildRealtimeInstructions(context, stage),
+      audio: {
+        input: {
+          transcription: { model: "whisper-1" },
+          // Semantic VAD waits for a natural end of thought, which matters a lot
+          // with children — they pause mid-sentence far more than adults.
+          turn_detection: { type: "semantic_vad" },
+          noise_reduction: { type: "near_field" },
+        },
+        output: { voice: REALTIME_VOICE, speed: 0.95 },
+      },
+    },
+  });
+
+  return Response.json(
+    apiSuccess({
+      clientSecret: secret.value,
+      model: REALTIME_MODEL,
+      mentorName: context.mentorName,
+      childName: context.childName,
+      stage,
+    })
+  );
+}
