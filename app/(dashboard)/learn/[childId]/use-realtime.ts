@@ -57,13 +57,13 @@ const PLAYBACK_WAIT_MS = 700;
  */
 const DRAIN_MS = 600;
 /**
- * How much buffered text can be explained by the reveal lagging the voice. About
- * a second and a half at the current rate. More than this was never spoken — the
- * model generated transcript it produced no audio for — and showing it puts words
- * on screen the child never heard. A short clipped tail is far better than a whole
- * invented sentence.
+ * Only used when a reply was cut short. A completed reply had audio for every
+ * word, so nothing is dropped; an incomplete one may have generated transcript
+ * it never voiced, and only a lag-sized tail is trusted.
  */
 const LAG_TOLERANCE_CHARS = 20;
+/** Ceiling on how long the tail may take to catch up once the voice stops. */
+const DRAIN_MAX_MS = 1200;
 /**
  * Only catch up once the backlog is genuinely large. The model finishes composing
  * long before the voice finishes speaking, so a full buffer is the normal state —
@@ -110,6 +110,8 @@ export function useRealtime({
   const finalisedRef = useRef(true);
   /** True once audio playback has actually begun for the current response. */
   const playbackStartedRef = useRef(false);
+  /** Set when a reply ends early, so the tail cannot be trusted as spoken. */
+  const responseIncompleteRef = useRef(false);
   /** Safety net for the case where no playback events arrive at all. */
   const finaliseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** The opening greeting must happen exactly once per connection. */
@@ -167,12 +169,14 @@ export function useRealtime({
     (done: () => void) => {
       stopReveal();
 
-      // Anything beyond plausible lag was generated but never voiced. Drop it.
-      if (pendingRef.current.length > LAG_TOLERANCE_CHARS) {
+      // A reply that ran to completion had audio for every word it wrote, so the
+      // whole tail is real and must be shown. Only a reply cut short can contain
+      // transcript that was never voiced — trust just a lag-sized tail of that.
+      if (responseIncompleteRef.current && pendingRef.current.length > LAG_TOLERANCE_CHARS) {
         console.warn(
-          `[realtime] discarding ${pendingRef.current.length} chars of transcript with no audio`
+          `[realtime] reply ended early; dropping ${pendingRef.current.length} unvoiced chars`
         );
-        pendingRef.current = "";
+        pendingRef.current = pendingRef.current.slice(0, LAG_TOLERANCE_CHARS);
       }
 
       const remaining = pendingRef.current;
@@ -180,7 +184,13 @@ export function useRealtime({
         done();
         return;
       }
-      const ticks = Math.max(1, Math.round(DRAIN_MS / REVEAL_TICK_MS));
+      // Catch up at roughly double speaking pace, so a long tail eases in rather
+      // than blinking, and a short one finishes almost immediately.
+      const windowMs = Math.min(
+        DRAIN_MAX_MS,
+        Math.max(DRAIN_MS, (remaining.length / (CHARS_PER_SECOND * 2)) * 1000)
+      );
+      const ticks = Math.max(1, Math.round(windowMs / REVEAL_TICK_MS));
       let tick = 0;
       revealTimerRef.current = setInterval(() => {
         tick += 1;
@@ -335,6 +345,7 @@ export function useRealtime({
             spokenRef.current = "";
             finalisedRef.current = false;
             playbackStartedRef.current = false;
+            responseIncompleteRef.current = false;
             if (finaliseTimerRef.current) clearTimeout(finaliseTimerRef.current);
             // Open the bubble now so text streams into a slot that already exists,
             // instead of appearing, vanishing, then reappearing committed.
@@ -406,6 +417,7 @@ export function useRealtime({
             // A reply stopped by the token ceiling ends mid-sentence, in text and
             // in audio. Surface it rather than leaving it to be guessed at.
             if (evt.response?.status === "incomplete") {
+              responseIncompleteRef.current = true;
               const why = evt.response?.status_details?.reason ?? "unknown";
               console.warn(`[realtime] reply ended early: ${why}`);
               if (why === "max_output_tokens") {
