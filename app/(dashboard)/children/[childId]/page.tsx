@@ -218,17 +218,28 @@ export default async function ChildReportPage({
             </h2>
             <ul className="mt-4 divide-y border-y">
               {r.sessions.slice(0, 8).map((s) => (
-                <li key={s.id} className="flex items-center justify-between py-3 text-sm">
-                  <span>
-                    {s.startedAt.toLocaleDateString(undefined, {
-                      weekday: "short",
-                      month: "short",
-                      day: "numeric",
-                    })}
-                  </span>
-                  <span className="text-muted-foreground">
-                    {s._count.messages} message{s._count.messages === 1 ? "" : "s"}
-                  </span>
+                <li key={s.id}>
+                  <Link
+                    href={`/children/${childId}/sessions/${s.id}`}
+                    className="group flex items-center justify-between gap-4 py-3 text-sm transition-colors hover:text-foreground"
+                  >
+                    <span className="shrink-0">
+                      {s.startedAt.toLocaleDateString(undefined, {
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </span>
+                    {s.summary && (
+                      <span className="hidden flex-1 truncate text-muted-foreground sm:block">
+                        {s.summary}
+                      </span>
+                    )}
+                    <span className="flex shrink-0 items-center gap-3 text-muted-foreground">
+                      {s._count.messages} message{s._count.messages === 1 ? "" : "s"}
+                      <span className="opacity-0 transition-opacity group-hover:opacity-100">→</span>
+                    </span>
+                  </Link>
                 </li>
               ))}
             </ul>

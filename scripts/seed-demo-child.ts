@@ -89,37 +89,109 @@ async function main() {
         status: "COMPLETED",
         startedAt: ago(d),
         endedAt: new Date(ago(d).getTime() + 11 * 60_000),
-        summary:
-          d === 2
-            ? "Worked on 15 - 8 using the number line. Alex got there by going to ten first, then back three."
-            : null,
+        summary: null,
       },
     });
     sessionIds.push(s.id);
   }
 
-  const lastSession = sessionIds[sessionIds.length - 1];
-  const transcript: [("TUTOR" | "CHILD"), string][] = [
-    ["TUTOR", "Hi Alex. Last time we were doing takeaways. Want to try one with the number line?"],
-    ["CHILD", "okay"],
-    ["TUTOR", "Fifteen take away eight. Picture the line — you're standing on fifteen."],
-    ["CHILD", "um... seven?"],
-    ["TUTOR", "That's it. How did you get there?"],
-    ["CHILD", "i went back to ten first and then three more"],
-    ["TUTOR", "That's exactly the trick. Going to ten first makes the jump easier to hold onto."],
+  // Six sessions that tell the arc: meeting, the misconception surfacing, a
+  // strategy that fails, the one that works, transfer, and consolidation.
+  type Line = ["TUTOR" | "CHILD", string, string?];
+  const transcripts: { summary: string | null; lines: Line[] }[] = [
+    {
+      summary: "First conversation. Alex named me Comet. Talked about rockets and his dog Biscuit.",
+      lines: [
+        ["TUTOR", "Hi Alex. I'm a computer program, and we're going to learn things together. I don't have a name yet — what should you call me?"],
+        ["CHILD", "um... Comet"],
+        ["TUTOR", "Comet. That's me then. What do you like doing when you're not at school?"],
+        ["CHILD", "i like rockets. i drew one yesterday"],
+        ["TUTOR", "A drawn one or a built one?"],
+        ["CHILD", "drawn. but me and my dad made a real one once, it went really high"],
+        ["TUTOR", "That's the kind of thing you remember for a long time. What are you doing at school at the moment?"],
+        ["CHILD", "taking away numbers. and reading"],
+      ],
+    },
+    {
+      summary: "First takeaway work. Alex answered 17 - 9 as 10 and explained it as nine take away seven.",
+      lines: [
+        ["TUTOR", "Let's try a takeaway. Seventeen take away nine.", "PROBE"],
+        ["CHILD", "ten"],
+        ["TUTOR", "How did you work that out?", "ASK_CHILD_TO_EXPLAIN"],
+        ["CHILD", "i did nine take away seven, thats two, and then the one stays so ten"],
+        ["TUTOR", "I see what you did there. Let's try one that stays smaller — twelve take away four.", "PROBE"],
+        ["CHILD", "eight"],
+        ["TUTOR", "Straight away. So the small ones are fine. It's the bigger ones we'll look at.", "REINFORCE"],
+      ],
+    },
+    {
+      summary: "Tried counters for 16 - 8. Alex lost track partway and got frustrated. Counters did not land.",
+      lines: [
+        ["TUTOR", "Picture sixteen little counters in a row. Take eight away, one at a time.", "CHANGE_REPRESENTATION"],
+        ["CHILD", "okay... um"],
+        ["CHILD", "i lost it"],
+        ["TUTOR", "That's a lot to hold in your head at once. Let's put the counters down.", "CHANGE_REPRESENTATION"],
+        ["CHILD", "its too many"],
+        ["TUTOR", "It is. We'll find a way that doesn't need you to hold sixteen things at once."],
+      ],
+    },
+    {
+      summary: "Number line worked. Alex solved 16 - 8 by stepping back to ten first, then two more.",
+      lines: [
+        ["TUTOR", "New way. There's a line of numbers, and you're standing on sixteen. Step back to ten first — how many steps was that?", "CHANGE_REPRESENTATION"],
+        ["CHILD", "six"],
+        ["TUTOR", "Six. And you needed to take away eight altogether, so how many are left to take?"],
+        ["CHILD", "two"],
+        ["TUTOR", "Take those two back from ten."],
+        ["CHILD", "eight! its eight"],
+        ["TUTOR", "That's it. Going to ten first is the trick — it breaks the hard jump into two easy ones.", "REINFORCE"],
+      ],
+    },
+    {
+      summary: "Alex used the number line on 21 - 5 without being told to. First time he reached for it himself.",
+      lines: [
+        ["TUTOR", "Try this one. Twenty-one take away five.", "PROBE"],
+        ["CHILD", "can i do the line thing"],
+        ["TUTOR", "Go on."],
+        ["CHILD", "so i go back one to twenty... and then four more... sixteen"],
+        ["TUTOR", "Sixteen. And you picked that way yourself.", "REINFORCE"],
+        ["CHILD", "its easier"],
+        ["TUTOR", "It is. Rockets count down like that too — twenty, nineteen, eighteen, all the way to zero.", "GIVE_EXAMPLE"],
+      ],
+    },
+    {
+      summary: "Worked on 15 - 8 using the number line. Alex got there by going to ten first, then back three.",
+      lines: [
+        ["TUTOR", "Hi Alex. Want to try a takeaway with the line?"],
+        ["CHILD", "okay"],
+        ["TUTOR", "Fifteen take away eight. You're standing on fifteen.", "PROBE"],
+        ["CHILD", "um... seven?"],
+        ["TUTOR", "That's it. How did you get there?", "ASK_CHILD_TO_EXPLAIN"],
+        ["CHILD", "i went back to ten first and then three more"],
+        ["TUTOR", "That's exactly the trick. Going to ten first makes the jump easier to hold onto.", "REINFORCE"],
+      ],
+    },
   ];
-  for (let i = 0; i < transcript.length; i++) {
-    const [role, content] = transcript[i];
-    await prisma.message.create({
-      data: {
-        sessionId: lastSession,
-        role,
-        content,
-        action: role === "TUTOR" ? (i === 2 ? "CHANGE_REPRESENTATION" : "PROBE") : null,
-        targetConcept: role === "TUTOR" ? "cross_ten_subtraction" : null,
-        createdAt: new Date(ago(2).getTime() + i * 40_000),
-      },
-    });
+
+  for (let si = 0; si < sessionIds.length; si++) {
+    const { summary, lines } = transcripts[si];
+    const day = sessionDays[si];
+    if (summary) {
+      await prisma.session.update({ where: { id: sessionIds[si] }, data: { summary } });
+    }
+    for (let i = 0; i < lines.length; i++) {
+      const [role, content, action] = lines[i];
+      await prisma.message.create({
+        data: {
+          sessionId: sessionIds[si],
+          role,
+          content,
+          action: (action ?? null) as never,
+          targetConcept: action ? "cross_ten_subtraction" : null,
+          createdAt: new Date(ago(day).getTime() + i * 45_000),
+        },
+      });
+    }
   }
 
   // ── Hypotheses ─────────────────────────────────────────────────────────────
