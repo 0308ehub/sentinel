@@ -2,8 +2,8 @@ import type { LearnerContext } from "@/lib/shared/types";
 import type { SessionStage } from "./planner";
 
 export const REALTIME_MODEL = "gpt-realtime";
-/** Calm and grounded. "coral" and "shimmer" read as bright and over-eager for a mentor. */
-export const REALTIME_VOICE = "sage";
+/** Calm, grounded, male. "coral"/"shimmer" read bright and over-eager for a mentor. */
+export const REALTIME_VOICE = "ash";
 
 /**
  * The realtime model is the CONVERSATION. It must answer instantly, so it never

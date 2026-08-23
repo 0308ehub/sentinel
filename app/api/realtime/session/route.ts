@@ -51,13 +51,16 @@ export async function POST(req: Request) {
       }),
       audio: {
         input: {
-          transcription: { model: "whisper-1" },
+          // whisper-1 invents text on silence — it produced phantom child turns
+          // like "BOOM!". gpt-4o-transcribe is far more reluctant to hallucinate.
+          transcription: { model: "gpt-4o-transcribe", language: "en" },
           // Semantic VAD waits for a natural end of thought, which matters a lot
           // with children — they pause mid-sentence far more than adults.
-          turn_detection: { type: "semantic_vad" },
+          // Low eagerness makes it wait longer still before deciding they're done.
+          turn_detection: { type: "semantic_vad", eagerness: "low" },
           noise_reduction: { type: "near_field" },
         },
-        output: { voice: REALTIME_VOICE, speed: 0.9 },
+        output: { voice: REALTIME_VOICE, speed: 1.0 },
       },
     },
   });

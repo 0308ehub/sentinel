@@ -23,7 +23,17 @@ interface UseRealtimeArgs {
 const OPENAI_REALTIME_URL = "https://api.openai.com/v1/realtime/calls";
 
 /** How long a child may sit silent before the mentor gently re-engages. */
-const IDLE_NUDGE_MS = 11_000;
+const IDLE_NUDGE_MS = 18_000;
+
+/**
+ * Transcribers still occasionally emit filler on non-speech audio. If we never saw
+ * the VAD report speech, treat the transcript as phantom and drop it.
+ */
+function isPhantom(text: string, sawSpeech: boolean): boolean {
+  if (!sawSpeech) return true;
+  const t = text.trim().toLowerCase().replace(/[.!?]+$/, "");
+  return t.length === 0 || ["you", "thank you", "thanks", "bye", "boom", "uh", "um"].includes(t);
+}
 /** Cap the nudges so a child who has wandered off isn't talked at forever. */
 const MAX_CONSECUTIVE_NUDGES = 3;
 
@@ -45,6 +55,10 @@ export function useRealtime({
   const lastTutorRef = useRef("");
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nudgeCountRef = useRef(0);
+  /** True while the mentor is generating — never stack a nudge on top of a reply. */
+  const responseActiveRef = useRef(false);
+  /** Did the VAD actually detect speech since the last transcript? */
+  const sawSpeechRef = useRef(false);
 
   const clearIdle = useCallback(() => {
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
@@ -61,6 +75,8 @@ export function useRealtime({
     idleTimerRef.current = setTimeout(() => {
       const dc = dcRef.current;
       if (!dc || dc.readyState !== "open") return;
+      // A reply is already on its way — nudging now produces the stray fragments.
+      if (responseActiveRef.current) return;
       nudgeCountRef.current += 1;
       dc.send(
         JSON.stringify({
@@ -88,6 +104,8 @@ export function useRealtime({
     setLiveChild("");
     setLiveTutor("");
     nudgeCountRef.current = 0;
+    responseActiveRef.current = false;
+    sawSpeechRef.current = false;
     setState("idle");
   }, [clearIdle]);
 
@@ -141,22 +159,28 @@ export function useRealtime({
       // The mentor opens the conversation. A child will not start it.
       dc.onopen = () => {
         dc.send(JSON.stringify({ type: "response.create" }));
-        armIdleNudge();
       };
 
       dc.onmessage = (e) => {
         const evt = JSON.parse(e.data);
 
         switch (evt.type) {
+          case "response.created":
+            responseActiveRef.current = true;
+            clearIdle();
+            break;
           // Child speech, transcribed as they go.
           case "conversation.item.input_audio_transcription.delta":
             setLiveChild((t) => t + (evt.delta ?? ""));
             break;
           case "conversation.item.input_audio_transcription.completed": {
             const finalText = (evt.transcript ?? "").trim();
+            const sawSpeech = sawSpeechRef.current;
+            sawSpeechRef.current = false;
             setLiveChild("");
+            if (isPhantom(finalText, sawSpeech)) break;
             nudgeCountRef.current = 0;
-            if (finalText) onChildUtterance(finalText, lastTutorRef.current);
+            onChildUtterance(finalText, lastTutorRef.current);
             break;
           }
 
@@ -175,6 +199,7 @@ export function useRealtime({
             break;
           }
           case "response.done":
+            responseActiveRef.current = false;
             setLiveTutor("");
             setState("listening");
             // Start counting silence only once the mentor has finished talking.
@@ -185,6 +210,7 @@ export function useRealtime({
           case "input_audio_buffer.speech_started":
             // The child is talking — cancel any pending nudge.
             clearIdle();
+            sawSpeechRef.current = true;
             nudgeCountRef.current = 0;
             setState("listening");
             setLiveTutor("");
