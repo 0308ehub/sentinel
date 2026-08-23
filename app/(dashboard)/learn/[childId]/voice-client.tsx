@@ -27,28 +27,34 @@ export function VoiceClient({ childId, childName }: { childId: string; childName
   const [thinking, setThinking] = useState(false);
   const [showReasoning, setShowReasoning] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  /** True until the first load resolves, so we never flash an empty slate. */
+  const [loading, setLoading] = useState(true);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const applyRef = useRef<((i: string) => void) | null>(null);
 
   const loadSession = useCallback(async () => {
-    const res = await fetch("/api/sessions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ childId }),
-    });
-    const b = await res.json();
-    if (!b.ok) return;
-    setSessionId(b.data.session.id);
-    setMentorName(b.data.mentorName ?? null);
-    // Only the mentor's side is replayed. The child knows what they said, and
-    // showing imperfect transcripts of their own speech back to them is noise.
-    setTurns(
-      b.data.messages
-        .filter((m: { role: string }) => m.role === "TUTOR")
-        .map((m: { content: string }) => ({ text: m.content }))
-    );
+    try {
+      const res = await fetch("/api/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ childId }),
+      });
+      const b = await res.json();
+      if (!b.ok) return;
+      setSessionId(b.data.session.id);
+      setMentorName(b.data.mentorName ?? null);
+      // Only the mentor's side is replayed. The child knows what they said, and
+      // showing imperfect transcripts of their own speech back to them is noise.
+      setTurns(
+        b.data.messages
+          .filter((m: { role: string }) => m.role === "TUTOR")
+          .map((m: { content: string }) => ({ text: m.content }))
+      );
+    } finally {
+      setLoading(false);
+    }
   }, [childId]);
 
   useEffect(() => {
@@ -123,10 +129,18 @@ export function VoiceClient({ childId, childName }: { childId: string; childName
   // scrolling back to re-read is never yanked away.
   useEffect(() => {
     const el = scrollRef.current;
-    if (!el) return;
+    if (!el || loading) return;
     const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
     if (nearBottom) endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [turns, liveChild]);
+  }, [turns, liveChild, loading]);
+
+  // On first paint land at the latest message without animating up from the top.
+  const didInitialScroll = useRef(false);
+  useEffect(() => {
+    if (loading || didInitialScroll.current) return;
+    didInitialScroll.current = true;
+    endRef.current?.scrollIntoView({ behavior: "auto" });
+  }, [loading]);
 
   useEffect(() => () => stop(), [stop]);
 
@@ -143,6 +157,7 @@ export function VoiceClient({ childId, childName }: { childId: string; childName
       return;
     }
     stop();
+    setLoading(true);
     setTurns([]);
     setReasoning(null);
     setMentorName(null);
@@ -168,10 +183,19 @@ export function VoiceClient({ childId, childName }: { childId: string; childName
           </Link>
           <SentinelMark size={20} />
           <div className="min-w-0">
-            <p className="truncate font-medium leading-tight">{displayName}</p>
-            <p className="truncate text-xs text-muted-foreground">
-              {mentorName ? `talking with ${childName}` : `getting to know ${childName}`}
-            </p>
+            {loading ? (
+              <>
+                <div className="h-4 w-28 animate-pulse rounded bg-muted" />
+                <div className="mt-1.5 h-3 w-36 animate-pulse rounded bg-muted" />
+              </>
+            ) : (
+              <>
+                <p className="truncate font-medium leading-tight">{displayName}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {mentorName ? `talking with ${childName}` : `getting to know ${childName}`}
+                </p>
+              </>
+            )}
           </div>
         </div>
 
@@ -242,7 +266,14 @@ export function VoiceClient({ childId, childName }: { childId: string; childName
       )}
 
       <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto py-6 pr-1">
-        {turns.length === 0 && state === "idle" && (
+        {loading && (
+          <div className="space-y-4" aria-hidden>
+            <div className="h-5 w-3/4 animate-pulse rounded bg-muted" />
+            <div className="h-5 w-1/2 animate-pulse rounded bg-muted" />
+          </div>
+        )}
+
+        {!loading && turns.length === 0 && state === "idle" && (
           <div className="rounded-xl border border-dashed p-10 text-center">
             <SentinelMark size={32} className="mx-auto opacity-40" />
             <p className="mt-4 font-medium">Tap the microphone to begin</p>
