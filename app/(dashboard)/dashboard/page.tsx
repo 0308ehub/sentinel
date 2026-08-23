@@ -37,7 +37,7 @@ export default async function DashboardPage() {
           {children.map((c) => (
             <Link
               key={c.id}
-              href={`/learn/${c.id}`}
+              href={`/children/${c.id}`}
               className="group flex items-center justify-between rounded-lg border bg-card p-5 transition-colors hover:border-foreground/30"
             >
               <div>
