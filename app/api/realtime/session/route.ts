@@ -64,10 +64,17 @@ export async function POST(req: Request) {
             language: "en",
             prompt: buildTranscriptionPrompt(context),
           },
-          // Semantic VAD waits for a natural end of thought, which matters a lot
-          // with children — they pause mid-sentence far more than adults.
-          // Low eagerness makes it wait longer still before deciding they're done.
-          turn_detection: { type: "semantic_vad", eagerness: "low" },
+          // Semantic VAD judges whether the thought is finished rather than just
+          // timing silence, which matters with children — they pause mid-sentence
+          // far more than adults. Eagerness caps how long it may wait when unsure:
+          // low 8s, medium 4s, high 2s. Low read as the app being stuck.
+          turn_detection: {
+            type: "semantic_vad",
+            eagerness: "medium",
+            // The child talking over the mentor should always win.
+            interrupt_response: true,
+            create_response: true,
+          },
           noise_reduction: { type: "near_field" },
         },
         output: { voice: REALTIME_VOICE, speed: 1.0 },
