@@ -37,8 +37,18 @@ const IDLE_NUDGE_MS = 18_000;
  * So we buffer the transcript and reveal it in step with playback instead.
  */
 const REVEAL_TICK_MS = 50;
-/** Roughly conversational pace for the voice at speed 1.0. */
-const CHARS_PER_SECOND = 15;
+/**
+ * Measured against the voice at speed 1.0. Erring slow is deliberate: text
+ * trailing the audio slightly is unnoticeable, text running ahead spoils the
+ * illusion and shows words before they are said.
+ */
+const CHARS_PER_SECOND = 11;
+/**
+ * Generation leads playback, so the first transcript delta arrives before any
+ * sound. Wait for playback to actually start — but not forever, in case the
+ * audio buffer events never arrive over WebRTC.
+ */
+const PLAYBACK_WAIT_MS = 700;
 /**
  * Only catch up once the backlog is genuinely large. The model finishes composing
  * long before the voice finishes speaking, so a full buffer is the normal state —
@@ -97,26 +107,54 @@ export function useRealtime({
   /** Did the VAD actually detect speech since the last transcript? */
   const sawSpeechRef = useRef(false);
 
+  const revealStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Fractional characters carried between ticks so the rate is exact. */
+  const revealCarryRef = useRef(0);
+
   const stopReveal = useCallback(() => {
     if (revealTimerRef.current) clearInterval(revealTimerRef.current);
     revealTimerRef.current = null;
+    if (revealStartTimerRef.current) clearTimeout(revealStartTimerRef.current);
+    revealStartTimerRef.current = null;
+    revealCarryRef.current = 0;
   }, []);
 
   /** Reveals buffered transcript at roughly the pace the voice is speaking. */
   const startReveal = useCallback(() => {
     if (revealTimerRef.current) return;
+    if (revealStartTimerRef.current) {
+      clearTimeout(revealStartTimerRef.current);
+      revealStartTimerRef.current = null;
+    }
     revealTimerRef.current = setInterval(() => {
       if (!pendingRef.current) return;
-      const base = Math.max(1, Math.round((CHARS_PER_SECOND * REVEAL_TICK_MS) / 1000));
-      // Speak-ahead happens; if the buffer is deep the audio is long, so hurry.
+      // Carry the fraction between ticks. Rounding per tick silently floored to
+      // one character, which at a 50ms tick is 20 chars/sec — nearly double the
+      // intended rate, and why the text kept outrunning the voice.
+      const perTick = (CHARS_PER_SECOND * REVEAL_TICK_MS) / 1000;
       const overflow = Math.max(0, pendingRef.current.length - BACKLOG_CATCHUP_CHARS);
-      const take = base + Math.ceil(overflow / 120);
+      revealCarryRef.current += perTick + overflow / 400;
+      const take = Math.floor(revealCarryRef.current);
+      if (take < 1) return;
+      revealCarryRef.current -= take;
       const chunk = pendingRef.current.slice(0, take);
       pendingRef.current = pendingRef.current.slice(take);
       spokenRef.current += chunk;
       onTutorDelta(chunk);
     }, REVEAL_TICK_MS);
   }, [onTutorDelta]);
+
+  /**
+   * Called when transcript text arrives. Holds briefly so the voice can get
+   * going first; playback starting cancels the wait and begins immediately.
+   */
+  const scheduleReveal = useCallback(() => {
+    if (revealTimerRef.current || revealStartTimerRef.current) return;
+    revealStartTimerRef.current = setTimeout(() => {
+      revealStartTimerRef.current = null;
+      startReveal();
+    }, PLAYBACK_WAIT_MS);
+  }, [startReveal]);
 
   const clearIdle = useCallback(() => {
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
@@ -303,7 +341,7 @@ export function useRealtime({
             // if that event never arrives — it just paces itself instead.
             pendingRef.current += evt.delta ?? "";
             setState("speaking");
-            startReveal();
+            scheduleReveal();
             break;
           case "response.output_audio_transcript.done":
             // Generation finished, but playback has not. Do not render this —
@@ -391,6 +429,7 @@ export function useRealtime({
     armIdleNudge,
     clearIdle,
     startReveal,
+    scheduleReveal,
     stopReveal,
   ]);
 
