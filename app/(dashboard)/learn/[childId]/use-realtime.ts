@@ -52,10 +52,18 @@ const CHARS_PER_SECOND = 13.5;
  */
 const PLAYBACK_WAIT_MS = 700;
 /**
- * When the voice stops, any remaining text was spoken and must still appear —
- * but dumping it in one frame reads as a blink. Ease it out over this window.
+ * When the voice stops, a little text may still be buffered simply because the
+ * reveal runs slightly behind. Ease that out rather than blinking it in.
  */
 const DRAIN_MS = 600;
+/**
+ * How much buffered text can be explained by the reveal lagging the voice. About
+ * a second and a half at the current rate. More than this was never spoken — the
+ * model generated transcript it produced no audio for — and showing it puts words
+ * on screen the child never heard. A short clipped tail is far better than a whole
+ * invented sentence.
+ */
+const LAG_TOLERANCE_CHARS = 20;
 /**
  * Only catch up once the backlog is genuinely large. The model finishes composing
  * long before the voice finishes speaking, so a full buffer is the normal state —
@@ -152,12 +160,21 @@ export function useRealtime({
   }, [onTutorDelta]);
 
   /**
-   * The voice has finished, so everything buffered was spoken. Reveal what is
-   * left quickly but smoothly, then run `done`.
+   * The voice has finished. Reveal the small tail the reveal loop was still
+   * behind on, discard anything larger as unspoken, then run `done`.
    */
   const drainThen = useCallback(
     (done: () => void) => {
       stopReveal();
+
+      // Anything beyond plausible lag was generated but never voiced. Drop it.
+      if (pendingRef.current.length > LAG_TOLERANCE_CHARS) {
+        console.warn(
+          `[realtime] discarding ${pendingRef.current.length} chars of transcript with no audio`
+        );
+        pendingRef.current = "";
+      }
+
       const remaining = pendingRef.current;
       if (!remaining) {
         done();
