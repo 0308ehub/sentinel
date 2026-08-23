@@ -85,7 +85,22 @@ export async function buildParentReport(childId: string) {
     .map(([strategy, count]) => ({ strategy, count }));
 
   const masteredIds = skills.filter((s) => isMastered(s)).map((s) => s.conceptId);
-  const nextConceptIds = getUnlockedConcepts(masteredIds).slice(0, 3);
+
+  // What's next means what we're actually working on, not just the frontier.
+  // A concept already underway matters more to a parent than one that is unlocked
+  // but untouched — and it can be underway while its prerequisites are still short
+  // of full mastery, which is exactly where most real learning sits.
+  const attempts = (s: { independentSuccesses: number; promptedSuccesses: number; failures: number }) =>
+    s.independentSuccesses + s.promptedSuccesses + s.failures;
+
+  const inProgress = skills
+    .filter((s) => !isMastered(s) && s.masteryProbability > 0)
+    // Most-worked first: the concept a child keeps running into is the one a
+    // parent cares about, not whichever happens to have the lowest score.
+    .sort((a, b) => attempts(b) - attempts(a) || a.masteryProbability - b.masteryProbability)
+    .map((s) => s.conceptId);
+
+  const nextConceptIds = [...new Set([...inProgress, ...getUnlockedConcepts(masteredIds)])].slice(0, 3);
 
   /**
    * A parent should never be shown a claim about their child that rests on one

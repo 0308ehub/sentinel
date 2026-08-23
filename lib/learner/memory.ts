@@ -36,7 +36,9 @@ export async function buildLearnerContext(
       take: 12,
     }),
     prisma.hypothesis.findMany({
-      where: { childId, status: "ACTIVE" },
+      // CONFIRMED belongs here too — a belief we have corroborated is the most
+      // useful thing we know, and filtering to ACTIVE silently discarded it.
+      where: { childId, status: { in: ["ACTIVE", "CONFIRMED"] } },
       orderBy: { confidence: "desc" },
       take: 6,
     }),
@@ -94,7 +96,9 @@ export async function buildLearnerContext(
   }
   const successfulStrategies: StrategyView[] = [...byStrategy.entries()]
     .map(([strategy, v]) => ({ strategy, ...v, successRate: v.successes / v.attempts }))
-    .sort((a, b) => b.successRate - a.successRate)
+    // Rate first, but break ties on how often it actually worked — four wins beats
+    // one win, and both are 100%.
+    .sort((a, b) => b.successRate - a.successRate || b.successes - a.successes)
     .slice(0, 5);
 
   return {

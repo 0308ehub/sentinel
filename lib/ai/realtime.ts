@@ -250,9 +250,16 @@ export function buildRealtimeInstructions(
     }
   }
 
-  if (ctx.successfulStrategies.length) {
-    const best = ctx.successfulStrategies[0];
-    lines.push("", `WHAT HAS WORKED BEFORE: ${best.strategy.replace(/_/g, " ")}.`);
+  const worked = ctx.successfulStrategies.filter((s) => s.successes > 0).slice(0, 3);
+  const failed = ctx.successfulStrategies.filter((s) => s.successes === 0).slice(0, 2);
+  if (worked.length || failed.length) {
+    lines.push("", "WHAT HAS AND HAS NOT WORKED FOR THIS CHILD");
+    for (const s of worked) {
+      lines.push(`- ${s.strategy.replace(/_/g, " ")} has worked (${s.successes} of ${s.attempts} times). Reach for this first.`);
+    }
+    for (const s of failed) {
+      lines.push(`- ${s.strategy.replace(/_/g, " ")} has not landed with them. Avoid it.`);
+    }
   }
 
   // Only things the child told us or worked on. Behavioural observations stay
