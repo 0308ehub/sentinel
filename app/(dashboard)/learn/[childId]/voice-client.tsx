@@ -21,13 +21,7 @@ export function VoiceClient({ childId, childName }: { childId: string; childName
    */
   const onChildUtterance = useCallback(
     async (childText: string, tutorText: string) => {
-      setTurns((t) => [
-        ...t,
-        ...(tutorText && t[t.length - 1]?.text !== tutorText
-          ? [{ role: "TUTOR" as const, text: tutorText }]
-          : []),
-        { role: "CHILD" as const, text: childText },
-      ]);
+      setTurns((t) => [...t, { role: "CHILD" as const, text: childText }]);
       if (!sessionId) return;
 
       setThinking(true);
@@ -64,9 +58,14 @@ export function VoiceClient({ childId, childName }: { childId: string; childName
     [sessionId]
   );
 
+  const onTutorTurn = useCallback((tutorText: string) => {
+    setTurns((t) => (t[t.length - 1]?.text === tutorText ? t : [...t, { role: "TUTOR", text: tutorText }]));
+  }, []);
+
   const { state, error, liveChild, liveTutor, start, stop, applyInstructions } = useRealtime({
     sessionId,
     onChildUtterance,
+    onTutorTurn,
     onMentorName: setMentorName,
   });
 

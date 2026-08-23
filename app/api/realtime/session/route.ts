@@ -57,7 +57,7 @@ export async function POST(req: Request) {
           turn_detection: { type: "semantic_vad" },
           noise_reduction: { type: "near_field" },
         },
-        output: { voice: REALTIME_VOICE, speed: 0.95 },
+        output: { voice: REALTIME_VOICE, speed: 0.9 },
       },
     },
   });

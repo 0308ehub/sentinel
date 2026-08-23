@@ -16,6 +16,7 @@ export interface VoiceTurn {
 interface UseRealtimeArgs {
   sessionId: string | null;
   onChildUtterance: (childText: string, tutorText: string) => void;
+  onTutorTurn: (tutorText: string) => void;
   onMentorName: (name: string) => void;
 }
 
@@ -26,7 +27,12 @@ const IDLE_NUDGE_MS = 11_000;
 /** Cap the nudges so a child who has wandered off isn't talked at forever. */
 const MAX_CONSECUTIVE_NUDGES = 3;
 
-export function useRealtime({ sessionId, onChildUtterance, onMentorName }: UseRealtimeArgs) {
+export function useRealtime({
+  sessionId,
+  onChildUtterance,
+  onTutorTurn,
+  onMentorName,
+}: UseRealtimeArgs) {
   const [state, setState] = useState<VoiceState>("idle");
   const [error, setError] = useState<string | null>(null);
   const [liveChild, setLiveChild] = useState("");
@@ -159,9 +165,15 @@ export function useRealtime({ sessionId, onChildUtterance, onMentorName }: UseRe
             setState("speaking");
             setLiveTutor((t) => t + (evt.delta ?? ""));
             break;
-          case "response.output_audio_transcript.done":
-            lastTutorRef.current = evt.transcript ?? "";
+          case "response.output_audio_transcript.done": {
+            const finalText = (evt.transcript ?? "").trim();
+            lastTutorRef.current = finalText;
+            // Commit it straight away. Waiting for the child's next utterance made
+            // the text vanish the moment the mentor stopped talking.
+            if (finalText) onTutorTurn(finalText);
+            setLiveTutor("");
             break;
+          }
           case "response.done":
             setLiveTutor("");
             setState("listening");
@@ -201,7 +213,7 @@ export function useRealtime({ sessionId, onChildUtterance, onMentorName }: UseRe
       setState("error");
       stop();
     }
-  }, [sessionId, onChildUtterance, onMentorName, stop, armIdleNudge, clearIdle]);
+  }, [sessionId, onChildUtterance, onTutorTurn, onMentorName, stop, armIdleNudge, clearIdle]);
 
   return { state, error, liveChild, liveTutor, start, stop, applyInstructions };
 }
