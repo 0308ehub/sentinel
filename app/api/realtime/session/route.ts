@@ -3,7 +3,12 @@ import { prisma } from "@/lib/db/prisma";
 import { requireUser } from "@/lib/auth/helpers";
 import { buildLearnerContext } from "@/lib/learner/memory";
 import { stageForTurn } from "@/lib/ai/planner";
-import { buildRealtimeInstructions, REALTIME_MODEL, REALTIME_VOICE } from "@/lib/ai/realtime";
+import {
+  buildRealtimeInstructions,
+  buildTranscriptionPrompt,
+  REALTIME_MODEL,
+  REALTIME_VOICE,
+} from "@/lib/ai/realtime";
 import { apiSuccess, apiError } from "@/types";
 
 export async function POST(req: Request) {
@@ -53,7 +58,11 @@ export async function POST(req: Request) {
         input: {
           // whisper-1 invents text on silence — it produced phantom child turns
           // like "BOOM!". gpt-4o-transcribe is far more reluctant to hallucinate.
-          transcription: { model: "gpt-4o-transcribe", language: "en" },
+          transcription: {
+            model: "gpt-4o-transcribe",
+            language: "en",
+            prompt: buildTranscriptionPrompt(context),
+          },
           // Semantic VAD waits for a natural end of thought, which matters a lot
           // with children — they pause mid-sentence far more than adults.
           // Low eagerness makes it wait longer still before deciding they're done.

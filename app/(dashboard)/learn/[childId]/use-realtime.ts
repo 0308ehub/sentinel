@@ -16,6 +16,11 @@ export interface VoiceTurn {
 interface UseRealtimeArgs {
   sessionId: string | null;
   onChildUtterance: (childText: string, tutorText: string) => void;
+  /** A reply is starting — open an empty bubble to stream into. */
+  onTutorStart: () => void;
+  /** Append streamed text to the open bubble. */
+  onTutorDelta: (chunk: string) => void;
+  /** The reply is final. */
   onTutorTurn: (tutorText: string) => void;
   onMentorName: (name: string) => void;
 }
@@ -40,13 +45,14 @@ const MAX_CONSECUTIVE_NUDGES = 3;
 export function useRealtime({
   sessionId,
   onChildUtterance,
+  onTutorStart,
+  onTutorDelta,
   onTutorTurn,
   onMentorName,
 }: UseRealtimeArgs) {
   const [state, setState] = useState<VoiceState>("idle");
   const [error, setError] = useState<string | null>(null);
   const [liveChild, setLiveChild] = useState("");
-  const [liveTutor, setLiveTutor] = useState("");
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const dcRef = useRef<RTCDataChannel | null>(null);
@@ -102,7 +108,6 @@ export function useRealtime({
     pcRef.current = null;
     streamRef.current = null;
     setLiveChild("");
-    setLiveTutor("");
     nudgeCountRef.current = 0;
     responseActiveRef.current = false;
     sawSpeechRef.current = false;
@@ -168,6 +173,9 @@ export function useRealtime({
           case "response.created":
             responseActiveRef.current = true;
             clearIdle();
+            // Open the bubble now so text streams into a slot that already exists,
+            // instead of appearing, vanishing, then reappearing committed.
+            onTutorStart();
             break;
           // Child speech, transcribed as they go.
           case "conversation.item.input_audio_transcription.delta":
@@ -187,20 +195,16 @@ export function useRealtime({
           // Mentor speech.
           case "response.output_audio_transcript.delta":
             setState("speaking");
-            setLiveTutor((t) => t + (evt.delta ?? ""));
+            onTutorDelta(evt.delta ?? "");
             break;
           case "response.output_audio_transcript.done": {
             const finalText = (evt.transcript ?? "").trim();
             lastTutorRef.current = finalText;
-            // Commit it straight away. Waiting for the child's next utterance made
-            // the text vanish the moment the mentor stopped talking.
-            if (finalText) onTutorTurn(finalText);
-            setLiveTutor("");
+            onTutorTurn(finalText);
             break;
           }
           case "response.done":
             responseActiveRef.current = false;
-            setLiveTutor("");
             setState("listening");
             // Start counting silence only once the mentor has finished talking.
             armIdleNudge();
@@ -213,7 +217,6 @@ export function useRealtime({
             sawSpeechRef.current = true;
             nudgeCountRef.current = 0;
             setState("listening");
-            setLiveTutor("");
             break;
 
           case "error":
@@ -239,7 +242,17 @@ export function useRealtime({
       setState("error");
       stop();
     }
-  }, [sessionId, onChildUtterance, onTutorTurn, onMentorName, stop, armIdleNudge, clearIdle]);
+  }, [
+    sessionId,
+    onChildUtterance,
+    onTutorStart,
+    onTutorDelta,
+    onTutorTurn,
+    onMentorName,
+    stop,
+    armIdleNudge,
+    clearIdle,
+  ]);
 
-  return { state, error, liveChild, liveTutor, start, stop, applyInstructions };
+  return { state, error, liveChild, start, stop, applyInstructions };
 }

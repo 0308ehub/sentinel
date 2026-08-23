@@ -2,28 +2,86 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Mic, MicOff } from "lucide-react";
+import { ArrowLeft, Mic, MicOff, MoreHorizontal } from "lucide-react";
+import { toast } from "sonner";
 import { SentinelMark } from "@/components/brand/sentinel-logo";
-import { useRealtime, type VoiceTurn } from "./use-realtime";
+import { useRealtime } from "./use-realtime";
+
+interface MentorTurn {
+  text: string;
+  streaming?: boolean;
+}
+
+interface Reasoning {
+  action?: string;
+  target?: string | null;
+  observation?: string;
+  reason?: string;
+}
 
 export function VoiceClient({ childId, childName }: { childId: string; childName: string }) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [mentorName, setMentorName] = useState<string | null>(null);
-  const [turns, setTurns] = useState<VoiceTurn[]>([]);
+  const [turns, setTurns] = useState<MentorTurn[]>([]);
+  const [reasoning, setReasoning] = useState<Reasoning | null>(null);
   const [thinking, setThinking] = useState(false);
-  const [showReasoning, setShowReasoning] = useState(true);
+  const [showReasoning, setShowReasoning] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const scrollRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const applyRef = useRef<((i: string) => void) | null>(null);
 
-  /**
-   * Runs the planner behind the live conversation. The mentor has already
-   * answered by now — this steers the next turn.
-   */
+  const loadSession = useCallback(async () => {
+    const res = await fetch("/api/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ childId }),
+    });
+    const b = await res.json();
+    if (!b.ok) return;
+    setSessionId(b.data.session.id);
+    setMentorName(b.data.mentorName ?? null);
+    // Only the mentor's side is replayed. The child knows what they said, and
+    // showing imperfect transcripts of their own speech back to them is noise.
+    setTurns(
+      b.data.messages
+        .filter((m: { role: string }) => m.role === "TUTOR")
+        .map((m: { content: string }) => ({ text: m.content }))
+    );
+  }, [childId]);
+
+  useEffect(() => {
+    loadSession();
+  }, [loadSession]);
+
+  const onTutorStart = useCallback(() => {
+    setTurns((t) => [...t, { text: "", streaming: true }]);
+  }, []);
+
+  const onTutorDelta = useCallback((chunk: string) => {
+    setTurns((t) => {
+      if (!t.length) return [{ text: chunk, streaming: true }];
+      const copy = [...t];
+      const last = copy[copy.length - 1];
+      copy[copy.length - 1] = { ...last, text: last.text + chunk };
+      return copy;
+    });
+  }, []);
+
+  const onTutorTurn = useCallback((finalText: string) => {
+    setTurns((t) => {
+      if (!t.length) return finalText ? [{ text: finalText }] : t;
+      const copy = [...t];
+      copy[copy.length - 1] = { text: finalText || copy[copy.length - 1].text };
+      return copy.filter((x) => x.text.trim().length > 0);
+    });
+  }, []);
+
+  /** The planner runs behind the conversation and steers the next turn. */
   const onChildUtterance = useCallback(
     async (childText: string, tutorText: string) => {
-      setTurns((t) => [...t, { role: "CHILD" as const, text: childText }]);
       if (!sessionId) return;
-
       setThinking(true);
       try {
         const res = await fetch(`/api/sessions/${sessionId}/observe`, {
@@ -35,21 +93,11 @@ export function VoiceClient({ childId, childName }: { childId: string; childName
         if (!body.ok) return;
         if (body.data.mentorName) setMentorName(body.data.mentorName);
         if (body.data.instructions) applyRef.current?.(body.data.instructions);
-        setTurns((t) => {
-          const copy = [...t];
-          for (let i = copy.length - 1; i >= 0; i--) {
-            if (copy[i].role === "CHILD") {
-              copy[i] = {
-                ...copy[i],
-                action: body.data.action,
-                target: body.data.target,
-                observation: body.data.observation,
-                reason: body.data.reason,
-              };
-              break;
-            }
-          }
-          return copy;
+        setReasoning({
+          action: body.data.action,
+          target: body.data.target,
+          observation: body.data.observation,
+          reason: body.data.reason,
         });
       } finally {
         setThinking(false);
@@ -58,13 +106,11 @@ export function VoiceClient({ childId, childName }: { childId: string; childName
     [sessionId]
   );
 
-  const onTutorTurn = useCallback((tutorText: string) => {
-    setTurns((t) => (t[t.length - 1]?.text === tutorText ? t : [...t, { role: "TUTOR", text: tutorText }]));
-  }, []);
-
-  const { state, error, liveChild, liveTutor, start, stop, applyInstructions } = useRealtime({
+  const { state, error, liveChild, start, stop, applyInstructions } = useRealtime({
     sessionId,
     onChildUtterance,
+    onTutorStart,
+    onTutorDelta,
     onTutorTurn,
     onMentorName: setMentorName,
   });
@@ -73,36 +119,38 @@ export function VoiceClient({ childId, childName }: { childId: string; childName
     applyRef.current = applyInstructions;
   }, [applyInstructions]);
 
+  // Only follow the conversation if the reader is already at the bottom, so
+  // scrolling back to re-read is never yanked away.
   useEffect(() => {
-    fetch("/api/sessions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ childId }),
-    })
-      .then((r) => r.json())
-      .then((b) => {
-        if (!b.ok) return;
-        setSessionId(b.data.session.id);
-        setMentorName(b.data.mentorName ?? null);
-        setTurns(
-          b.data.messages
-            .filter((m: { role: string }) => m.role !== "SYSTEM")
-            .map((m: Record<string, string | null>) => ({
-              role: m.role as "TUTOR" | "CHILD",
-              text: m.content ?? "",
-              action: m.action ?? undefined,
-              target: m.targetConcept ?? undefined,
-              reason: m.rationale ?? undefined,
-            }))
-        );
-      });
-  }, [childId]);
-
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [turns, liveChild, liveTutor]);
+    const el = scrollRef.current;
+    if (!el) return;
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+    if (nearBottom) endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [turns, liveChild]);
 
   useEffect(() => () => stop(), [stop]);
+
+  async function clearHistory(scope: "conversation" | "everything") {
+    setMenuOpen(false);
+    const res = await fetch(`/api/children/${childId}/history`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scope }),
+    });
+    const b = await res.json();
+    if (!b.ok) {
+      toast.error(b.error?.message ?? "Could not clear");
+      return;
+    }
+    stop();
+    setTurns([]);
+    setReasoning(null);
+    setMentorName(null);
+    await loadSession();
+    toast.success(
+      scope === "everything" ? "Reset — the mentor starts fresh" : "Conversation cleared"
+    );
+  }
 
   const live = state === "listening" || state === "speaking";
   const displayName = mentorName ?? "Your mentor";
@@ -126,64 +174,100 @@ export function VoiceClient({ childId, childName }: { childId: string; childName
             </p>
           </div>
         </div>
-        <button
-          onClick={() => setShowReasoning((s) => !s)}
-          className="shrink-0 text-xs text-muted-foreground underline-offset-4 hover:underline"
-        >
-          {showReasoning ? "Hide" : "Show"} reasoning
-        </button>
+
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            onClick={() => setShowReasoning((s) => !s)}
+            className="rounded-full px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            {showReasoning ? "Hide" : "Show"} reasoning
+          </button>
+          <div className="relative">
+            <button
+              onClick={() => setMenuOpen((m) => !m)}
+              aria-label="More options"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </button>
+            {menuOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+                <div className="absolute right-0 z-20 mt-1 w-64 overflow-hidden rounded-lg border bg-background shadow-lg">
+                  <button
+                    onClick={() => clearHistory("conversation")}
+                    className="block w-full px-4 py-3 text-left text-sm transition-colors hover:bg-muted"
+                  >
+                    Clear conversation
+                    <span className="block text-xs text-muted-foreground">
+                      Keeps what the mentor has learned
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => clearHistory("everything")}
+                    className="block w-full border-t px-4 py-3 text-left text-sm text-destructive transition-colors hover:bg-muted"
+                  >
+                    Reset everything
+                    <span className="block text-xs text-muted-foreground">
+                      Erases memories, hypotheses, and the mentor&apos;s name
+                    </span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       </div>
 
-      <div className="flex-1 space-y-4 overflow-y-auto py-6">
+      {/*
+        The reasoning lives in a fixed strip rather than inline with the messages.
+        The planner finishes seconds after the turn it explains, so inserting it
+        into the transcript pushed everything below it down — that was the jump.
+      */}
+      {showReasoning && (
+        <div className="mt-3 min-h-[4.5rem] rounded-md border-l-2 border-foreground/20 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+          {reasoning ? (
+            <>
+              <span className="font-mono font-medium text-foreground/70">{reasoning.action}</span>
+              {reasoning.target ? <span className="font-mono"> → {reasoning.target}</span> : null}
+              {reasoning.observation ? <p className="mt-1">{reasoning.observation}</p> : null}
+              {reasoning.reason ? <p className="mt-1 italic">{reasoning.reason}</p> : null}
+            </>
+          ) : (
+            <span className="opacity-60">
+              {thinking ? "Thinking…" : "The mentor's reasoning will appear here."}
+            </span>
+          )}
+        </div>
+      )}
+
+      <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto py-6 pr-1">
         {turns.length === 0 && state === "idle" && (
           <div className="rounded-xl border border-dashed p-10 text-center">
             <SentinelMark size={32} className="mx-auto opacity-40" />
             <p className="mt-4 font-medium">Tap the microphone to begin</p>
             <p className="mt-1 text-sm text-muted-foreground">
               {displayName} will say hello first and lead the conversation.
-              {childName} just talks — no button to hold.
             </p>
           </div>
         )}
 
         {turns.map((t, i) => (
-          <div key={i}>
-            {showReasoning && t.action && (
-              <div className="mb-1.5 rounded-md border-l-2 border-foreground/20 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                <span className="font-mono font-medium text-foreground/70">{t.action}</span>
-                {t.target ? <span className="font-mono"> → {t.target}</span> : null}
-                {t.observation ? <p className="mt-1">{t.observation}</p> : null}
-                {t.reason ? <p className="mt-1 italic">{t.reason}</p> : null}
-              </div>
-            )}
-            <div
-              className={
-                t.role === "CHILD"
-                  ? "ml-auto w-fit max-w-[75%] rounded-2xl rounded-br-sm bg-foreground px-4 py-2 text-background"
-                  : "w-fit max-w-[85%] rounded-2xl rounded-bl-sm bg-muted px-4 py-2"
-              }
-            >
-              {t.text}
-            </div>
-          </div>
+          <p key={i} className="max-w-[90%] text-[17px] leading-relaxed">
+            {t.text}
+          </p>
         ))}
-
-        {liveTutor && (
-          <div className="w-fit max-w-[85%] rounded-2xl rounded-bl-sm bg-muted px-4 py-2 opacity-80">
-            {liveTutor}
-          </div>
-        )}
-        {liveChild && (
-          <div className="ml-auto w-fit max-w-[75%] rounded-2xl rounded-br-sm bg-foreground/70 px-4 py-2 text-background">
-            {liveChild}
-          </div>
-        )}
 
         <div ref={endRef} />
       </div>
 
       <div className="flex flex-col items-center gap-3 pb-8">
         {error && <p className="text-sm text-destructive">{error}</p>}
+
+        {/* Transient — shows the mic is hearing them, then gets out of the way. */}
+        <p className="h-5 max-w-full truncate text-sm italic text-muted-foreground">
+          {liveChild}
+        </p>
 
         <button
           onClick={live ? stop : start}
@@ -203,11 +287,9 @@ export function VoiceClient({ childId, childName }: { childId: string; childName
           {state === "connecting"
             ? "Connecting…"
             : state === "listening"
-              ? thinking
-                ? "Listening · thinking about what you said"
-                : "Listening — just talk"
+              ? "Listening"
               : state === "speaking"
-                ? `${displayName} is speaking — you can interrupt`
+                ? "Speaking — you can interrupt"
                 : state === "error"
                   ? "Something went wrong"
                   : "Microphone off"}

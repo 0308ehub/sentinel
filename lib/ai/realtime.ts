@@ -10,6 +10,24 @@ export const REALTIME_VOICE = "sage";
  * waits on the planner. The planner runs behind it and revises these instructions
  * between turns (spec §12).
  */
+/**
+ * Priors for the transcriber. A young child's speech is short, quiet and often
+ * mumbled; without context the model guesses proper nouns ("two guns" -> "Juha")
+ * and invents profanity out of unclear audio.
+ */
+export function buildTranscriptionPrompt(ctx: LearnerContext): string {
+  const parts = [
+    `A young child aged ${ctx.ageYears} named ${ctx.childName} is talking to a tutor.`,
+    "Expect short, simple, everyday words — often one to five words at a time.",
+    "Expect plain childhood vocabulary: animals, colours, numbers, food, family,",
+    "school, games, toys. Prefer common words over unusual names.",
+    "Do not transcribe unclear audio as a proper noun or a name unless it is clearly one.",
+    "Do not invent profanity: if the audio is unclear, prefer a common ordinary word.",
+  ];
+  if (ctx.interests.length) parts.push(`They often talk about: ${ctx.interests.join(", ")}.`);
+  return parts.join(" ");
+}
+
 export interface RealtimeInstructionOpts {
   /** True when this child has never talked to the mentor before. */
   isFirstEver: boolean;
