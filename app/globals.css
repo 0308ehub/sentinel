@@ -141,3 +141,24 @@
 .animate-fade-up {
   animation: fade-up 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
+/* ─── Marketing surface ──────────────────────────────────────────────────────
+   The marketing site commits to a fixed warm palette rather than following the
+   app's light/dark tokens. Parents are the audience; this should feel like a
+   well-made book, not a dashboard. */
+.marketing {
+  --paper: #faf6f0;
+  --paper-deep: #f2ebe0;
+  --ink: #1c1917;
+  --ink-soft: #57534e;
+  --ink-faint: #6b625a; /* 5.4:1 on --paper, passes AA for small text */
+  --accent: #a84a1a; /* 5.3:1 on paper, 4.9:1 on paper-deep — AA both */
+  --accent-soft: #e8d9c8;
+  --rule: #e3d9cb;
+
+  background: var(--paper);
+  color: var(--ink);
+}
+.font-display {
+  font-family: var(--font-display), Georgia, serif;
+  font-optical-sizing: auto;
+}
