@@ -195,7 +195,13 @@ async function main() {
   }
 
   // ── Hypotheses ─────────────────────────────────────────────────────────────
-  const hypotheses = [
+  // Each belief carries the path it took, so the adaptation view shows real
+  // movement rather than a single final number.
+  const hypotheses: {
+    type: string; description: string; confidence: number;
+    status: "ACTIVE" | "CONFIRMED"; conceptId: string | null; evidence: number;
+    track: number[];
+  }[] = [
     {
       type: "digitwise_subtraction",
       description:
@@ -204,6 +210,8 @@ async function main() {
       status: "CONFIRMED" as const,
       conceptId: "cross_ten_subtraction",
       evidence: 5,
+      // Suspected, then corroborated four times.
+      track: [0.0, 0.35, 0.5, 0.66, 0.79, 0.89],
     },
     {
       type: "responds_to_spatial_representation",
@@ -213,6 +221,7 @@ async function main() {
       status: "CONFIRMED" as const,
       conceptId: null,
       evidence: 4,
+      track: [0.0, 0.3, 0.52, 0.7, 0.84],
     },
     {
       type: "explains_before_answering",
@@ -222,6 +231,7 @@ async function main() {
       status: "ACTIVE" as const,
       conceptId: "explanation_quality",
       evidence: 3,
+      track: [0.0, 0.3, 0.52, 0.71],
     },
     {
       type: "loses_track_crossing_ten",
@@ -231,6 +241,8 @@ async function main() {
       status: "ACTIVE" as const,
       conceptId: "cross_ten_subtraction",
       evidence: 3,
+      // Rose, then fell back when the number line made the slips stop.
+      track: [0.0, 0.45, 0.7, 0.62],
     },
     {
       type: "guesses_when_tired",
@@ -239,6 +251,7 @@ async function main() {
       status: "ACTIVE" as const,
       conceptId: null,
       evidence: 1,
+      track: [0.0, 0.38],
     },
   ];
 
@@ -261,7 +274,7 @@ async function main() {
         })
       );
     }
-    await prisma.hypothesis.create({
+    const created = await prisma.hypothesis.create({
       data: {
         childId: alex.id,
         type: h.type,
@@ -273,6 +286,26 @@ async function main() {
         supportingEvidence: { connect: obs.map((o) => ({ id: o.id })) },
       },
     });
+
+    for (let i = 1; i < h.track.length; i++) {
+      const before = h.track[i - 1];
+      const after = h.track[i];
+      await prisma.hypothesisRevision.create({
+        data: {
+          hypothesisId: created.id,
+          before,
+          after,
+          reason:
+            i === 1
+              ? "First time we noticed this"
+              : after >= before
+                ? "Saw it again"
+                : "Saw the opposite",
+          observationId: obs[Math.min(i - 1, obs.length - 1)]?.id ?? null,
+          createdAt: ago(21 - i * 3),
+        },
+      });
+    }
   }
 
   // ── Knowledge graph ────────────────────────────────────────────────────────

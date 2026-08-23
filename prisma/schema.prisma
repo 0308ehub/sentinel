@@ -58,8 +58,8 @@ model Child {
 
 /// The mentor persona bound to one child, plus the slowly-updating longitudinal narrative (memory layer 4).
 model MentorProfile {
-  id         String @id @default(cuid())
-  childId    String @unique
+  id            String    @id @default(cuid())
+  childId       String    @unique
   /// Null until the child chooses a name for their mentor during the first session.
   mentorName    String?
   mentorNamedAt DateTime?
@@ -273,6 +273,23 @@ model Observation {
   @@index([sessionId])
 }
 
+/// One recorded change of belief. Confidence is otherwise overwritten in place,
+/// which makes adaptation invisible — this is the audit trail behind it.
+model HypothesisRevision {
+  id            String   @id @default(cuid())
+  hypothesisId  String
+  before        Float
+  after         Float
+  /// What moved it: the observation, or a status transition.
+  reason        String
+  observationId String?
+  createdAt     DateTime @default(now())
+
+  hypothesis Hypothesis @relation(fields: [hypothesisId], references: [id], onDelete: Cascade)
+
+  @@index([hypothesisId, createdAt])
+}
+
 enum HypothesisStatus {
   ACTIVE
   CONFIRMED
@@ -296,9 +313,10 @@ model Hypothesis {
   child   Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
   concept Concept? @relation(fields: [conceptId], references: [id], onDelete: SetNull)
 
-  supportingEvidence    Observation[]  @relation("SupportingEvidence")
-  contradictingEvidence Observation[]  @relation("ContradictingEvidence")
+  supportingEvidence    Observation[]        @relation("SupportingEvidence")
+  contradictingEvidence Observation[]        @relation("ContradictingEvidence")
   interventions         Intervention[]
+  revisions             HypothesisRevision[]
 
   @@index([childId, status])
 }

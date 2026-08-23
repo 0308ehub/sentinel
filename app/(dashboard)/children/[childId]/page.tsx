@@ -63,6 +63,13 @@ export default async function ChildReportPage({
               {mentor ? ` · mentor named ${mentor}` : " · mentor not named yet"}
             </p>
           </div>
+          <div className="flex items-center gap-2">
+          <Link
+            href={`/children/${childId}/adaptation`}
+            className="rounded-full border px-5 py-2.5 text-sm font-medium transition-colors hover:bg-muted"
+          >
+            How it adapted
+          </Link>
           <Link
             href={`/learn/${childId}`}
             className="inline-flex items-center gap-2 rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition-opacity hover:opacity-90"
@@ -70,6 +77,7 @@ export default async function ChildReportPage({
             <Mic className="h-4 w-4" />
             Start a session
           </Link>
+          </div>
         </div>
       </header>
 
