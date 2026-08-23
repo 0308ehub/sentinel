@@ -33,6 +33,35 @@ export interface RealtimeInstructionOpts {
   isFirstEver: boolean;
   /** Short recap of the previous session, if there was one. */
   lastSessionSummary?: string | null;
+  /** How many times the child has spoken this session — drives the opening beat. */
+  childTurnCount?: number;
+}
+
+/**
+ * The opening arc, one beat per turn. Only the CURRENT beat is ever sent to the
+ * model: handing it the whole ordered list on every turn made it restart from the
+ * top each time instructions were refreshed mid-conversation.
+ */
+const OPENING_BEATS: ((childName: string) => string)[] = [
+  (n) =>
+    `Say hello to ${n} and say plainly what you are: a computer program that is going ` +
+    `to learn things together with them. Then tell them you do not have a name yet, ` +
+    `and ask them to choose one for you. That is the whole turn — do not ask anything else.`,
+  () =>
+    `They have just given you a name. Use it: say it back, warmly and briefly, and say ` +
+    `that is who you are now. Then ask what they like doing when they are not at school.`,
+  () =>
+    `Ask one real follow-up about whatever they just told you. Be specific to their ` +
+    `actual answer — this is the moment that shows you were listening.`,
+  () => `Ask what they are learning about at school right now, or what they did today.`,
+  () =>
+    `Say you would like to try something together, and begin ONE small concrete thing ` +
+    `pitched at their level. From here on you are teaching, not interviewing.`,
+];
+
+export function openingBeat(childTurnCount: number, childName: string): string | null {
+  const beat = OPENING_BEATS[childTurnCount];
+  return beat ? beat(childName) : null;
 }
 
 export function buildRealtimeInstructions(
@@ -150,33 +179,25 @@ export function buildRealtimeInstructions(
     );
   }
 
-  lines.push("", "RIGHT NOW");
-  if (stage === 1 || stage === 2) {
+  lines.push("", "YOUR NEXT TURN");
+  const beat = opts.isFirstEver ? openingBeat(opts.childTurnCount ?? 0, ctx.childName) : null;
+  if (beat) {
     lines.push(
-      "You are meeting this child for the first time. Work through the beats below IN",
-      "ORDER, one per turn, one question at a time. Do not rush them and do not skip",
-      "ahead, but do keep moving — the whole opening should take about five turns.",
+      "You are still getting started with this child. Do exactly this, and only this:",
       "",
-      `BEAT 1 — Say hello using their name, and say plainly what you are: a computer`,
-      `  program that learns things together with them. Then ask what they like doing`,
-      `  when they're not at school.`,
-      "BEAT 2 — Ask one real follow-up about whatever they just said. Be specific to",
-      "  their answer. This is the beat that shows you were actually listening.",
-      "BEAT 3 — Ask what they're learning about at school right now, or what they",
-      "  worked on today.",
-      "BEAT 4 — Ask them to pick a name for you, if you don't have one yet.",
-      "BEAT 5 — Say you'd like to try something together, and start with one small,",
-      "  concrete thing pitched at their level.",
+      `  ${beat}`,
       "",
-      `You already know their name and that they are ${ctx.ageYears}. Do NOT ask for either —`,
-      "asking for something you were already told makes you look broken. You may",
-      "confirm naturally in passing if it fits, but never interrogate.",
-      "",
-      "During these beats, no schoolwork questions, no numbers, no letters, no",
-      "spelling — except in BEAT 5, where you begin something real."
+      "One question. Two or three sentences. Do not repeat a question you have already",
+      "asked — read the conversation so far and move forward from it.",
+      `You already know their name and that they are ${ctx.ageYears}. Never ask for either.`,
+      "No schoolwork, numbers, letters or spelling until you are told to begin something."
     );
   } else {
-    lines.push("- You are learning together now. Diagnose gently before you teach.");
+    lines.push(
+      "- You are learning together now. Diagnose gently before you teach.",
+      "- Do not restart the conversation or re-introduce yourself. Continue from where",
+      "  you and the child actually are."
+    );
   }
 
   if (ctx.interests.length) {
@@ -221,8 +242,7 @@ export function buildRealtimeInstructions(
   if (opts.isFirstEver) {
     lines.push(
       `- You speak FIRST, before ${ctx.childName} says anything. Do not wait for them.`,
-      "- Your first turn is BEAT 1 above. Follow it exactly: greet them by name, say",
-      "  plainly what you are, then ask what they like doing outside school.",
+      "- Follow YOUR NEXT TURN above exactly.",
       "- About three sentences. Do not explain how you work or list what you can do."
     );
   } else {

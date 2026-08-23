@@ -59,12 +59,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ session
     });
   }
 
-  const [context, childTurns, priorSessions] = await Promise.all([
+  const [context, childTurns, priorSessions, totalMessages] = await Promise.all([
     buildLearnerContext(session.childId, sessionId),
     prisma.message.count({ where: { sessionId, role: "CHILD" } }),
     prisma.session.count({ where: { childId: session.childId } }),
+    prisma.message.count({ where: { session: { childId: session.childId } } }),
   ]);
   const stage = stageForTurn(childTurns - 1, priorSessions <= 1);
+  // The child has spoken childTurns times, so the next beat is the one at that index.
+  const isFirstEver = totalMessages <= childTurns + 1;
+  const beatOpts = { isFirstEver, childTurnCount: childTurns };
 
   if (!verdict.safe) {
     return Response.json(
@@ -72,7 +76,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ session
         blocked: true,
         guidance:
           "The child said something outside what we handle. Gently and calmly move the conversation back to something friendly. Do not engage with what they said.",
-        instructions: buildRealtimeInstructions(context, stage, undefined, { isFirstEver: false }),
+        instructions: buildRealtimeInstructions(context, stage, undefined, beatOpts),
       })
     );
   }
@@ -151,7 +155,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ session
       reason: planner.reason,
       mentorName: context.mentorName,
       guidance,
-      instructions: buildRealtimeInstructions(context, stage, guidance, { isFirstEver: false }),
+      instructions: buildRealtimeInstructions(context, stage, guidance, beatOpts),
     })
   );
 }

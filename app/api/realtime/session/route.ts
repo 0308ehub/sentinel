@@ -53,6 +53,7 @@ export async function POST(req: Request) {
       instructions: buildRealtimeInstructions(context, stage, undefined, {
         isFirstEver,
         lastSessionSummary: lastSession?.summary ?? null,
+        childTurnCount: childTurns,
       }),
       audio: {
         input: {
