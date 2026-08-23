@@ -21,6 +21,11 @@ interface UseRealtimeArgs {
 
 const OPENAI_REALTIME_URL = "https://api.openai.com/v1/realtime/calls";
 
+/** How long a child may sit silent before the mentor gently re-engages. */
+const IDLE_NUDGE_MS = 11_000;
+/** Cap the nudges so a child who has wandered off isn't talked at forever. */
+const MAX_CONSECUTIVE_NUDGES = 3;
+
 export function useRealtime({ sessionId, onChildUtterance, onMentorName }: UseRealtimeArgs) {
   const [state, setState] = useState<VoiceState>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -32,8 +37,42 @@ export function useRealtime({ sessionId, onChildUtterance, onMentorName }: UseRe
   const streamRef = useRef<MediaStream | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const lastTutorRef = useRef("");
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const nudgeCountRef = useRef(0);
+
+  const clearIdle = useCallback(() => {
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    idleTimerRef.current = null;
+  }, []);
+
+  /**
+   * Children don't fill silence — they wait, or drift. If nothing has happened for
+   * a while, the mentor says something rather than leaving dead air.
+   */
+  const armIdleNudge = useCallback(() => {
+    clearIdle();
+    if (nudgeCountRef.current >= MAX_CONSECUTIVE_NUDGES) return;
+    idleTimerRef.current = setTimeout(() => {
+      const dc = dcRef.current;
+      if (!dc || dc.readyState !== "open") return;
+      nudgeCountRef.current += 1;
+      dc.send(
+        JSON.stringify({
+          type: "response.create",
+          response: {
+            instructions:
+              "The child has gone quiet. Don't ask what they want to do. Warmly offer " +
+              "something specific and easy — a small question about something they like, " +
+              "a fun fact, or an easier version of what you just asked. Keep it to one or " +
+              "two short sentences.",
+          },
+        })
+      );
+    }, IDLE_NUDGE_MS);
+  }, [clearIdle]);
 
   const stop = useCallback(() => {
+    clearIdle();
     dcRef.current?.close();
     pcRef.current?.close();
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -42,8 +81,9 @@ export function useRealtime({ sessionId, onChildUtterance, onMentorName }: UseRe
     streamRef.current = null;
     setLiveChild("");
     setLiveTutor("");
+    nudgeCountRef.current = 0;
     setState("idle");
-  }, []);
+  }, [clearIdle]);
 
   /** Revises the live session's instructions mid-conversation. */
   const applyInstructions = useCallback((instructions: string) => {
@@ -92,6 +132,12 @@ export function useRealtime({ sessionId, onChildUtterance, onMentorName }: UseRe
       const dc = pc.createDataChannel("oai-events");
       dcRef.current = dc;
 
+      // The mentor opens the conversation. A child will not start it.
+      dc.onopen = () => {
+        dc.send(JSON.stringify({ type: "response.create" }));
+        armIdleNudge();
+      };
+
       dc.onmessage = (e) => {
         const evt = JSON.parse(e.data);
 
@@ -103,6 +149,7 @@ export function useRealtime({ sessionId, onChildUtterance, onMentorName }: UseRe
           case "conversation.item.input_audio_transcription.completed": {
             const finalText = (evt.transcript ?? "").trim();
             setLiveChild("");
+            nudgeCountRef.current = 0;
             if (finalText) onChildUtterance(finalText, lastTutorRef.current);
             break;
           }
@@ -118,10 +165,15 @@ export function useRealtime({ sessionId, onChildUtterance, onMentorName }: UseRe
           case "response.done":
             setLiveTutor("");
             setState("listening");
+            // Start counting silence only once the mentor has finished talking.
+            armIdleNudge();
             break;
 
           // Barge-in: the child started talking over the mentor.
           case "input_audio_buffer.speech_started":
+            // The child is talking — cancel any pending nudge.
+            clearIdle();
+            nudgeCountRef.current = 0;
             setState("listening");
             setLiveTutor("");
             break;
@@ -149,7 +201,7 @@ export function useRealtime({ sessionId, onChildUtterance, onMentorName }: UseRe
       setState("error");
       stop();
     }
-  }, [sessionId, onChildUtterance, onMentorName, stop]);
+  }, [sessionId, onChildUtterance, onMentorName, stop, armIdleNudge, clearIdle]);
 
   return { state, error, liveChild, liveTutor, start, stop, applyInstructions };
 }

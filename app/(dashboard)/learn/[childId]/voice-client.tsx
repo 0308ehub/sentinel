@@ -139,9 +139,10 @@ export function VoiceClient({ childId, childName }: { childId: string; childName
         {turns.length === 0 && state === "idle" && (
           <div className="rounded-xl border border-dashed p-10 text-center">
             <SentinelMark size={32} className="mx-auto opacity-40" />
-            <p className="mt-4 font-medium">Tap the microphone to start talking</p>
+            <p className="mt-4 font-medium">Tap the microphone to begin</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              {displayName} listens the whole time — no button to hold.
+              {displayName} will say hello first and lead the conversation.
+              {childName} just talks — no button to hold.
             </p>
           </div>
         )}

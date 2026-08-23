@@ -72,7 +72,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ session
         blocked: true,
         guidance:
           "The child said something outside what we handle. Gently and calmly move the conversation back to something friendly. Do not engage with what they said.",
-        instructions: buildRealtimeInstructions(context, stage),
+        instructions: buildRealtimeInstructions(context, stage, undefined, { isFirstEver: false }),
       })
     );
   }
@@ -151,7 +151,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ session
       reason: planner.reason,
       mentorName: context.mentorName,
       guidance,
-      instructions: buildRealtimeInstructions(context, stage, guidance),
+      instructions: buildRealtimeInstructions(context, stage, guidance, { isFirstEver: false }),
     })
   );
 }

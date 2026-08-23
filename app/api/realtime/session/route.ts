@@ -25,12 +25,19 @@ export async function POST(req: Request) {
     return Response.json(apiError("NOT_FOUND", "Session not found"), { status: 404 });
   }
 
-  const [context, childTurns, priorSessions] = await Promise.all([
+  const [context, childTurns, priorSessions, lastSession, totalMessages] = await Promise.all([
     buildLearnerContext(session.childId, sessionId),
     prisma.message.count({ where: { sessionId, role: "CHILD" } }),
     prisma.session.count({ where: { childId: session.childId } }),
+    prisma.session.findFirst({
+      where: { childId: session.childId, id: { not: sessionId }, summary: { not: null } },
+      orderBy: { startedAt: "desc" },
+      select: { summary: true },
+    }),
+    prisma.message.count({ where: { session: { childId: session.childId } } }),
   ]);
   const stage = stageForTurn(childTurns, priorSessions <= 1);
+  const isFirstEver = totalMessages === 0;
 
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const secret = await client.realtime.clientSecrets.create({
@@ -38,7 +45,10 @@ export async function POST(req: Request) {
     session: {
       type: "realtime",
       model: REALTIME_MODEL,
-      instructions: buildRealtimeInstructions(context, stage),
+      instructions: buildRealtimeInstructions(context, stage, undefined, {
+        isFirstEver,
+        lastSessionSummary: lastSession?.summary ?? null,
+      }),
       audio: {
         input: {
           transcription: { model: "whisper-1" },
@@ -59,6 +69,7 @@ export async function POST(req: Request) {
       mentorName: context.mentorName,
       childName: context.childName,
       stage,
+      isFirstEver,
     })
   );
 }
