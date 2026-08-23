@@ -106,8 +106,7 @@ export default async function TranscriptPage({
       </div>
 
       <p className="border-t pt-4 text-xs leading-relaxed text-muted-foreground">
-        This is the complete record of the conversation. Nothing {childName} said is
-        withheld from you, and you can delete this history at any time.
+        {`This is the complete record of the conversation. Nothing ${childName} said is withheld from you, and you can delete this history at any time.`}
       </p>
     </div>
   );

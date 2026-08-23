@@ -50,6 +50,10 @@ export async function POST(req: Request) {
     session: {
       type: "realtime",
       model: REALTIME_MODEL,
+      // A hard ceiling on one spoken turn. Enough for a four or five sentence
+      // demonstration, not enough to run through several exchanges in one breath
+      // and invent the child's replies along the way.
+      max_output_tokens: 320,
       instructions: buildRealtimeInstructions(context, stage, undefined, {
         isFirstEver,
         lastSessionSummary: lastSession?.summary ?? null,

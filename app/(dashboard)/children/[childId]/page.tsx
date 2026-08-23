@@ -85,8 +85,7 @@ export default async function ChildReportPage({
         <div className="rounded-xl border border-dashed p-12 text-center">
           <p className="font-medium">Nothing to report yet</p>
           <p className="mx-auto mt-2 max-w-sm text-sm text-muted-foreground">
-            After {name}&apos;s first conversation, this page will show what they&apos;re
-            learning and what we&apos;ve noticed about how they think.
+            {`After ${name}'s first conversation, this page will show what they're learning and what we've noticed about how they think.`}
           </p>
         </div>
       ) : (
@@ -167,9 +166,7 @@ export default async function ChildReportPage({
                 ))}
               </ul>
               <p className="mt-5 max-w-xl text-xs leading-relaxed text-muted-foreground">
-                These are working theories, not conclusions. Each is held with a
-                confidence that moves as {name} gives us more evidence, and we don&apos;t
-                show you anything resting on a single moment.
+                {`These are working theories, not conclusions. Each is held with a confidence that moves as ${name} gives us more evidence, and we don't show you anything resting on a single moment.`}
                 {r.provisionalCount > 0
                   ? ` ${r.provisionalCount} early observation${r.provisionalCount === 1 ? " is" : "s are"} still being checked.`
                   : ""}
@@ -252,7 +249,7 @@ export default async function ChildReportPage({
               ))}
             </ul>
             <p className="mt-3 text-xs text-muted-foreground">
-              Every conversation is reviewable. Nothing {name} says is hidden from you.
+              {`Every conversation is reviewable. Nothing ${name} says is hidden from you.`}
             </p>
           </section>
         </>

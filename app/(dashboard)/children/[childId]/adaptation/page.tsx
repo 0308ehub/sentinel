@@ -109,8 +109,7 @@ export default async function AdaptationPage({
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">How {mentor} adapted</h1>
           <p className="mt-2 max-w-xl text-[15px] leading-relaxed text-muted-foreground">
-            Every belief about {name} is provisional and moves as evidence arrives.
-            This is the record of it changing.
+            {`Every belief about ${name} is provisional and moves as evidence arrives. This is the record of it changing.`}
           </p>
         </div>
       </header>
@@ -123,8 +122,7 @@ export default async function AdaptationPage({
 
         {moved.length === 0 && (
           <p className="mt-4 text-[15px] text-muted-foreground">
-            Nothing has been revised yet — beliefs start moving once {name} gives us a
-            second data point on the same thing.
+            {`Nothing has been revised yet — beliefs start moving once ${name} gives us a second data point on the same thing.`}
           </p>
         )}
 
@@ -172,8 +170,7 @@ export default async function AdaptationPage({
             What {mentor} tried, and what it does now
           </h2>
           <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-muted-foreground">
-            When an explanation does not land, it is recorded as not landing and is not
-            reached for again. This is how the mentor learns how {name} learns.
+            {`When an explanation does not land, it is recorded as not landing and is not reached for again. This is how the mentor learns how ${name} learns.`}
           </p>
           <ul className="mt-5 divide-y border-y">
             {strategies.map(([strategy, v]) => {

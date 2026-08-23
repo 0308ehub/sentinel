@@ -280,7 +280,7 @@ export function VoiceClient({ childId, childName }: { childId: string; childName
             <SentinelMark size={32} className="mx-auto opacity-40" />
             <p className="mt-4 font-medium">Tap the microphone to begin</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              {displayName} will say hello first and lead the conversation.
+              {`${displayName} will say hello first and lead the conversation.`}
             </p>
           </div>
         )}
