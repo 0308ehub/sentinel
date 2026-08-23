@@ -274,8 +274,12 @@ export function useRealtime({
 
           // Mentor speech.
           case "response.output_audio_transcript.delta":
-            // Buffer only. The reveal loop pushes it out in time with the audio.
+            // Buffer, then reveal at speaking pace. Starting the loop here rather
+            // than waiting on output_audio_buffer.started means text still streams
+            // if that event never arrives — it just paces itself instead.
             pendingRef.current += evt.delta ?? "";
+            setState("speaking");
+            startReveal();
             break;
           case "response.output_audio_transcript.done":
             // Generation finished, but playback has not. Do not render this —

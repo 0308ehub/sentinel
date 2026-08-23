@@ -62,6 +62,12 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ child
       await tx.observation.updateMany({ where: { childId, sessionId }, data: { sessionId: null } });
       await tx.intervention.updateMany({ where: { childId, sessionId }, data: { sessionId: null } });
       await tx.session.deleteMany({ where: { id: sessionId, childId } });
+      // Close any other session still marked active, or the next load resumes a
+      // stale one and the screen refills with talk the parent just cleared.
+      await tx.session.updateMany({
+        where: { childId, status: "ACTIVE" },
+        data: { status: "COMPLETED", endedAt: new Date() },
+      });
     }
   });
 

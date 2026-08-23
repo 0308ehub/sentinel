@@ -50,9 +50,10 @@ export async function POST(req: Request) {
       data: { childId: child.id, variant: parsed.data.variant },
     }));
 
-  // The child's conversation so far, across sessions — continuity is the product.
+  // Scoped to this session. Continuity lives in the learner model and in the
+  // parent's session-by-session review, not in replaying old talk to the child.
   const messages = await prisma.message.findMany({
-    where: { session: { childId: child.id } },
+    where: { sessionId: session.id },
     orderBy: { createdAt: "asc" },
     take: HISTORY_LIMIT,
     select: {

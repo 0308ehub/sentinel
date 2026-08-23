@@ -160,7 +160,8 @@ export function VoiceClient({ childId, childName }: { childId: string; childName
     setLoading(true);
     setTurns([]);
     setReasoning(null);
-    setMentorName(null);
+    // Only a full reset releases the name the child chose.
+    if (scope === "everything") setMentorName(null);
     await loadSession();
     toast.success(
       scope === "everything" ? "Reset — the mentor starts fresh" : "This conversation was cleared"
