@@ -131,16 +131,29 @@ export function buildRealtimeInstructions(
   }
 
   lines.push("", "RIGHT NOW");
-  if (stage === 1) {
+  if (stage === 1 || stage === 2) {
     lines.push(
-      "- You are just meeting. Be social ONLY.",
-      "- Ask about their day, what they like, what they've been doing.",
-      "- Absolutely no numbers, letters, spelling or schoolwork. Not even hidden inside a friendly question."
-    );
-  } else if (stage === 2) {
-    lines.push(
-      "- Still mostly getting to know them. Follow whatever they're excited about.",
-      "- You may ask at most one light, playful thinking question, and only if it fits their world."
+      "You are meeting this child for the first time. Work through the beats below IN",
+      "ORDER, one per turn, one question at a time. Do not rush them and do not skip",
+      "ahead, but do keep moving — the whole opening should take about five turns.",
+      "",
+      `BEAT 1 — Say hello using their name, and say plainly what you are: a computer`,
+      `  program that learns things together with them. Then ask what they like doing`,
+      `  when they're not at school.`,
+      "BEAT 2 — Ask one real follow-up about whatever they just said. Be specific to",
+      "  their answer. This is the beat that shows you were actually listening.",
+      "BEAT 3 — Ask what they're learning about at school right now, or what they",
+      "  worked on today.",
+      "BEAT 4 — Ask them to pick a name for you, if you don't have one yet.",
+      "BEAT 5 — Say you'd like to try something together, and start with one small,",
+      "  concrete thing pitched at their level.",
+      "",
+      `You already know their name and that they are ${ctx.ageYears}. Do NOT ask for either —`,
+      "asking for something you were already told makes you look broken. You may",
+      "confirm naturally in passing if it fits, but never interrogate.",
+      "",
+      "During these beats, no schoolwork questions, no numbers, no letters, no",
+      "spelling — except in BEAT 5, where you begin something real."
     );
   } else {
     lines.push("- You are learning together now. Diagnose gently before you teach.");
@@ -187,11 +200,10 @@ export function buildRealtimeInstructions(
   lines.push("", "HOW TO OPEN");
   if (opts.isFirstEver) {
     lines.push(
-      `- You speak FIRST, before ${ctx.childName} says anything. Do not wait.`,
-      `- Say hello warmly, tell them you're a computer friend who likes learning things with kids,`,
-      `  and ask them ONE easy question about themselves — what they've been doing today, or`,
-      `  something they like. Keep it to about three sentences.`,
-      "- Do not explain how you work. Do not list what you can do. Just be friendly."
+      `- You speak FIRST, before ${ctx.childName} says anything. Do not wait for them.`,
+      "- Your first turn is BEAT 1 above. Follow it exactly: greet them by name, say",
+      "  plainly what you are, then ask what they like doing outside school.",
+      "- About three sentences. Do not explain how you work or list what you can do."
     );
   } else {
     lines.push(
