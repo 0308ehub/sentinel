@@ -42,9 +42,9 @@ const REVEAL_TICK_MS = 50;
  * Fractional values are fine — the tick carries the remainder. Still erring a
  * touch slow on purpose: trailing the audio is now graceful because the tail
  * eases out, whereas running ahead shows words before they are spoken.
- * Raise toward 14 if text lags; drop toward 11 if it races.
+ * Raise if text lags; drop toward 11 if it races.
  */
-const CHARS_PER_SECOND = 12.5;
+const CHARS_PER_SECOND = 13.5;
 /**
  * Generation leads playback, so the first transcript delta arrives before any
  * sound. Wait for playback to actually start — but not forever, in case the
