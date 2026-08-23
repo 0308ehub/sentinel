@@ -3,15 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
     "build": "prisma generate && next build",
-    "start": "next start",
-    "postinstall": "prisma generate",
-    "lint": "eslint",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
-    "db:studio": "prisma studio"
+    "db:seed": "tsx prisma/seed.ts",
+    "db:studio": "prisma studio",
+    "dev": "next dev",
+    "lint": "eslint",
+    "postinstall": "prisma generate",
+    "start": "next start"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.96.0",
@@ -51,7 +52,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",
-    "tsx": "^4.22.1",
+    "tsx": "^4.23.12",
     "typescript": "^5"
   }
 }
