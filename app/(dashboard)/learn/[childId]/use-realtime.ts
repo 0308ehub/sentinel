@@ -38,17 +38,24 @@ const IDLE_NUDGE_MS = 18_000;
  */
 const REVEAL_TICK_MS = 50;
 /**
- * Measured against the voice at speed 1.0. Erring slow is deliberate: text
- * trailing the audio slightly is unnoticeable, text running ahead spoils the
- * illusion and shows words before they are said.
+ * Measured against the voice at speed 1.0, which lands around 145 words/minute.
+ * Fractional values are fine — the tick carries the remainder. Still erring a
+ * touch slow on purpose: trailing the audio is now graceful because the tail
+ * eases out, whereas running ahead shows words before they are spoken.
+ * Raise toward 14 if text lags; drop toward 11 if it races.
  */
-const CHARS_PER_SECOND = 11;
+const CHARS_PER_SECOND = 12.5;
 /**
  * Generation leads playback, so the first transcript delta arrives before any
  * sound. Wait for playback to actually start — but not forever, in case the
  * audio buffer events never arrive over WebRTC.
  */
 const PLAYBACK_WAIT_MS = 700;
+/**
+ * When the voice stops, any remaining text was spoken and must still appear —
+ * but dumping it in one frame reads as a blink. Ease it out over this window.
+ */
+const DRAIN_MS = 600;
 /**
  * Only catch up once the backlog is genuinely large. The model finishes composing
  * long before the voice finishes speaking, so a full buffer is the normal state —
@@ -143,6 +150,41 @@ export function useRealtime({
       onTutorDelta(chunk);
     }, REVEAL_TICK_MS);
   }, [onTutorDelta]);
+
+  /**
+   * The voice has finished, so everything buffered was spoken. Reveal what is
+   * left quickly but smoothly, then run `done`.
+   */
+  const drainThen = useCallback(
+    (done: () => void) => {
+      stopReveal();
+      const remaining = pendingRef.current;
+      if (!remaining) {
+        done();
+        return;
+      }
+      const ticks = Math.max(1, Math.round(DRAIN_MS / REVEAL_TICK_MS));
+      let tick = 0;
+      revealTimerRef.current = setInterval(() => {
+        tick += 1;
+        const target = Math.ceil((remaining.length * tick) / ticks);
+        const already = remaining.length - pendingRef.current.length;
+        const take = Math.max(0, target - already);
+        if (take > 0) {
+          const chunk = pendingRef.current.slice(0, take);
+          pendingRef.current = pendingRef.current.slice(take);
+          spokenRef.current += chunk;
+          onTutorDelta(chunk);
+        }
+        if (tick >= ticks || !pendingRef.current) {
+          stopReveal();
+          pendingRef.current = "";
+          done();
+        }
+      }, REVEAL_TICK_MS);
+    },
+    [onTutorDelta, stopReveal]
+  );
 
   /**
    * Called when transcript text arrives. Holds briefly so the voice can get
@@ -294,15 +336,11 @@ export function useRealtime({
             if (finaliseTimerRef.current) clearTimeout(finaliseTimerRef.current);
             if (!finalisedRef.current) {
               finalisedRef.current = true;
-              stopReveal();
-              if (pendingRef.current) {
-                spokenRef.current += pendingRef.current;
-                onTutorDelta(pendingRef.current);
-                pendingRef.current = "";
-              }
-              lastTutorRef.current = spokenRef.current.trim();
-              onTutorTurn(lastTutorRef.current);
-              armIdleNudge();
+              drainThen(() => {
+                lastTutorRef.current = spokenRef.current.trim();
+                onTutorTurn(lastTutorRef.current);
+                armIdleNudge();
+              });
             }
             setState("listening");
             break;
@@ -370,15 +408,11 @@ export function useRealtime({
             finaliseTimerRef.current = setTimeout(() => {
               if (finalisedRef.current) return;
               finalisedRef.current = true;
-              stopReveal();
-              if (pendingRef.current) {
-                spokenRef.current += pendingRef.current;
-                onTutorDelta(pendingRef.current);
-                pendingRef.current = "";
-              }
-              lastTutorRef.current = spokenRef.current.trim();
-              onTutorTurn(lastTutorRef.current);
-              armIdleNudge();
+              drainThen(() => {
+                lastTutorRef.current = spokenRef.current.trim();
+                onTutorTurn(lastTutorRef.current);
+                armIdleNudge();
+              });
             }, 1500);
             break;
 
@@ -431,6 +465,7 @@ export function useRealtime({
     startReveal,
     scheduleReveal,
     stopReveal,
+    drainThen,
   ]);
 
   return { state, error, liveChild, start, stop, applyInstructions };
