@@ -149,7 +149,7 @@ export function VoiceClient({ childId, childName }: { childId: string; childName
     const res = await fetch(`/api/children/${childId}/history`, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scope }),
+      body: JSON.stringify({ scope, sessionId }),
     });
     const b = await res.json();
     if (!b.ok) {
@@ -163,7 +163,7 @@ export function VoiceClient({ childId, childName }: { childId: string; childName
     setMentorName(null);
     await loadSession();
     toast.success(
-      scope === "everything" ? "Reset — the mentor starts fresh" : "Conversation cleared"
+      scope === "everything" ? "Reset — the mentor starts fresh" : "This conversation was cleared"
     );
   }
 
@@ -222,9 +222,10 @@ export function VoiceClient({ childId, childName }: { childId: string; childName
                     onClick={() => clearHistory("conversation")}
                     className="block w-full px-4 py-3 text-left text-sm transition-colors hover:bg-muted"
                   >
-                    Clear conversation
+                    Clear this conversation
                     <span className="block text-xs text-muted-foreground">
-                      Keeps what the mentor has learned
+                      Only this one. Other conversations and everything the mentor
+                      has learned are kept.
                     </span>
                   </button>
                   <button
@@ -233,7 +234,8 @@ export function VoiceClient({ childId, childName }: { childId: string; childName
                   >
                     Reset everything
                     <span className="block text-xs text-muted-foreground">
-                      Erases memories, hypotheses, and the mentor&apos;s name
+                      Erases all conversations, memories, hypotheses, and the
+                      mentor&apos;s name
                     </span>
                   </button>
                 </div>

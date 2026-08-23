@@ -15,8 +15,13 @@ async function main() {
     isFirstEver: false,
     lastSessionSummary: last?.summary ?? null,
   });
-  // Just the parts that carry the learner model into the room.
-  const start = out.indexOf("THINGS THEY LIKE");
-  console.log(out.slice(start));
+  const section = process.env.SECTION;
+  if (section) {
+    const i = out.indexOf(section);
+    console.log(i === -1 ? `(section "${section}" not found)` : out.slice(i, i + 1600));
+  } else {
+    const start = out.indexOf("THINGS THEY LIKE");
+    console.log(out.slice(start));
+  }
 }
 main().catch((e)=>{console.error(e);process.exit(1)}).finally(()=>prisma.$disconnect());

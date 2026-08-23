@@ -5,10 +5,12 @@ import { apiSuccess, apiError } from "@/types";
 
 const scopeSchema = z.object({
   /**
-   * conversation — wipe the transcript, keep everything the mentor learned.
-   * everything  — full reset: transcript, learner graph, mastery, mentor name.
+   * conversation — clear just the session named by sessionId, keeping every other
+   *                conversation and everything the mentor has learned.
+   * everything    — full reset: all transcripts, learner graph, mastery, mentor name.
    */
   scope: z.enum(["conversation", "everything"]).default("conversation"),
+  sessionId: z.string().optional(),
 });
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ childId: string }> }) {
@@ -29,7 +31,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ child
   const body = await req.json().catch(() => ({}));
   const parsed = scopeSchema.safeParse(body);
   if (!parsed.success) return Response.json(apiError("INVALID_INPUT", "bad scope"), { status: 400 });
-  const { scope } = parsed.data;
+  const { scope, sessionId } = parsed.data;
 
   // Sessions cascade to their messages; observations and interventions reference
   // sessions with SetNull, so they are cleared explicitly when wiping everything.
@@ -53,12 +55,14 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ child
           longitudinalNarrative: null,
         },
       });
-    } else {
-      // Keep the learner model, but detach it from transcripts we're deleting.
-      await tx.observation.updateMany({ where: { childId }, data: { sessionId: null } });
-      await tx.intervention.updateMany({ where: { childId }, data: { sessionId: null } });
+      await tx.session.deleteMany({ where: { childId } });
+    } else if (sessionId) {
+      // Only the conversation the parent is looking at. Everything the mentor
+      // learned survives, and so does every other conversation.
+      await tx.observation.updateMany({ where: { childId, sessionId }, data: { sessionId: null } });
+      await tx.intervention.updateMany({ where: { childId, sessionId }, data: { sessionId: null } });
+      await tx.session.deleteMany({ where: { id: sessionId, childId } });
     }
-    await tx.session.deleteMany({ where: { childId } });
   });
 
   return Response.json(apiSuccess({ scope, cleared: true }));

@@ -75,9 +75,16 @@ function actionGuidance(p: PlannerOutput): string {
     case "PROBE":
       return "Ask one specific question that will reveal how the child is thinking.";
     case "EXPLAIN":
-      return "Explain the idea simply and concretely, then check understanding with a short question.";
+      return (
+        "Teach it properly. Say WHY this helps before you say what to do, then work " +
+        "one example all the way through out loud, narrating your own thinking. Four " +
+        "or five sentences is right here. Do not ask them to work out the method."
+      );
     case "GIVE_EXAMPLE":
-      return "Walk through one clear worked example, thinking out loud as you go.";
+      return (
+        "Work one example all the way through yourself, out loud, showing every step " +
+        "and why you took it. Finish it — do not stop halfway and hand it to them."
+      );
     case "ASK_CHILD_TO_EXPLAIN":
       return "Warmly invite the child to describe how they worked it out. Show genuine curiosity.";
     case "REINFORCE":
