@@ -1,11 +1,11 @@
-interface SentinelLogoProps {
+interface ElvaLogoProps {
   className?: string;
   iconOnly?: boolean;
   size?: number;
 }
 
 /** Lighthouse mark — inherits the current text color. Aspect ratio 44×60. */
-export function SentinelMark({ size = 24, className = "" }: { size?: number; className?: string }) {
+export function ElvaMark({ size = 24, className = "" }: { size?: number; className?: string }) {
   const height = Math.round((size * 60) / 44);
   return (
     <svg
@@ -29,11 +29,11 @@ export function SentinelMark({ size = 24, className = "" }: { size?: number; cla
   );
 }
 
-export function SentinelLogo({ className, iconOnly = false, size = 24 }: SentinelLogoProps) {
+export function ElvaLogo({ className, iconOnly = false, size = 24 }: ElvaLogoProps) {
   return (
     <div className={`flex items-center gap-2.5 ${className ?? ""}`}>
-      <SentinelMark size={size} />
-      {!iconOnly && <span className="font-semibold tracking-tight">Sentinel</span>}
+      <ElvaMark size={size} />
+      {!iconOnly && <span className="font-semibold tracking-tight">Elva</span>}
     </div>
   );
 }

@@ -9,7 +9,7 @@ const ThemeContext = createContext<{ theme: Theme; toggle: () => void } | null>(
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window === 'undefined') return 'dark'
-    const stored = localStorage.getItem('sentinel-theme')
+    const stored = localStorage.getItem('elva-theme')
     return stored === 'light' ? 'light' : 'dark'
   })
 
@@ -20,7 +20,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     } else {
       root.classList.remove('dark')
     }
-    localStorage.setItem('sentinel-theme', theme)
+    localStorage.setItem('elva-theme', theme)
   }, [theme])
 
   const toggle = useCallback(() => setTheme(t => t === 'light' ? 'dark' : 'light'), [])

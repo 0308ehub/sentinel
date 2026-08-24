@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, ArrowUp } from "lucide-react";
-import { SentinelMark } from "@/components/brand/sentinel-logo";
+import { ElvaMark } from "@/components/brand/elva-logo";
 
 interface Turn {
   role: "TUTOR" | "CHILD";
@@ -157,7 +157,7 @@ export function SessionClient({ childId, childName }: { childId: string; childNa
           >
             <ArrowLeft className="h-4 w-4" />
           </Link>
-          <SentinelMark size={20} />
+          <ElvaMark size={20} />
           <div className="min-w-0">
             <p className="truncate font-medium leading-tight">{displayName}</p>
             <p className="truncate text-xs text-muted-foreground">

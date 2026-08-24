@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { SentinelMark } from "@/components/brand/sentinel-logo";
+import { ElvaMark } from "@/components/brand/elva-logo";
 
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -10,8 +10,8 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
           className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4"
         >
           <Link href="/" className="flex items-center gap-2.5 text-[var(--ink)]">
-            <SentinelMark size={20} />
-            <span className="font-display text-lg font-semibold tracking-tight">Sentinel</span>
+            <ElvaMark size={20} />
+            <span className="font-display text-lg font-semibold tracking-tight">Elva</span>
           </Link>
 
           <div className="flex items-center gap-1 text-sm">
@@ -48,15 +48,15 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
       <footer className="border-t border-[var(--rule)] bg-[var(--paper-deep)]">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-12 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2.5">
-            <SentinelMark size={18} />
-            <span className="font-display text-base font-semibold">Sentinel</span>
+            <ElvaMark size={18} />
+            <span className="font-display text-base font-semibold">Elva</span>
           </div>
           <p className="max-w-md text-sm leading-relaxed text-[var(--ink-faint)]">
             An AI mentor that learns how your child thinks. Built with parental consent,
             review, and deletion at its core.
           </p>
           <p className="text-xs text-[var(--ink-faint)]">
-            © {new Date().getFullYear()} Sentinel
+            © {new Date().getFullYear()} Elva
           </p>
         </div>
       </footer>

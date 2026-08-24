@@ -15,7 +15,7 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "Sentinel — An AI Mentor for Children",
+  title: "Elva — An AI Mentor for Children",
   description:
     "An AI mentor that learns how your child thinks, adapts to how they learn, and grows with them over time.",
 };
@@ -27,7 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <body className="min-h-full bg-background text-foreground">
           <script
             dangerouslySetInnerHTML={{
-              __html: `(function(){try{var t=localStorage.getItem('sentinel-theme');if(!t||t==='dark')document.documentElement.classList.add('dark')}catch(e){document.documentElement.classList.add('dark')}})()`,
+              __html: `(function(){try{var t=localStorage.getItem('elva-theme');if(!t||t==='dark')document.documentElement.classList.add('dark')}catch(e){document.documentElement.classList.add('dark')}})()`,
             }}
           />
           <ThemeProvider>

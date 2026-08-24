@@ -27,7 +27,7 @@ export function AddChildForm() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!consent) {
-      toast.error("Parental consent is required before your child can use Sentinel.");
+      toast.error("Parental consent is required before your child can use Elva.");
       return;
     }
     setSaving(true);
@@ -87,7 +87,7 @@ export function AddChildForm() {
           className="mt-1"
         />
         <span>
-          I am this child&apos;s parent or guardian and I consent to them using Sentinel. I understand
+          I am this child&apos;s parent or guardian and I consent to them using Elva. I understand
           I can review all activity and delete their data at any time.
         </span>
       </label>

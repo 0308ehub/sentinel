@@ -1,13 +1,13 @@
-# Sentinel
+# Elva
 
 **An AI mentor for children that learns how each child thinks and grows with them over time.**
 
-Sentinel starts with foundational learning — reading, writing, and arithmetic — but instead of
+Elva starts with foundational learning — reading, writing, and arithmetic — but instead of
 simply adapting question difficulty, it builds a **persistent model of the child**: what they
 understand, where they struggle, how they reason, which explanations work for them, and what
 they are curious about.
 
-If a child can solve `17 − 6` but consistently struggles with `17 − 9`, Sentinel identifies the
+If a child can solve `17 − 6` but consistently struggles with `17 − 9`, Elva identifies the
 underlying misconception — regrouping across a ten — and changes *how* it teaches, rather than
 just serving easier problems.
 

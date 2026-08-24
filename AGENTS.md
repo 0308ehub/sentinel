@@ -6,13 +6,13 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ---
 
-# Sentinel-Next Codebase Guide
+# Elva Codebase Guide
 
 > This file is **self-improving**. When you discover important architecture details, gotchas, or patterns during a session, update the relevant section below so future sessions start with that knowledge.
 
 ## Architecture Overview
 
-Sentinel is currently a minimal skeleton for an AI mentor/tutor for children. Do not restore the deleted B2B product-management domain unless explicitly asked.
+Elva is currently a minimal skeleton for an AI mentor/tutor for children. Do not restore the deleted B2B product-management domain unless explicitly asked.
 
 ## Key Files
 

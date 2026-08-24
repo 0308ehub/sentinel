@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { SentinelMark } from "@/components/brand/sentinel-logo";
+import { ElvaMark } from "@/components/brand/elva-logo";
 
 const LOOP = [
   { verb: "Observe", detail: "What did they actually say, and how fast?" },
@@ -36,7 +36,7 @@ export default function LandingPage() {
           </h1>
 
           <p className="mt-8 max-w-xl text-lg leading-relaxed text-[var(--ink-soft)]">
-            Most tutors adjust how hard the questions are. Sentinel builds a model of your
+            Most tutors adjust how hard the questions are. Elva builds a model of your
             child — what they understand, where they get stuck, which explanations land —
             and it keeps that understanding for years.
           </p>
@@ -79,7 +79,7 @@ export default function LandingPage() {
               className="absolute left-0 top-0 hidden h-full w-px bg-[var(--rule)] md:block"
             />
             <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[var(--accent)]">
-              Sentinel
+              Elva
             </p>
             <p className="font-display mt-4 text-2xl leading-snug">
               &ldquo;She subtracts each digit on its own. Crossing ten is where it breaks.
@@ -118,7 +118,7 @@ export default function LandingPage() {
           <div className="space-y-8">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[var(--ink-faint)]">
-                What Sentinel records
+                What Elva records
               </p>
               <p className="mt-4 leading-relaxed text-[var(--ink-soft)]">
                 Not &ldquo;got it wrong.&rdquo; It records a <em>misconception</em>: Maya treats
@@ -252,7 +252,7 @@ export default function LandingPage() {
 
       {/* ── CTA ──────────────────────────────────────────────────────────── */}
       <section className="mx-auto max-w-6xl px-6 py-28 text-center">
-        <SentinelMark size={40} className="mx-auto text-[var(--ink)]" />
+        <ElvaMark size={40} className="mx-auto text-[var(--ink)]" />
         <h2 className="font-display mx-auto mt-8 max-w-2xl text-4xl font-semibold leading-tight sm:text-5xl">
           Give your child a tutor who knows them.
         </h2>

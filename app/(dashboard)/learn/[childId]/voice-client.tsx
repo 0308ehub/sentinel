@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Mic, MicOff, MoreHorizontal } from "lucide-react";
 import { toast } from "sonner";
-import { SentinelMark } from "@/components/brand/sentinel-logo";
+import { ElvaMark } from "@/components/brand/elva-logo";
 import { useRealtime } from "./use-realtime";
 
 interface MentorTurn {
@@ -182,7 +182,7 @@ export function VoiceClient({ childId, childName }: { childId: string; childName
           >
             <ArrowLeft className="h-4 w-4" />
           </Link>
-          <SentinelMark size={20} />
+          <ElvaMark size={20} />
           <div className="min-w-0">
             {loading ? (
               <>
@@ -278,7 +278,7 @@ export function VoiceClient({ childId, childName }: { childId: string; childName
 
         {!loading && turns.length === 0 && state === "idle" && (
           <div className="rounded-xl border border-dashed p-10 text-center">
-            <SentinelMark size={32} className="mx-auto opacity-40" />
+            <ElvaMark size={32} className="mx-auto opacity-40" />
             <p className="mt-4 font-medium">Tap the microphone to begin</p>
             <p className="mt-1 text-sm text-muted-foreground">
               {`${displayName} will say hello first and lead the conversation.`}
