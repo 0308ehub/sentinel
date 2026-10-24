@@ -34,8 +34,9 @@ All API routes use `apiSuccess(data)` and `apiError(code, message)` from `@/type
 
 - The `params` and `searchParams` in Next.js App Router page components are now Promises — always `await params` before destructuring
 - Prisma client is at `@/lib/db/prisma` — never instantiate a new PrismaClient in route handlers
-- Prisma is pinned to v6 so it can run without the removed PostgreSQL driver adapter; Prisma v7 requires an adapter or Accelerate URL.
-- `npm run build` must not deploy migrations or otherwise mutate the production database.
+- Prisma 7 has no `url` in `schema.prisma`. The client uses `@prisma/adapter-pg` in `lib/db/prisma.ts`, and the CLI reads `DATABASE_URL` from `prisma.config.ts`.
+- `npm run build` must not deploy migrations or otherwise mutate the production database. Prisma 7 and Next 16 need Node `20.19+`, `22.12+`, or `24+`. The system Node at `/usr/local/bin/node` is 18, so `scripts/build.mjs` switches to a matching nvm install when the current shell is too old.
+- `kismet/` is a separate Next app. Keep it in the root `tsconfig.json` `exclude` list, or `next build` type-checks it against this app's `@/*` paths and fails.
 
 ## Self-Improvement Instructions
 
