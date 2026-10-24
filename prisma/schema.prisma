@@ -1,463 +1,239 @@
+// Product IDE — Knowledge Graph Schema
+// Run: npx prisma generate && npx prisma db push && npx prisma db seed
+
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["postgresqlExtensions"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
-  provider   = "postgresql"
-  extensions = [vector]
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
-// ─── Accounts ────────────────────────────────────────────────────────────────
+enum NodeType {
+  PRODUCT
+  FEATURE
+  CUSTOMER_PROBLEM
+  CUSTOMER
+  USER_SEGMENT
+  REQUIREMENT
+  DECISION
+  GOAL
+  EXPERIMENT
+  METRIC
+  DASHBOARD
+  ANALYTICS_QUERY
+  PRD
+  DESIGN
+  FIGMA_FRAME
+  ENGINEERING_TASK
+  PULL_REQUEST
+  COMMIT
+  RELEASE
+  LAUNCH
+  SUPPORT_TICKET
+  CUSTOMER_INTERVIEW
+  SLACK_THREAD
+  MEETING
+  ACTION_ITEM
+  TEAM
+  PERSON
+  API
+  DATABASE_TABLE
+  SERVICE
+  AI_INSIGHT
+}
 
-/// A parent / guardian. This is the only entity that logs in.
-model User {
+enum RelationshipType {
+  ADDRESSES
+  IMPLEMENTS
+  BLOCKS
+  DEPENDS_ON
+  MEASURES
+  OWNED_BY
+  RELATED_TO
+  SUPERSEDES
+  VALIDATES
+  CAUSED_BY
+  RESULTED_IN
+  PART_OF
+  LINKED_TO
+}
+
+enum NodeStatus {
+  DRAFT
+  ACTIVE
+  IN_PROGRESS
+  COMPLETED
+  ARCHIVED
+  AT_RISK
+  STALE
+}
+
+enum Priority {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+model Organization {
   id        String   @id @default(cuid())
-  clerkId   String   @unique
-  email     String   @unique
-  name      String?
-  imageUrl  String?
+  name      String
+  slug      String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  children Child[]
+  products Product[]
+  teams    Team[]
+  people   Person[]
 }
 
-/// A child. Never a login — always reached through the parent account.
-model Child {
-  id            String   @id @default(cuid())
-  parentId      String
-  name          String
-  ageYears      Int
-  gradeLabel    String?
-  readingLevel  String?
-  mathLevel     String?
-  interests     String[] @default([])
-  goals         String[] @default([])
-  strugglesWith String[] @default([])
+model Team {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  description    String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
-  /// Parental consent is required before any child-facing interaction (COPPA).
-  consentGrantedAt DateTime?
-  consentVersion   String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  parent         User                @relation(fields: [parentId], references: [id], onDelete: Cascade)
-  mentorProfile  MentorProfile?
-  skillStates    LearnerSkillState[]
-  memoryNodes    MemoryNode[]
-  observations   Observation[]
-  hypotheses     Hypothesis[]
-  interventions  Intervention[]
-  sessions       Session[]
-  learningEvents LearningEvent[]
-
-  @@index([parentId])
+  members Person[]
 }
 
-/// The mentor persona bound to one child, plus the slowly-updating longitudinal narrative (memory layer 4).
-model MentorProfile {
-  id            String    @id @default(cuid())
-  childId       String    @unique
-  /// Null until the child chooses a name for their mentor during the first session.
-  mentorName    String?
-  mentorNamedAt DateTime?
+model Person {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  teamId         String?
+  team           Team?        @relation(fields: [teamId], references: [id])
+  clerkUserId    String?      @unique
+  name           String
+  email          String
+  avatarUrl      String?
+  role           String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
-  /// Layer 4 — narrative of development over months. Updated rarely.
-  longitudinalNarrative String?
-  narrativeUpdatedAt    DateTime?
-
-  /// Layer 3 — stable inferred learner model, regenerated periodically.
-  semanticSummary  String?
-  summaryUpdatedAt DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  child Child @relation(fields: [childId], references: [id], onDelete: Cascade)
+  ownedNodes GraphNode[] @relation("NodeOwner")
 }
 
-// ─── Curriculum graph ────────────────────────────────────────────────────────
+model Product {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  description    String?
+  status         NodeStatus   @default(ACTIVE)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
-enum Domain {
-  MATH
-  READING
-  REASONING
+  nodes GraphNode[]
 }
 
-/// A curriculum concept. Prerequisites form the curriculum DAG.
-model Concept {
-  id          String @id
-  domain      Domain
-  label       String
-  description String
-  /// Ordering hint within a domain, low = earlier.
-  sequence    Int
+model GraphNode {
+  id          String     @id @default(cuid())
+  productId   String
+  product     Product    @relation(fields: [productId], references: [id])
+  type        NodeType
+  title       String
+  description String?    @db.Text
+  summary     String?    @db.Text
+  status      NodeStatus @default(DRAFT)
+  priority    Priority?
+  ownerId     String?
+  owner       Person?    @relation("NodeOwner", fields: [ownerId], references: [id])
+  metadata    Json       @default("{}")
+  tags        String[]   @default([])
+  searchText  String?    @db.Text
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
-  learningObjectives    String[] @default([])
-  commonMisconceptions  String[] @default([])
-  diagnosticQuestions   String[] @default([])
-  teachingStrategies    String[] @default([])
-  examples              String[] @default([])
-  masteryCriteria       String?
-  /// Days until a retention check should be scheduled after mastery.
-  retentionIntervalDays Int      @default(7)
+  outgoingEdges GraphEdge[]     @relation("SourceNode")
+  incomingEdges GraphEdge[]     @relation("TargetNode")
+  timeline      TimelineEvent[]
+  activities    Activity[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  prerequisiteOf ConceptEdge[] @relation("PrereqSource")
-  requires       ConceptEdge[] @relation("PrereqTarget")
-
-  skillStates    LearnerSkillState[]
-  observations   Observation[]
-  hypotheses     Hypothesis[]
-  interventions  Intervention[]
-  learningEvents LearningEvent[]
-
-  @@index([domain, sequence])
+  @@index([productId, type])
+  @@index([status])
+  @@index([ownerId])
 }
 
-/// prerequisite --PREREQUISITE_OF--> dependent
-model ConceptEdge {
-  id       String @id @default(cuid())
-  sourceId String
-  targetId String
+model GraphEdge {
+  id        String           @id @default(cuid())
+  sourceId  String
+  source    GraphNode        @relation("SourceNode", fields: [sourceId], references: [id], onDelete: Cascade)
+  targetId  String
+  target    GraphNode        @relation("TargetNode", fields: [targetId], references: [id], onDelete: Cascade)
+  type      RelationshipType
+  label     String?
+  weight    Float?
+  createdAt DateTime         @default(now())
 
-  source Concept @relation("PrereqSource", fields: [sourceId], references: [id], onDelete: Cascade)
-  target Concept @relation("PrereqTarget", fields: [targetId], references: [id], onDelete: Cascade)
-
-  @@unique([sourceId, targetId])
+  @@unique([sourceId, targetId, type])
+  @@index([sourceId])
   @@index([targetId])
 }
 
-// ─── Mastery ─────────────────────────────────────────────────────────────────
-
-/// Per (child, concept) mastery state. Mastery is probabilistic, never a streak count.
-model LearnerSkillState {
-  id        String @id @default(cuid())
-  childId   String
-  conceptId String
-
-  masteryProbability Float @default(0.0)
-  /// How much we trust masteryProbability, given how much evidence exists.
-  confidence         Float @default(0.0)
-
-  independentSuccesses  Int @default(0)
-  promptedSuccesses     Int @default(0)
-  failures              Int @default(0)
-  retentionChecksPassed Int @default(0)
-  transferSuccesses     Int @default(0)
-
-  lastTestedAt         DateTime?
-  nextRetentionCheckAt DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  child   Child   @relation(fields: [childId], references: [id], onDelete: Cascade)
-  concept Concept @relation(fields: [conceptId], references: [id], onDelete: Cascade)
-
-  @@unique([childId, conceptId])
-  @@index([childId])
-  @@index([nextRetentionCheckAt])
-}
-
-// ─── Learner knowledge graph ─────────────────────────────────────────────────
-
-enum MemoryNodeType {
-  INTEREST
-  CONCEPT
-  SKILL
-  MISCONCEPTION
-  REASONING_PATTERN
-  TEACHING_STRATEGY
-  EXPERIENCE
-  GOAL
-  CONVERSATION_MEMORY
-  PERSON
-  BOOK
-  STORY
-}
-
-enum MemoryRelationship {
-  STRUGGLES_WITH
-  MASTERED
-  INTERESTED_IN
-  RESPONDS_WELL_TO
-  CONFUSES_WITH
-  PREREQUISITE_OF
-  EXPLAINED_BY
-  IMPROVED_BY
-  AVOIDS
-  PREFERS
-  RETAINED_AFTER
-  CAUSED_BY
-}
-
-/// A node in the child's personal knowledge graph.
-model MemoryNode {
-  id          String         @id @default(cuid())
-  childId     String
-  type        MemoryNodeType
-  label       String
+model TimelineEvent {
+  id          String    @id @default(cuid())
+  nodeId      String
+  node        GraphNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  title       String
   description String?
+  eventType   String
+  timestamp   DateTime
+  actorId     String?
+  metadata    Json      @default("{}")
 
-  /// 0..1 — how strongly we believe this. Grows with corroborating evidence.
-  confidence    Float @default(0.5)
-  /// How educationally important this memory is, for retrieval ranking.
-  importance    Float @default(0.5)
-  evidenceCount Int   @default(1)
-
-  embedding Unsupported("vector(1536)")?
-
-  firstObservedAt DateTime @default(now())
-  lastObservedAt  DateTime @default(now())
-
-  child    Child        @relation(fields: [childId], references: [id], onDelete: Cascade)
-  outgoing MemoryEdge[] @relation("EdgeSource")
-  incoming MemoryEdge[] @relation("EdgeTarget")
-
-  @@index([childId, type])
-  @@index([childId, lastObservedAt])
+  @@index([nodeId, timestamp])
 }
 
-model MemoryEdge {
-  id            String             @id @default(cuid())
-  sourceNodeId  String
-  targetNodeId  String
-  relationship  MemoryRelationship
-  confidence    Float              @default(0.5)
-  evidenceCount Int                @default(1)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  source MemoryNode @relation("EdgeSource", fields: [sourceNodeId], references: [id], onDelete: Cascade)
-  target MemoryNode @relation("EdgeTarget", fields: [targetNodeId], references: [id], onDelete: Cascade)
-
-  @@unique([sourceNodeId, targetNodeId, relationship])
-  @@index([targetNodeId])
-}
-
-// ─── Evidence ────────────────────────────────────────────────────────────────
-
-/// A single observed child response. Raw evidence — never a permanent label.
-model Observation {
-  id        String  @id @default(cuid())
-  childId   String
-  sessionId String?
-  conceptId String?
-
-  prompt   String
-  response String
-
-  correctness       Boolean?
-  /// e.g. ["counted on fingers", "explained before answering"]
-  reasoningEvidence String[] @default([])
-  /// e.g. "digitwise_subtraction"
-  reasoningPattern  String?
-  latencyMs         Int?
-
-  createdAt DateTime @default(now())
-
-  child   Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
-  session Session? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
-  concept Concept? @relation(fields: [conceptId], references: [id], onDelete: SetNull)
-
-  supports    Hypothesis[] @relation("SupportingEvidence")
-  contradicts Hypothesis[] @relation("ContradictingEvidence")
-
-  @@index([childId, createdAt])
-  @@index([sessionId])
-}
-
-/// One recorded change of belief. Confidence is otherwise overwritten in place,
-/// which makes adaptation invisible — this is the audit trail behind it.
-model HypothesisRevision {
-  id            String   @id @default(cuid())
-  hypothesisId  String
-  before        Float
-  after         Float
-  /// What moved it: the observation, or a status transition.
-  reason        String
-  observationId String?
-  createdAt     DateTime @default(now())
-
-  hypothesis Hypothesis @relation(fields: [hypothesisId], references: [id], onDelete: Cascade)
-
-  @@index([hypothesisId, createdAt])
-}
-
-enum HypothesisStatus {
-  ACTIVE
-  CONFIRMED
-  REFUTED
-  DORMANT
-}
-
-/// A belief about the child, held with explicit confidence and revisable.
-model Hypothesis {
-  id          String           @id @default(cuid())
-  childId     String
-  conceptId   String?
+model Activity {
+  id          String     @id @default(cuid())
+  nodeId      String?
+  node        GraphNode? @relation(fields: [nodeId], references: [id], onDelete: SetNull)
   type        String
+  title       String
+  description String?
+  actorId     String
+  timestamp   DateTime   @default(now())
+
+  @@index([timestamp])
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String
   description String
-  confidence  Float            @default(0.5)
-  status      HypothesisStatus @default(ACTIVE)
+  type        String
+  read        Boolean  @default(false)
+  nodeId      String?
+  createdAt   DateTime @default(now())
 
+  @@index([userId, read])
+}
+
+model SavedQuery {
+  id          String   @id @default(cuid())
+  productId   String
+  name        String
+  description String?
+  sql         String   @db.Text
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model GraphSnapshot {
+  id        String   @id @default(cuid())
+  productId String
+  name      String
+  message   String?
+  data      Json
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdBy String
 
-  child   Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
-  concept Concept? @relation(fields: [conceptId], references: [id], onDelete: SetNull)
-
-  supportingEvidence    Observation[]        @relation("SupportingEvidence")
-  contradictingEvidence Observation[]        @relation("ContradictingEvidence")
-  interventions         Intervention[]
-  revisions             HypothesisRevision[]
-
-  @@index([childId, status])
-}
-
-// ─── Teaching ────────────────────────────────────────────────────────────────
-
-enum TutorAction {
-  /// Social/rapport turn — get to know the child, no academic content.
-  CONNECT
-  PROBE
-  EXPLAIN
-  GIVE_EXAMPLE
-  ASK_CHILD_TO_EXPLAIN
-  REINFORCE
-  REVIEW
-  ADVANCE
-  CHANGE_REPRESENTATION
-}
-
-/// A teaching strategy applied to a child, and whether it worked. First-class data (§17).
-model Intervention {
-  id           String  @id @default(cuid())
-  childId      String
-  sessionId    String?
-  conceptId    String?
-  hypothesisId String?
-
-  action    TutorAction
-  /// e.g. "number_line", "counters", "story_framing"
-  strategy  String
-  rationale String?
-
-  /// Null until we observe the follow-up result.
-  successful  Boolean?
-  evaluatedAt DateTime?
-
-  createdAt DateTime @default(now())
-
-  child      Child       @relation(fields: [childId], references: [id], onDelete: Cascade)
-  session    Session?    @relation(fields: [sessionId], references: [id], onDelete: SetNull)
-  concept    Concept?    @relation(fields: [conceptId], references: [id], onDelete: SetNull)
-  hypothesis Hypothesis? @relation(fields: [hypothesisId], references: [id], onDelete: SetNull)
-
-  @@index([childId, strategy])
-  @@index([sessionId])
-}
-
-enum LearningEventType {
-  CONCEPT_INTRODUCED
-  MASTERY_REACHED
-  MASTERY_LOST
-  RETENTION_PASSED
-  RETENTION_FAILED
-  MISCONCEPTION_DETECTED
-  MISCONCEPTION_RESOLVED
-  TRANSFER_DEMONSTRATED
-}
-
-/// Milestones worth surfacing to a parent, and worth remembering longitudinally.
-model LearningEvent {
-  id        String            @id @default(cuid())
-  childId   String
-  conceptId String?
-  type      LearningEventType
-  summary   String
-  createdAt DateTime          @default(now())
-
-  child   Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
-  concept Concept? @relation(fields: [conceptId], references: [id], onDelete: SetNull)
-
-  @@index([childId, createdAt])
-}
-
-// ─── Conversation ────────────────────────────────────────────────────────────
-
-enum SessionStatus {
-  ACTIVE
-  COMPLETED
-  ABANDONED
-}
-
-model Session {
-  id        String        @id @default(cuid())
-  childId   String
-  status    SessionStatus @default(ACTIVE)
-  startedAt DateTime      @default(now())
-  endedAt   DateTime?
-
-  /// Session-scoped recap written at the end (memory layer 2 seed).
-  summary String?
-  /// Which experiment arm this session ran under (§28).
-  variant String  @default("PRIMER")
-
-  child         Child          @relation(fields: [childId], references: [id], onDelete: Cascade)
-  messages      Message[]
-  observations  Observation[]
-  interventions Intervention[]
-
-  @@index([childId, startedAt])
-}
-
-enum MessageRole {
-  TUTOR
-  CHILD
-  SYSTEM
-}
-
-model Message {
-  id        String      @id @default(cuid())
-  sessionId String
-  role      MessageRole
-  content   String
-
-  /// The pedagogical decision behind a tutor turn, for audit + analysis.
-  action        TutorAction?
-  targetConcept String?
-  rationale     String?
-
-  /// Safety verdict recorded for every child-facing turn (§23).
-  safetyFlagged Boolean @default(false)
-  safetyReason  String?
-
-  createdAt DateTime @default(now())
-
-  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-
-  @@index([sessionId, createdAt])
-}
-
-// ─── Misc ────────────────────────────────────────────────────────────────────
-
-model WaitlistEntry {
-  id       String   @id @default(cuid())
-  email    String   @unique
-  joinedAt DateTime @default(now())
-}
-
-model ProductEvent {
-  id         String   @id @default(cuid())
-  userId     String?
-  event      String
-  properties Json?
-  createdAt  DateTime @default(now())
+  @@index([productId, createdAt])
 }

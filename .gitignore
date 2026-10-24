@@ -32,7 +32,9 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
-!.env.example
+
+# local OAuth tokens
+.data/
 
 # vercel
 .vercel
@@ -41,10 +43,10 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-/lib/generated/prisma
+!.env.example
 
 # clerk configuration (can include secrets)
 /.clerk/
 
-# claude code agent worktrees
+# local claude settings
 /.claude/

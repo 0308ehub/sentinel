@@ -1,30 +1,39 @@
-import { PrismaClient } from "@prisma/client";
-import { PrismaPg } from "@prisma/adapter-pg";
-import { CONCEPTS } from "../lib/curriculum/concepts";
-import { PREREQUISITE_EDGES } from "../lib/curriculum/graph";
+/**
+ * Prisma seed script — run after `npx prisma generate && npx prisma db push`
+ * Mirrors src/lib/data/seed.ts for PostgreSQL persistence
+ */
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { PrismaClient } = require("@prisma/client");
 
-const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
-const prisma = new PrismaClient({ adapter });
+const prisma = new PrismaClient();
 
 async function main() {
-  for (const c of CONCEPTS) {
-    await prisma.concept.upsert({ where: { id: c.id }, update: c, create: c });
-  }
-  console.log(`seeded ${CONCEPTS.length} concepts`);
+  const org = await prisma.organization.upsert({
+    where: { slug: "acme" },
+    update: {},
+    create: { name: "Acme Inc", slug: "acme" },
+  });
 
-  for (const e of PREREQUISITE_EDGES) {
-    await prisma.conceptEdge.upsert({
-      where: { sourceId_targetId: { sourceId: e.sourceId, targetId: e.targetId } },
-      update: {},
-      create: e,
-    });
-  }
-  console.log(`seeded ${PREREQUISITE_EDGES.length} prerequisite edges`);
+  const product = await prisma.product.upsert({
+    where: { id: "product-acme" },
+    update: {},
+    create: {
+      id: "product-acme",
+      organizationId: org.id,
+      name: "Acme Platform",
+      description: "B2B SaaS platform for workflow automation",
+      status: "ACTIVE",
+    },
+  });
+
+  console.log(`Seeded organization ${org.name} with product ${product.name}`);
+  console.log("Import full seed data from src/lib/data/seed.ts for complete graph");
 }
 
 main()
-  .catch((e) => {
+  .then(() => prisma.$disconnect())
+  .catch(async (e) => {
     console.error(e);
+    await prisma.$disconnect();
     process.exit(1);
-  })
-  .finally(() => prisma.$disconnect());
+  });
