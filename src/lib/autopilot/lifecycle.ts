@@ -40,6 +40,7 @@ export async function reject(experiment: Experiment): Promise<string> {
 }
 
 export async function rollout(experiment: Experiment): Promise<string> {
+  if (experiment.status === "rolled_out") throw new Error("This experiment is already rolled out.");
   if (experiment.status !== "awaiting_rollout") throw new Error("This experiment hasn't won yet.");
   await setFlag(experiment.flag, "rolled_out", 100);
   await updateExperiment(experiment.id, { status: "rolled_out", endedAt: new Date().toISOString(), note: "Everyone sees the new version." });

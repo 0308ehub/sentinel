@@ -135,8 +135,8 @@ export function AutopilotView() {
               This week: <strong>{state.summary.evidenceThisWeek}</strong> pieces of evidence
               {state.summary.evidenceThisWeek > 0 && state.summary.realThisWeek === 0 && " (all synthetic)"}
               {state.summary.realThisWeek > 0 && ` (${state.summary.realThisWeek} real)`}, {" "}
-              <strong>{state.summary.readySignals}</strong> problems ready to test, <strong>{state.summary.running}</strong>{" "}
-              experiments running.{" "}
+              <strong>{state.summary.readySignals}</strong> {state.summary.readySignals === 1 ? "problem" : "problems"} ready
+              to test, <strong>{state.summary.running}</strong> {state.summary.running === 1 ? "experiment" : "experiments"} running.{" "}
               <span className="text-muted-foreground">
                 {state.lastRunAt ? (
                   <>
