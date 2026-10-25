@@ -1,4 +1,6 @@
-# Product IDE
+# Kismet
+
+> **Kismet is the primary product.** `main` is Kismet and is what deploys to the live app (app.sentinelai.one). Elva, the earlier AI-mentor product, is frozen on the `legacy/elva` branch and tag `elva-archive` — do not change it or merge it back into `main`.
 
 The operating system for product development. A graph-centric platform where every document, metric, decision, and customer signal connects into a living Product Knowledge Graph.
 
