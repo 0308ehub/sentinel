@@ -55,6 +55,20 @@ export interface Readout {
   at: string;
 }
 
+/**
+ * Removing the experiment switch once the decision is made: keep the winner (rolled out) or the
+ * original (turned off). "awaiting" means the change is ready and waits for your approval.
+ */
+export type CleanupStatus = "building" | "awaiting" | "merged" | "closed" | "failed";
+
+export interface Cleanup {
+  status: CleanupStatus;
+  keep: "control" | "treatment";
+  prUrl: string | null;
+  prNumber: number | null;
+  note: string | null;
+}
+
 export interface Experiment {
   id: string;
   signalId: string;
@@ -75,6 +89,7 @@ export interface Experiment {
   readout: Readout | null;
   /** The file the change edits. In dry-run mode the change is stored, not pushed. */
   draftPath: string | null;
+  cleanup: Cleanup | null;
   createdAt: string;
   startedAt: string | null;
   endedAt: string | null;

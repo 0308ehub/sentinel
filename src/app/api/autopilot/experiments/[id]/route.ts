@@ -1,10 +1,11 @@
+import { approveCleanup, dismissCleanup } from "@/lib/autopilot/cleanup";
 import { approve, reject, rollout, stop } from "@/lib/autopilot/lifecycle";
 import { getExperiment } from "@/lib/autopilot/store";
 import { GitHubApiError } from "@/lib/github/client";
 
 export const dynamic = "force-dynamic";
 
-const ACTIONS = ["approve", "reject", "rollout", "stop"] as const;
+const ACTIONS = ["approve", "reject", "rollout", "stop", "approve-cleanup", "dismiss-cleanup"] as const;
 type Action = (typeof ACTIONS)[number];
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -21,6 +22,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (action === "approve") message = await approve(experiment);
     else if (action === "reject") message = await reject(experiment);
     else if (action === "rollout") message = await rollout(experiment);
+    else if (action === "approve-cleanup") message = await approveCleanup(experiment);
+    else if (action === "dismiss-cleanup") message = await dismissCleanup(experiment);
     else {
       await stop(experiment, "Turned off by you.", false);
       message = "Turned off. Everyone sees the current version.";

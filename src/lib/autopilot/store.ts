@@ -6,6 +6,7 @@ import {
   READY_MIN_EVIDENCE,
   READY_MIN_SOURCES,
   type Activity,
+  type CleanupStatus,
   type Evidence,
   type EvidenceSource,
   type Experiment,
@@ -54,6 +55,15 @@ function toExperiment(row: Row): Experiment {
     note: (row.note as string | null) ?? null,
     readout: (row.readout as Readout | null) ?? null,
     draftPath: (row.draft_path as string | null) ?? null,
+    cleanup: row.cleanup_status
+      ? {
+          status: row.cleanup_status as CleanupStatus,
+          keep: row.status === "rolled_out" ? "treatment" : "control",
+          prUrl: (row.cleanup_pr_url as string | null) ?? null,
+          prNumber: row.cleanup_pr_number == null ? null : Number(row.cleanup_pr_number),
+          note: (row.cleanup_note as string | null) ?? null,
+        }
+      : null,
     createdAt: iso(row.created_at),
     startedAt: isoOrNull(row.started_at),
     endedAt: isoOrNull(row.ended_at),
@@ -198,6 +208,12 @@ export async function updateExperiment(
     readout: Readout | null;
     draftPath: string | null;
     draft: string | null;
+    original: string | null;
+    cleanupStatus: CleanupStatus | null;
+    cleanupPrUrl: string | null;
+    cleanupPrNumber: number | null;
+    cleanupDraft: string | null;
+    cleanupNote: string | null;
     startedAt: string | null;
     endedAt: string | null;
   }>
@@ -212,6 +228,12 @@ export async function updateExperiment(
   if (patch.readout !== undefined) columns.readout = patch.readout === null ? null : sql.json(patch.readout as never);
   if (patch.draftPath !== undefined) columns.draft_path = patch.draftPath;
   if (patch.draft !== undefined) columns.draft = patch.draft;
+  if (patch.original !== undefined) columns.original = patch.original;
+  if (patch.cleanupStatus !== undefined) columns.cleanup_status = patch.cleanupStatus;
+  if (patch.cleanupPrUrl !== undefined) columns.cleanup_pr_url = patch.cleanupPrUrl;
+  if (patch.cleanupPrNumber !== undefined) columns.cleanup_pr_number = patch.cleanupPrNumber;
+  if (patch.cleanupDraft !== undefined) columns.cleanup_draft = patch.cleanupDraft;
+  if (patch.cleanupNote !== undefined) columns.cleanup_note = patch.cleanupNote;
   if (patch.startedAt !== undefined) columns.started_at = patch.startedAt;
   if (patch.endedAt !== undefined) columns.ended_at = patch.endedAt;
   if (Object.keys(columns).length === 0) return;
@@ -401,4 +423,12 @@ export async function hasEvidenceTitled(title: string, sinceDays: number): Promi
     select 1 from kismet.evidence where title = ${title} and occurred_at > now() - make_interval(days => ${sinceDays}) limit 1
   `;
   return rows.length > 0;
+}
+
+/** The file before and after an experiment's change, as stored when it was built. */
+export async function experimentDraft(id: string): Promise<{ path: string; content: string; original: string | null } | null> {
+  const sql = await db();
+  const [row] = await sql`select draft_path, draft, original from kismet.experiments where id = ${id}`;
+  if (!row?.draft_path || !row?.draft) return null;
+  return { path: String(row.draft_path), content: String(row.draft), original: (row.original as string | null) ?? null };
 }

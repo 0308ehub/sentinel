@@ -4,6 +4,7 @@ import { autopilotConfigured } from "@/lib/autopilot/db";
 import { autopilotDryRun } from "@/lib/autopilot/repo";
 import { isLocalSource, sourceLabel } from "@/lib/autopilot/source";
 import { buildNext, followPulls } from "@/lib/autopilot/build";
+import { buildCleanup, followCleanups } from "@/lib/autopilot/cleanup";
 import { clusterEvidence } from "@/lib/autopilot/cluster";
 import { designNext } from "@/lib/autopilot/design";
 import { analyticsFindings } from "@/lib/autopilot/findings";
@@ -67,6 +68,10 @@ export async function runTick(): Promise<TickResult> {
     await step("follow", result, () => followPulls(startExperiment));
     await step("measure", result, measureRunning);
 
+    // Decided experiments: remove the switch and the losing version from the code.
+    await step("follow-cleanup", result, followCleanups);
+    await step("cleanup", result, buildCleanup);
+
     // Before the gate: design the next experiment and build its PR.
     await step("design", result, designNext);
     await step("build", result, buildNext);
@@ -109,7 +114,9 @@ export async function autopilotState(): Promise<AutopilotState> {
         realThisWeek: counts.real,
         readySignals: signals.filter((s) => s.ready && s.status === "open").length,
         running: experiments.filter((e) => e.status === "running").length,
-        needsYou: experiments.filter((e) => e.status === "awaiting_approval" || e.status === "awaiting_rollout").length,
+        needsYou: experiments.filter(
+          (e) => e.status === "awaiting_approval" || e.status === "awaiting_rollout" || e.cleanup?.status === "awaiting"
+        ).length,
       },
     };
   } catch (error) {

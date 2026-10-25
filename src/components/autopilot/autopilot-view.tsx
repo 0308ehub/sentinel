@@ -76,7 +76,10 @@ export function AutopilotView() {
     }
   }
 
-  async function act(experiment: Experiment, action: "approve" | "reject" | "rollout" | "stop") {
+  async function act(
+    experiment: Experiment,
+    action: "approve" | "reject" | "rollout" | "stop" | "approve-cleanup" | "dismiss-cleanup"
+  ) {
     setBusy(experiment.id + action);
     setMessage(null);
     try {
@@ -102,6 +105,7 @@ export function AutopilotView() {
   }
 
   const needsYou = state.experiments.filter((e) => e.status === "awaiting_approval" || e.status === "awaiting_rollout");
+  const finishing = state.experiments.filter((e) => e.cleanup?.status === "awaiting");
   const live = state.experiments.filter((e) => e.status === "running" || e.status === "building");
   const history = state.experiments.filter((e) => DONE.has(e.status));
   const problems = state.signals.filter((s) => s.status !== "dismissed");
@@ -156,7 +160,7 @@ export function AutopilotView() {
           {message && <p className="rounded-md bg-muted p-3 text-xs text-muted-foreground">{message}</p>}
         </header>
 
-        <Section title="Needs you" count={needsYou.length} empty="Nothing needs you right now.">
+        <Section title="Needs you" count={needsYou.length + finishing.length} empty="Nothing needs you right now.">
           {needsYou.map((experiment) => (
             <ExperimentCard
               key={experiment.id}
@@ -185,6 +189,15 @@ export function AutopilotView() {
                   </>
                 )
               }
+            />
+          ))}
+          {finishing.map((experiment) => (
+            <CleanupCard
+              key={experiment.id + "-cleanup"}
+              experiment={experiment}
+              busy={busy}
+              onApprove={() => act(experiment, "approve-cleanup")}
+              onDismiss={() => act(experiment, "dismiss-cleanup")}
             />
           ))}
         </Section>
@@ -390,6 +403,15 @@ function ExperimentCard({
         </div>
       )}
       {experiment.note && <p className="text-xs text-muted-foreground">{experiment.note}</p>}
+      {experiment.cleanup && experiment.cleanup.status !== "awaiting" && (
+        <p className="text-xs text-muted-foreground">
+          {experiment.cleanup.status === "merged"
+            ? "Code cleaned up: the experiment switch is gone."
+            : experiment.cleanup.status === "building"
+              ? "Writing the code cleanup."
+              : experiment.cleanup.note}
+        </p>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         {actions}
         {experiment.draftPath && !experiment.prUrl && (
@@ -410,6 +432,63 @@ function ExperimentCard({
             className="inline-flex items-center gap-1 text-xs text-muted-foreground underline"
           >
             Pull request #{experiment.prNumber} <ExternalLink className="h-3 w-3" />
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CleanupCard({
+  experiment,
+  busy,
+  onApprove,
+  onDismiss,
+}: {
+  experiment: Experiment;
+  busy: string | null;
+  onApprove: () => void;
+  onDismiss: () => void;
+}) {
+  const cleanup = experiment.cleanup!;
+  const kept = cleanup.keep === "treatment" ? "the new version" : "the original version";
+  return (
+    <div className="space-y-3 rounded-md border border-border p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <FlaskConical className="h-4 w-4 text-muted-foreground" />
+        <p className="text-sm font-medium">Finish: {experiment.title}</p>
+        <Badge variant="secondary">Remove experiment code</Badge>
+      </div>
+      <p className="text-xs">
+        Everyone already sees {kept}. This deletes the experiment switch and the other version from the code. It
+        doesn&apos;t change what anyone sees.
+      </p>
+      {cleanup.note && <p className="text-xs text-muted-foreground">{cleanup.note}</p>}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" onClick={onApprove} disabled={busy !== null}>
+          {busy === experiment.id + "approve-cleanup" && <Loader2 className="animate-spin" />}
+          Approve cleanup
+        </Button>
+        <Button size="sm" variant="outline" onClick={onDismiss} disabled={busy !== null}>
+          Keep the switch
+        </Button>
+        {cleanup.prUrl ? (
+          <a
+            href={cleanup.prUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground underline"
+          >
+            Pull request #{cleanup.prNumber} <ExternalLink className="h-3 w-3" />
+          </a>
+        ) : (
+          <a
+            href={`/api/autopilot/experiments/${experiment.id}/draft?cleanup=1`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground underline"
+          >
+            View the change <ExternalLink className="h-3 w-3" />
           </a>
         )}
       </div>

@@ -82,6 +82,12 @@ create table if not exists kismet.experiments (
 alter table kismet.experiments add column if not exists metric_spec jsonb;
 alter table kismet.experiments add column if not exists draft_path text;
 alter table kismet.experiments add column if not exists draft text;
+alter table kismet.experiments add column if not exists original text;
+alter table kismet.experiments add column if not exists cleanup_status text;
+alter table kismet.experiments add column if not exists cleanup_pr_url text;
+alter table kismet.experiments add column if not exists cleanup_pr_number integer;
+alter table kismet.experiments add column if not exists cleanup_draft text;
+alter table kismet.experiments add column if not exists cleanup_note text;
 
 create table if not exists kismet.flags (
   key text primary key,

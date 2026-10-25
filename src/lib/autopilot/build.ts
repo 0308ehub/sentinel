@@ -122,6 +122,7 @@ export async function buildNext(): Promise<string | null> {
         status: "awaiting_approval",
         draftPath: change.file.path,
         draft: change.content,
+        original: change.file.content,
         note: `Dry run: changes ${change.file.path}. Nothing was pushed to GitHub.`,
       });
       await log("build", `Wrote the change for “${experiment.title}” (dry run, not pushed).`, experiment.id);
@@ -141,6 +142,8 @@ export async function buildNext(): Promise<string | null> {
     await updateExperiment(experiment.id, {
       status: "awaiting_approval",
       draftPath: change.file.path,
+      draft: change.content,
+      original: change.file.content,
       prUrl: pull.url,
       prNumber: pull.number,
       branch: pull.branch,
