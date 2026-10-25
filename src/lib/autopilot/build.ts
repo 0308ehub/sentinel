@@ -4,17 +4,8 @@ import { askForJson, readJson } from "@/lib/ai/respond";
 import { autopilotDryRun, autopilotRepo } from "@/lib/autopilot/repo";
 import { listExperiments, listSignals, log, setSignalStatus, updateExperiment } from "@/lib/autopilot/store";
 import type { Experiment, Signal } from "@/lib/autopilot/types";
-import {
-  closePull,
-  commitChecks,
-  getPull,
-  GitHubApiError,
-  listUiFiles,
-  openPullRequest,
-  readFile,
-  repoDefaultBranch,
-  type GitHubFile,
-} from "@/lib/github/client";
+import { baseBranch, isLocalSource, listSourceFiles, readSourceFile } from "@/lib/autopilot/source";
+import { closePull, commitChecks, getPull, GitHubApiError, openPullRequest, type GitHubFile } from "@/lib/github/client";
 
 const IMPORT_LINE = 'import { useVariant } from "@/lib/autopilot/variant";';
 
@@ -30,8 +21,8 @@ function codeRules(flag: string): string {
   ].join(" ");
 }
 
-async function pickFiles(repo: string, base: string, experiment: Experiment, signal: Signal | undefined): Promise<GitHubFile[]> {
-  const paths = await listUiFiles(repo, base, 600);
+async function pickFiles(base: string, experiment: Experiment, signal: Signal | undefined): Promise<GitHubFile[]> {
+  const paths = await listSourceFiles(base, 600);
   const text = await askForJson(
     'Choose the files to read to make this UI change. Return JSON {"paths":[up to 3 paths from the list, most likely first]}.',
     [
@@ -48,7 +39,7 @@ async function pickFiles(repo: string, base: string, experiment: Experiment, sig
   const chosen = (readJson<{ paths?: string[] }>(text).paths ?? []).filter((p) => paths.includes(p)).slice(0, 3);
   const files: GitHubFile[] = [];
   for (const path of chosen) {
-    const file = await readFile(repo, path, base).catch(() => null);
+    const file = await readSourceFile(path, base).catch(() => null);
     if (file) files.push(file);
   }
   return files;
@@ -122,11 +113,11 @@ export async function buildNext(): Promise<string | null> {
   const repo = autopilotRepo();
 
   try {
-    const base = await repoDefaultBranch(repo);
-    const files = await pickFiles(repo, base, experiment, signal);
+    const base = await baseBranch();
+    const files = await pickFiles(base, experiment, signal);
     if (files.length === 0) throw new Error("Could not find the files for this change.");
     const change = await writeChange(experiment, files);
-    if (autopilotDryRun()) {
+    if (autopilotDryRun() || isLocalSource()) {
       await updateExperiment(experiment.id, {
         status: "awaiting_approval",
         draftPath: change.file.path,
@@ -166,7 +157,7 @@ export async function buildNext(): Promise<string | null> {
 
 /** Follows open pull requests: preview build results, and merges or closes done on GitHub directly. */
 export async function followPulls(start: (experiment: Experiment) => Promise<void>): Promise<string | null> {
-  if (autopilotDryRun()) return null;
+  if (autopilotDryRun() || isLocalSource()) return null;
   const repo = autopilotRepo();
   const waiting = (await listExperiments()).filter((e) => e.status === "awaiting_approval" && e.prNumber);
   const done: string[] = [];

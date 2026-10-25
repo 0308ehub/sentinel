@@ -131,7 +131,7 @@ export async function listUiFiles(fullName: string, branch: string, limit = 24):
   const paths = (tree.tree ?? [])
     .filter((item) => item.type === "blob" && item.path && isUiPath(item.path))
     .map((item) => item.path as string);
-  paths.sort((a, b) => rank(a) - rank(b) || a.length - b.length);
+  paths.sort((a, b) => rankUiPath(a) - rankUiPath(b) || a.length - b.length);
   return paths.slice(0, limit);
 }
 
@@ -254,12 +254,12 @@ export function githubErrorResponse(error: unknown): Response {
   return Response.json({ error: "unknown_error" }, { status: 500 });
 }
 
-function isUiPath(path: string): boolean {
+export function isUiPath(path: string): boolean {
   if (path.includes("..") || path.startsWith("/") || path.includes("node_modules")) return false;
   return /^(app|src\/app|pages|src\/pages|components|src\/components)\/[A-Za-z0-9_./-]+\.(tsx|jsx)$/.test(path);
 }
 
-function rank(path: string): number {
+export function rankUiPath(path: string): number {
   if (path.endsWith("/page.tsx") || path.endsWith("/page.jsx")) return 0;
   if (path.endsWith("page.tsx") || path.endsWith("index.tsx")) return 1;
   if (path.includes("pricing") || path.includes("hero") || path.includes("landing")) return 2;

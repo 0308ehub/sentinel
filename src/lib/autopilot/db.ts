@@ -19,7 +19,7 @@ export function autopilotConfigured(): boolean {
 function client(): Sql {
   if (!globalForSql.kismetSql) {
     const url = databaseUrl();
-    const local = /localhost|127\.0\.0\.1/.test(url);
+    const local = /localhost|127\.0\.0\.1|sslmode=disable/.test(url);
     globalForSql.kismetSql = postgres(url, {
       max: 5,
       ssl: local ? false : "require",

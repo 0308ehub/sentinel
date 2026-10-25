@@ -1,7 +1,8 @@
 import "server-only";
 
 import { autopilotConfigured } from "@/lib/autopilot/db";
-import { autopilotDryRun, autopilotRepo } from "@/lib/autopilot/repo";
+import { autopilotDryRun } from "@/lib/autopilot/repo";
+import { isLocalSource, sourceLabel } from "@/lib/autopilot/source";
 import { buildNext, followPulls } from "@/lib/autopilot/build";
 import { clusterEvidence } from "@/lib/autopilot/cluster";
 import { designNext } from "@/lib/autopilot/design";
@@ -84,8 +85,8 @@ export async function autopilotState(): Promise<AutopilotState> {
     activity: [],
     lastRunAt: null,
     synthetic: syntheticEnabled(),
-    dryRun: autopilotDryRun(),
-    repo: autopilotRepo(),
+    dryRun: autopilotDryRun() || isLocalSource(),
+    repo: sourceLabel(),
     summary: { evidenceThisWeek: 0, realThisWeek: 0, readySignals: 0, running: 0, needsYou: 0 },
   };
   if (!empty.configured) return empty;

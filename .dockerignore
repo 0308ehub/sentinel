@@ -1,0 +1,11 @@
+node_modules
+.next
+.git
+.vercel
+.clerk
+.claude
+.data
+.env
+.env.*
+*.png
+!public/**

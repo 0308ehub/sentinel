@@ -1,6 +1,7 @@
 import "server-only";
 
 import { autopilotDryRun, autopilotRepo } from "@/lib/autopilot/repo";
+import { isLocalSource } from "@/lib/autopilot/source";
 import { log, setFlag, setSignalStatus, updateExperiment } from "@/lib/autopilot/store";
 import type { Experiment } from "@/lib/autopilot/types";
 import { closePull, mergePull } from "@/lib/github/client";
@@ -19,7 +20,7 @@ export async function startExperiment(experiment: Experiment): Promise<void> {
 
 export async function approve(experiment: Experiment): Promise<string> {
   if (experiment.status !== "awaiting_approval") throw new Error("This experiment isn't waiting for approval.");
-  if (autopilotDryRun() && !experiment.prNumber) {
+  if ((autopilotDryRun() || isLocalSource()) && !experiment.prNumber) {
     await startExperiment(experiment);
     return "Started (dry run: nothing was merged, so only synthetic traffic will see it).";
   }

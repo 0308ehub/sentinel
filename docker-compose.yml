@@ -1,0 +1,53 @@
+# Local sandbox: Kismet + its database + a scheduler that runs Autopilot in the background.
+# Nothing here touches GitHub or production. Start with: docker compose up --build
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: kismet
+      POSTGRES_PASSWORD: kismet
+      POSTGRES_DB: kismet
+    volumes:
+      - kismet-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "kismet"]
+      interval: 2s
+      retries: 30
+
+  app:
+    build: .
+    env_file:
+      - path: .env.local
+        required: false
+    environment:
+      KISMET_DATABASE_URL: postgresql://kismet:kismet@db:5432/kismet?sslmode=disable
+      AUTOPILOT_DRY_RUN: "1"
+      # Autopilot reads (never writes) this checkout when it drafts a change.
+      AUTOPILOT_LOCAL_REPO: /repo
+    volumes:
+      - .:/repo:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Stands in for the production cron: one Autopilot run every AUTOPILOT_INTERVAL seconds.
+  scheduler:
+    image: curlimages/curl:8.10.1
+    environment:
+      AUTOPILOT_INTERVAL: ${AUTOPILOT_INTERVAL:-300}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        until curl -sf -o /dev/null http://app:3000/api/autopilot; do sleep 3; done
+        while true; do
+          echo "$$(date -u +%H:%M:%S) autopilot run"
+          curl -s -X POST --max-time 600 http://app:3000/api/autopilot/tick; echo
+          sleep "$$AUTOPILOT_INTERVAL"
+        done
+    depends_on:
+      - app
+
+volumes:
+  kismet-db:
