@@ -21,6 +21,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
+  Bot,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui-store";
@@ -45,6 +46,7 @@ const GROUPS = [
     label: "Workspace",
     items: [
       { label: "Chat", href: "/ai", icon: MessageSquare },
+      { label: "Autopilot", href: "/autopilot", icon: Bot },
       { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
       { label: "Explorer", href: "/explorer", icon: FolderTree },
       { label: "Features", href: "/features", icon: Layers },
