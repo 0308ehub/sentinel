@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { syncTheme } from "@/lib/theme";
+import { ExperimentProvider } from "@/components/autopilot/experiment-provider";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   useEffect(() => {
@@ -21,5 +22,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
       })
   );
 
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ExperimentProvider>{children}</ExperimentProvider>
+    </QueryClientProvider>
+  );
 }

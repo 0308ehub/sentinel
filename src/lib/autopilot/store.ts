@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db, newId } from "@/lib/autopilot/db";
+import { parseMetricSpec, type Arm, type FlagState, type MetricSpec } from "@/lib/autopilot/assign";
 import {
   READY_MIN_EVIDENCE,
   READY_MIN_SOURCES,
@@ -41,15 +42,18 @@ function toExperiment(row: Row): Experiment {
     title: String(row.title),
     hypothesis: String(row.hypothesis ?? ""),
     metric: String(row.metric ?? ""),
+    metricSpec: parseMetricSpec(row.metric_spec),
     guardrail: String(row.guardrail ?? ""),
     control: String(row.control ?? ""),
     treatment: String(row.treatment ?? ""),
     flag: String(row.flag),
     status: row.status as ExperimentStatus,
+    branch: (row.branch as string | null) ?? null,
     prUrl: (row.pr_url as string | null) ?? null,
     prNumber: row.pr_number == null ? null : Number(row.pr_number),
     note: (row.note as string | null) ?? null,
     readout: (row.readout as Readout | null) ?? null,
+    draftPath: (row.draft_path as string | null) ?? null,
     createdAt: iso(row.created_at),
     startedAt: isoOrNull(row.started_at),
     endedAt: isoOrNull(row.ended_at),
@@ -164,6 +168,7 @@ export async function createExperiment(input: {
   title: string;
   hypothesis: string;
   metric: string;
+  metricSpec: MetricSpec;
   guardrail: string;
   control: string;
   treatment: string;
@@ -173,10 +178,10 @@ export async function createExperiment(input: {
   const id = newId("exp");
   await sql`
     insert into kismet.experiments
-      (id, signal_id, version, title, hypothesis, metric, guardrail, control, treatment, flag, status)
+      (id, signal_id, version, title, hypothesis, metric, metric_spec, guardrail, control, treatment, flag, status)
     values
       (${id}, ${input.signalId}, ${input.version}, ${input.title.slice(0, 200)}, ${input.hypothesis.slice(0, 1000)},
-       ${input.metric.slice(0, 120)}, ${input.guardrail.slice(0, 300)}, ${input.control.slice(0, 500)},
+       ${input.metric.slice(0, 120)}, ${sql.json(input.metricSpec)}, ${input.guardrail.slice(0, 300)}, ${input.control.slice(0, 500)},
        ${input.treatment.slice(0, 500)}, ${input.flag}, 'building')
   `;
   return id;
@@ -191,6 +196,8 @@ export async function updateExperiment(
     branch: string | null;
     note: string | null;
     readout: Readout | null;
+    draftPath: string | null;
+    draft: string | null;
     startedAt: string | null;
     endedAt: string | null;
   }>
@@ -203,6 +210,8 @@ export async function updateExperiment(
   if (patch.branch !== undefined) columns.branch = patch.branch;
   if (patch.note !== undefined) columns.note = patch.note;
   if (patch.readout !== undefined) columns.readout = patch.readout === null ? null : sql.json(patch.readout as never);
+  if (patch.draftPath !== undefined) columns.draft_path = patch.draftPath;
+  if (patch.draft !== undefined) columns.draft = patch.draft;
   if (patch.startedAt !== undefined) columns.started_at = patch.startedAt;
   if (patch.endedAt !== undefined) columns.ended_at = patch.endedAt;
   if (Object.keys(columns).length === 0) return;
@@ -211,6 +220,13 @@ export async function updateExperiment(
 
 export async function log(kind: string, message: string, ref?: string): Promise<void> {
   const sql = await db();
+  if (kind === "error") {
+    // The same failure repeats every run until someone fixes it; record it once a day.
+    const [recent] = await sql`
+      select 1 from kismet.activity where kind = 'error' and message = ${message.slice(0, 500)} and at > now() - interval '1 day' limit 1
+    `;
+    if (recent) return;
+  }
   await sql`insert into kismet.activity (kind, message, ref) values (${kind}, ${message.slice(0, 500)}, ${ref ?? null})`;
 }
 
@@ -257,4 +273,132 @@ export async function withTickLock<T>(fn: () => Promise<T>): Promise<T | null> {
       conn.release();
     }
   });
+}
+
+export async function listFlags(): Promise<FlagState[]> {
+  const sql = await db();
+  const rows = await sql`select * from kismet.flags where status <> 'off'`;
+  return rows.map((row) => ({
+    key: String(row.key),
+    status: row.status as FlagState["status"],
+    treatmentPct: Number(row.treatment_pct),
+  }));
+}
+
+export async function setFlag(key: string, status: FlagState["status"], treatmentPct = 50): Promise<void> {
+  const sql = await db();
+  await sql`
+    insert into kismet.flags (key, status, treatment_pct) values (${key}, ${status}, ${treatmentPct})
+    on conflict (key) do update set status = excluded.status, treatment_pct = excluded.treatment_pct, updated_at = now()
+  `;
+}
+
+export interface NewEvent {
+  visitor: string;
+  name: "view" | "click";
+  page: string;
+  element: string;
+  arms: Record<string, Arm>;
+  synthetic: boolean;
+  at?: string;
+}
+
+export async function addEvents(events: NewEvent[]): Promise<void> {
+  if (events.length === 0) return;
+  const sql = await db();
+  const rows = events.map((e) => ({
+    visitor: e.visitor.slice(0, 64),
+    name: e.name,
+    page: e.page.slice(0, 200),
+    element: e.element.slice(0, 80),
+    arms: sql.json(e.arms),
+    synthetic: e.synthetic,
+    at: e.at ?? new Date().toISOString(),
+  }));
+  await sql`insert into kismet.events ${sql(rows)}`;
+}
+
+export interface ArmCount {
+  arm: Arm;
+  visitors: number;
+  conversions: number;
+  syntheticVisitors: number;
+}
+
+/** Visitors and converted visitors per arm since the experiment started, counted from tracked events. */
+export async function countArms(flag: string, since: string, spec: MetricSpec): Promise<ArmCount[]> {
+  const sql = await db();
+  const converts =
+    spec.kind === "click"
+      ? sql`e.name = 'click' and e.element ilike ${"%" + spec.text + "%"}`
+      : sql`e.name = 'view' and e.page like ${spec.path.replace(/[%_]/g, "") + "%"}`;
+  const rows = await sql`
+    with exposed as (
+      select visitor, min(arms ->> ${flag}) as arm, bool_or(synthetic) as synthetic
+      from kismet.events
+      where at >= ${since} and arms ? ${flag}
+      group by visitor
+    ),
+    converted as (
+      select distinct e.visitor from kismet.events e
+      where e.at >= ${since} and e.arms ? ${flag} and ${converts}
+    )
+    select x.arm,
+           count(*)::int as visitors,
+           count(c.visitor)::int as conversions,
+           count(*) filter (where x.synthetic)::int as synthetic_visitors
+    from exposed x left join converted c on c.visitor = x.visitor
+    group by x.arm
+  `;
+  return (["control", "treatment"] as Arm[]).map((arm) => {
+    const row = rows.find((r) => r.arm === arm);
+    return {
+      arm,
+      visitors: Number(row?.visitors ?? 0),
+      conversions: Number(row?.conversions ?? 0),
+      syntheticVisitors: Number(row?.synthetic_visitors ?? 0),
+    };
+  });
+}
+
+export interface ElementStat {
+  page: string;
+  element: string;
+  pageVisitors: number;
+  clickers: number;
+  synthetic: boolean;
+}
+
+/** Click-through of every labelled element on pages with enough traffic, for spotting what people ignore. */
+export async function elementStats(sinceDays: number, minVisitors: number): Promise<ElementStat[]> {
+  const sql = await db();
+  const rows = await sql`
+    with views as (
+      select page, count(distinct visitor)::int as visitors, bool_and(synthetic) as synthetic
+      from kismet.events where name = 'view' and at > now() - make_interval(days => ${sinceDays})
+      group by page having count(distinct visitor) >= ${minVisitors}
+    ),
+    clicks as (
+      select page, element, count(distinct visitor)::int as clickers
+      from kismet.events where name = 'click' and at > now() - make_interval(days => ${sinceDays})
+      group by page, element
+    )
+    select v.page, c.element, v.visitors, c.clickers, v.synthetic
+    from views v join clicks c on c.page = v.page
+  `;
+  return rows.map((row) => ({
+    page: String(row.page),
+    element: String(row.element),
+    pageVisitors: Number(row.visitors),
+    clickers: Number(row.clickers),
+    synthetic: Boolean(row.synthetic),
+  }));
+}
+
+export async function hasEvidenceTitled(title: string, sinceDays: number): Promise<boolean> {
+  const sql = await db();
+  const rows = await sql`
+    select 1 from kismet.evidence where title = ${title} and occurred_at > now() - make_interval(days => ${sinceDays}) limit 1
+  `;
+  return rows.length > 0;
 }

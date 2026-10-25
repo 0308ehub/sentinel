@@ -104,7 +104,7 @@ export function AutopilotView() {
   const needsYou = state.experiments.filter((e) => e.status === "awaiting_approval" || e.status === "awaiting_rollout");
   const live = state.experiments.filter((e) => e.status === "running" || e.status === "building");
   const history = state.experiments.filter((e) => DONE.has(e.status));
-  const problems = state.signals.filter((s) => s.status !== "dismissed" && s.title !== "Positive feedback");
+  const problems = state.signals.filter((s) => s.status !== "dismissed");
 
   return (
     <ScrollArea className="h-full">
@@ -146,6 +146,11 @@ export function AutopilotView() {
                   "Hasn't run yet."
                 )}
               </span>
+            </p>
+          )}
+          {state.dryRun && (
+            <p className="rounded-md bg-muted p-3 text-xs text-muted-foreground">
+              Dry run: Autopilot writes changes but never pushes, merges or closes anything on GitHub.
             </p>
           )}
           {message && <p className="rounded-md bg-muted p-3 text-xs text-muted-foreground">{message}</p>}
@@ -279,7 +284,7 @@ function SignalCard({ signal }: { signal: Signal }) {
           </div>
           {signal.problem && <p className="mt-1 text-xs text-muted-foreground">{signal.problem}</p>}
           <p className="mt-1 text-xs text-muted-foreground">
-            {signal.evidence.length} pieces from {signal.sources.map((s) => SOURCE_LABEL[s]).join(", ")}
+            {signal.evidence.length} {signal.evidence.length === 1 ? "piece" : "pieces"} from {signal.sources.map((s) => SOURCE_LABEL[s]).join(", ")}
             {signal.area && ` · ${signal.area}`}
             {synthetic > 0 && ` · ${synthetic === signal.evidence.length ? "all" : synthetic} synthetic`}
           </p>
@@ -387,6 +392,16 @@ function ExperimentCard({
       {experiment.note && <p className="text-xs text-muted-foreground">{experiment.note}</p>}
       <div className="flex flex-wrap items-center gap-2">
         {actions}
+        {experiment.draftPath && !experiment.prUrl && (
+          <a
+            href={`/api/autopilot/experiments/${experiment.id}/draft`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground underline"
+          >
+            View the change <ExternalLink className="h-3 w-3" />
+          </a>
+        )}
         {experiment.prUrl && (
           <a
             href={experiment.prUrl}

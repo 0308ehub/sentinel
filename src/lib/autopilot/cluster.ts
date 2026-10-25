@@ -1,7 +1,7 @@
 import "server-only";
 
 import { askForJson, readJson } from "@/lib/ai/respond";
-import { assignEvidence, createSignal, listSignals, log, unassignedEvidence } from "@/lib/autopilot/store";
+import { assignEvidence, createSignal, listSignals, log, setSignalStatus, unassignedEvidence } from "@/lib/autopilot/store";
 
 interface ClusterAnswer {
   groups?: {
@@ -10,6 +10,7 @@ interface ClusterAnswer {
     problem?: string;
     area?: string;
     evidenceIds?: string[];
+    isProblem?: boolean;
   }[];
 }
 
@@ -19,14 +20,14 @@ const BATCH = 40;
 export async function clusterEvidence(): Promise<number> {
   const fresh = await unassignedEvidence(BATCH);
   if (fresh.length === 0) return 0;
-  const open = (await listSignals()).filter((s) => s.status !== "dismissed").slice(0, 40);
+  const open = (await listSignals()).filter((s) => s.status !== "resolved").slice(0, 40);
 
   const text = await askForJson(
     [
       "You group customer evidence about a software product into distinct user problems.",
       "Join a piece of evidence to an existing problem only when it is clearly the same underlying problem.",
-      "Otherwise start a new problem. Praise or chatter with no problem still goes in its own group titled 'Positive feedback' or similar.",
-      "Return JSON: {\"groups\":[{\"signalId\": existing id or null, \"title\": short problem title, \"problem\": one sentence on what users struggle with, \"area\": the page or feature, \"evidenceIds\": [ids]}]}.",
+      "Otherwise start a new problem. Praise or chatter that describes no problem goes in its own group with isProblem false.",
+      "Return JSON: {\"groups\":[{\"signalId\": existing id or null, \"title\": short problem title, \"problem\": one sentence on what users struggle with, \"area\": the page or feature, \"isProblem\": true or false, \"evidenceIds\": [ids]}]}.",
       "Every evidence id must appear in exactly one group. Titles describe the user's problem, not a solution.",
     ].join(" "),
     [
@@ -58,7 +59,9 @@ export async function clusterEvidence(): Promise<number> {
         area: group.area?.trim() || "",
       });
       known.add(signalId);
-      created++;
+      // Praise and chatter are kept as evidence but never treated as something to fix.
+      if (group.isProblem === false) await setSignalStatus(signalId, "dismissed");
+      else created++;
     }
     await assignEvidence(signalId, ids);
     ids.forEach((id) => freshIds.delete(id));

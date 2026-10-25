@@ -1,3 +1,5 @@
+import type { MetricSpec } from "@/lib/autopilot/assign";
+
 export type EvidenceSource = "slack" | "ticket" | "analytics" | "interview";
 
 export interface Evidence {
@@ -60,15 +62,19 @@ export interface Experiment {
   title: string;
   hypothesis: string;
   metric: string;
+  metricSpec: MetricSpec | null;
   guardrail: string;
   control: string;
   treatment: string;
   flag: string;
   status: ExperimentStatus;
+  branch: string | null;
   prUrl: string | null;
   prNumber: number | null;
   note: string | null;
   readout: Readout | null;
+  /** The file the change edits. In dry-run mode the change is stored, not pushed. */
+  draftPath: string | null;
   createdAt: string;
   startedAt: string | null;
   endedAt: string | null;
@@ -90,6 +96,7 @@ export interface AutopilotState {
   activity: Activity[];
   lastRunAt: string | null;
   synthetic: boolean;
+  dryRun: boolean;
   repo: string;
   summary: {
     evidenceThisWeek: number;

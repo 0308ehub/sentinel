@@ -1,7 +1,14 @@
 import "server-only";
 
 import { autopilotConfigured } from "@/lib/autopilot/db";
+import { autopilotDryRun, autopilotRepo } from "@/lib/autopilot/repo";
+import { buildNext, followPulls } from "@/lib/autopilot/build";
 import { clusterEvidence } from "@/lib/autopilot/cluster";
+import { designNext } from "@/lib/autopilot/design";
+import { analyticsFindings } from "@/lib/autopilot/findings";
+import { startExperiment } from "@/lib/autopilot/lifecycle";
+import { measureRunning } from "@/lib/autopilot/measure";
+import { simulateTraffic } from "@/lib/autopilot/simulate";
 import {
   evidenceCounts,
   lastRunAt,
@@ -14,10 +21,6 @@ import {
 } from "@/lib/autopilot/store";
 import { syntheticEnabled, syntheticEvidence } from "@/lib/autopilot/synthetic";
 import type { AutopilotState } from "@/lib/autopilot/types";
-
-export function autopilotRepo(): string {
-  return process.env.AUTOPILOT_REPO?.trim() || "0308ehub/sentinel";
-}
 
 export interface TickResult {
   ran: boolean;
@@ -42,16 +45,30 @@ export async function runTick(): Promise<TickResult> {
   const outcome = await withTickLock(async () => {
     result.ran = true;
 
+    const synthetic = syntheticEnabled();
+
+    // Listen: new customer evidence and usage.
     await step("listen", result, async () => {
-      if (!syntheticEnabled()) return null;
+      if (!synthetic) return null;
       const added = await addEvidence(syntheticEvidence());
       return added ? `Collected ${added} pieces of synthetic evidence.` : null;
     });
+    await step("traffic", result, async () => (synthetic ? simulateTraffic() : null));
+    await step("analytics", result, analyticsFindings);
 
+    // Notice: group evidence into problems.
     await step("notice", result, async () => {
       const sorted = await clusterEvidence();
       return sorted ? `Sorted ${sorted} pieces of evidence into problems.` : null;
     });
+
+    // After the gate: follow PRs, measure live experiments, and act on results.
+    await step("follow", result, () => followPulls(startExperiment));
+    await step("measure", result, measureRunning);
+
+    // Before the gate: design the next experiment and build its PR.
+    await step("design", result, designNext);
+    await step("build", result, buildNext);
 
     await log("tick", result.errors.length ? `Ran with ${result.errors.length} error(s).` : "Ran.");
     return result;
@@ -67,6 +84,7 @@ export async function autopilotState(): Promise<AutopilotState> {
     activity: [],
     lastRunAt: null,
     synthetic: syntheticEnabled(),
+    dryRun: autopilotDryRun(),
     repo: autopilotRepo(),
     summary: { evidenceThisWeek: 0, realThisWeek: 0, readySignals: 0, running: 0, needsYou: 0 },
   };

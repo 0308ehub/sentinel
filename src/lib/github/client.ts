@@ -122,7 +122,7 @@ export async function repoDefaultBranch(fullName: string): Promise<string> {
   return repo.default_branch || "main";
 }
 
-export async function listUiFiles(fullName: string, branch: string): Promise<string[]> {
+export async function listUiFiles(fullName: string, branch: string, limit = 24): Promise<string[]> {
   const parsed = repoName(fullName);
   if (!parsed) throw new GitHubApiError("bad_repo", "Use a repository like owner/name.", 400);
   const tree = await github<TreePayload>(
@@ -132,7 +132,7 @@ export async function listUiFiles(fullName: string, branch: string): Promise<str
     .filter((item) => item.type === "blob" && item.path && isUiPath(item.path))
     .map((item) => item.path as string);
   paths.sort((a, b) => rank(a) - rank(b) || a.length - b.length);
-  return paths.slice(0, 24);
+  return paths.slice(0, limit);
 }
 
 export async function readFile(fullName: string, path: string, branch: string): Promise<GitHubFile | null> {
@@ -189,6 +189,61 @@ export async function openPullRequest(input: {
   });
   if (!pull.number || !pull.html_url) throw new GitHubApiError("github_error", "GitHub did not open the pull request.", 502);
   return { number: pull.number, url: pull.html_url, branch: input.branch };
+}
+
+export interface GitHubPullState {
+  state: "open" | "closed";
+  merged: boolean;
+  headSha: string;
+}
+
+export async function getPull(fullName: string, number: number): Promise<GitHubPullState> {
+  const parsed = repoName(fullName);
+  if (!parsed) throw new GitHubApiError("bad_repo", "Use a repository like owner/name.", 400);
+  const pull = await github<{ state?: string; merged?: boolean; head?: { sha?: string } }>(
+    `/repos/${parsed.owner}/${parsed.repo}/pulls/${number}`
+  );
+  return { state: pull.state === "closed" ? "closed" : "open", merged: Boolean(pull.merged), headSha: pull.head?.sha ?? "" };
+}
+
+export async function mergePull(fullName: string, number: number, title: string): Promise<void> {
+  const parsed = repoName(fullName);
+  if (!parsed) throw new GitHubApiError("bad_repo", "Use a repository like owner/name.", 400);
+  await github(`/repos/${parsed.owner}/${parsed.repo}/pulls/${number}/merge`, {
+    method: "PUT",
+    body: JSON.stringify({ merge_method: "squash", commit_title: title.slice(0, 120) }),
+  });
+}
+
+export async function closePull(fullName: string, number: number): Promise<void> {
+  const parsed = repoName(fullName);
+  if (!parsed) throw new GitHubApiError("bad_repo", "Use a repository like owner/name.", 400);
+  await github(`/repos/${parsed.owner}/${parsed.repo}/pulls/${number}`, {
+    method: "PATCH",
+    body: JSON.stringify({ state: "closed" }),
+  });
+}
+
+/** The combined result of the checks GitHub knows about for a commit (the Vercel preview build among them). */
+export async function commitChecks(fullName: string, sha: string): Promise<"pending" | "success" | "failure" | "none"> {
+  const parsed = repoName(fullName);
+  if (!parsed || !sha) return "none";
+  const status = await github<{ state?: string; total_count?: number }>(
+    `/repos/${parsed.owner}/${parsed.repo}/commits/${sha}/status`
+  );
+  const runs = await github<{ check_runs?: { status?: string; conclusion?: string | null }[] }>(
+    `/repos/${parsed.owner}/${parsed.repo}/commits/${sha}/check-runs`
+  );
+  const results: string[] = [];
+  if (status.total_count) results.push(status.state ?? "pending");
+  for (const run of runs.check_runs ?? []) {
+    if (run.status !== "completed") results.push("pending");
+    else results.push(run.conclusion === "success" || run.conclusion === "neutral" || run.conclusion === "skipped" ? "success" : "failure");
+  }
+  if (results.length === 0) return "none";
+  if (results.includes("failure") || results.includes("error")) return "failure";
+  if (results.includes("pending")) return "pending";
+  return "success";
 }
 
 export function githubErrorResponse(error: unknown): Response {
