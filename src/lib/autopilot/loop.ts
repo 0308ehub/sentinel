@@ -8,7 +8,7 @@ import { buildCleanup, followCleanups } from "@/lib/autopilot/cleanup";
 import { clusterEvidence } from "@/lib/autopilot/cluster";
 import { designNext } from "@/lib/autopilot/design";
 import { analyticsFindings } from "@/lib/autopilot/findings";
-import { startExperiment } from "@/lib/autopilot/lifecycle";
+import { startExperiment, startQueued } from "@/lib/autopilot/lifecycle";
 import { measureRunning } from "@/lib/autopilot/measure";
 import { simulateTraffic } from "@/lib/autopilot/simulate";
 import {
@@ -67,6 +67,7 @@ export async function runTick(): Promise<TickResult> {
     // After the gate: follow PRs, measure live experiments, and act on results.
     await step("follow", result, () => followPulls(startExperiment));
     await step("measure", result, measureRunning);
+    await step("queue", result, startQueued);
 
     // Decided experiments: remove the switch and the losing version from the code.
     await step("follow-cleanup", result, followCleanups);

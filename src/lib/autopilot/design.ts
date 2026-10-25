@@ -8,7 +8,7 @@ import type { Experiment, Signal } from "@/lib/autopilot/types";
 /** After this many attempts on one problem, Autopilot stops and leaves it to a person. */
 export const MAX_VERSIONS = 3;
 
-const ACTIVE = new Set(["building", "awaiting_approval", "running", "awaiting_rollout"]);
+const ACTIVE = new Set(["building", "awaiting_approval", "queued", "running", "awaiting_rollout"]);
 
 function productContext(): string {
   return (
@@ -37,6 +37,7 @@ interface DesignAnswer {
   control?: string;
   treatment?: string;
   metric?: unknown;
+  page?: string;
   guardrail?: string;
 }
 
@@ -76,7 +77,8 @@ export async function designNext(): Promise<string | null> {
       "Use one of:",
       '{"kind":"click","text":"<visible label of the button or link that completes the task in both versions, e.g. the submit button of a dialog>"}',
       'or {"kind":"visit","path":"/some/path"} (visitor reaches that page in either version).',
-      "Return JSON: {title, hypothesis, control, treatment, metric, guardrail}. Keep each field to one or two sentences.",
+      "page is the route the change appears on, like /features or /settings/connectors.",
+      "Return JSON: {title, hypothesis, control, treatment, metric, page, guardrail}. Keep each field to one or two sentences.",
       "If earlier attempts failed or were rejected, try a meaningfully different idea.",
     ].join(" "),
     [
@@ -104,6 +106,7 @@ export async function designNext(): Promise<string | null> {
     hypothesis: answer.hypothesis ?? "",
     metric: describeMetric(spec),
     metricSpec: spec,
+    page: answer.page?.trim().startsWith("/") ? answer.page.trim() : candidate.area,
     guardrail: answer.guardrail ?? "",
     control: answer.control ?? "",
     treatment: answer.treatment,

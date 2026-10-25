@@ -1,7 +1,8 @@
 import "server-only";
 
 import { armFor } from "@/lib/autopilot/assign";
-import { addEvents, listExperiments, type NewEvent } from "@/lib/autopilot/store";
+import { addEvents, listExperiments, listFlags, type NewEvent } from "@/lib/autopilot/store";
+import type { Arm } from "@/lib/autopilot/assign";
 
 // Synthetic visitors so the measure → decide → iterate half of the loop can run before real traffic
 // exists. Every event is stored with synthetic = true and readouts report the synthetic share.
@@ -40,17 +41,29 @@ export async function simulateTraffic(): Promise<string | null> {
     }
   }
 
+  // Each simulated visitor is assigned to every running experiment exactly as a real browser would
+  // be (same hashing, same layers), so overlapping and mutually exclusive experiments behave as in
+  // production.
+  const flags = (await listFlags()).filter((f) => f.status === "running");
   for (const experiment of running) {
     const spec = experiment.metricSpec!;
+    const flag = flags.find((f) => f.key === experiment.flag);
+    if (!flag) continue;
     // A hidden "true" effect per experiment: some ideas help, some hurt, some do nothing.
     const baseline = 0.08 + seeded(experiment.flag + "base") * 0.12;
     const trueLift = -0.3 + seeded(experiment.flag + "lift") * 0.9;
-    const flag = { key: experiment.flag, status: "running" as const, treatmentPct: 50 };
-    for (let i = 0; i < VISITORS_PER_EXPERIMENT; i++) {
+    let reached = 0;
+    for (let tries = 0; reached < VISITORS_PER_EXPERIMENT && tries < VISITORS_PER_EXPERIMENT * 10; tries++) {
       const visitor = visitorId();
       const arm = armFor(visitor, flag);
-      const arms = { [experiment.flag]: arm };
-      const page = spec.kind === "visit" ? "/dashboard" : "/features";
+      if (!arm) continue;
+      reached++;
+      const arms: Record<string, Arm> = {};
+      for (const other of flags) {
+        const otherArm = armFor(visitor, other);
+        if (otherArm) arms[other.key] = otherArm;
+      }
+      const page = experiment.page || (spec.kind === "visit" ? "/dashboard" : "/features");
       events.push({ visitor, name: "view", page, element: "", arms, synthetic: true });
       const rate = arm === "treatment" ? baseline * (1 + trueLift) : baseline;
       if (Math.random() < rate) {

@@ -83,6 +83,8 @@ alter table kismet.experiments add column if not exists metric_spec jsonb;
 alter table kismet.experiments add column if not exists draft_path text;
 alter table kismet.experiments add column if not exists draft text;
 alter table kismet.experiments add column if not exists original text;
+alter table kismet.experiments add column if not exists page text;
+alter table kismet.experiments add column if not exists overlap text;
 alter table kismet.experiments add column if not exists cleanup_status text;
 alter table kismet.experiments add column if not exists cleanup_pr_url text;
 alter table kismet.experiments add column if not exists cleanup_pr_number integer;
@@ -95,6 +97,9 @@ create table if not exists kismet.flags (
   treatment_pct integer not null default 50,
   updated_at timestamptz not null default now()
 );
+alter table kismet.flags add column if not exists layer text;
+alter table kismet.flags add column if not exists slot_start integer not null default 0;
+alter table kismet.flags add column if not exists slot_end integer not null default 100;
 
 create table if not exists kismet.events (
   id bigserial primary key,

@@ -51,7 +51,10 @@ export function ExperimentProvider({ children }: { children: React.ReactNode }) 
   const arms = useMemo(() => {
     const result: Record<string, Arm> = {};
     if (!visitor) return result;
-    for (const flag of flags.data ?? []) result[flag.key] = armFor(visitor, flag);
+    for (const flag of flags.data ?? []) {
+      const arm = armFor(visitor, flag);
+      if (arm) result[flag.key] = arm;
+    }
     return result;
   }, [flags.data, visitor]);
 

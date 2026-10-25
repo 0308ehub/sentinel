@@ -4,6 +4,7 @@ import { askForJson, readJson } from "@/lib/ai/respond";
 import { autopilotDryRun, autopilotRepo } from "@/lib/autopilot/repo";
 import { listExperiments, listSignals, log, setSignalStatus, updateExperiment } from "@/lib/autopilot/store";
 import type { Experiment, Signal } from "@/lib/autopilot/types";
+import { lockedFiles } from "@/lib/autopilot/overlap";
 import { baseBranch, isLocalSource, listSourceFiles, readSourceFile } from "@/lib/autopilot/source";
 import { closePull, commitChecks, getPull, GitHubApiError, openPullRequest, type GitHubFile } from "@/lib/github/client";
 
@@ -15,6 +16,7 @@ function codeRules(flag: string): string {
     `const variant = useVariant("${flag}"); render the change only when variant === "treatment".`,
     "Control must render exactly what it renders today.",
     "The file must start with \"use client\" and the hook must be called at the top level of a component, never conditionally.",
+    "The change must appear only where the experiment says, never on other pages: no global or fixed-position elements.",
     "Use only components and imports that already exist in the file or in the files shown. Match the existing style.",
     `Add data-track="${flag}" to the new element.`,
     "Do not invent data, results or claims.",
@@ -24,9 +26,10 @@ function codeRules(flag: string): string {
 async function pickFiles(base: string, experiment: Experiment, signal: Signal | undefined): Promise<GitHubFile[]> {
   const paths = await listSourceFiles(base, 600);
   const text = await askForJson(
-    'Choose the files to read to make this UI change. Return JSON {"paths":[up to 3 paths from the list, most likely first]}.',
+    'Choose the files to read to make this UI change. The first path must be the file the change belongs in: the page or component that renders that part of the screen. Return JSON {"paths":[up to 3 paths from the list, that file first]}.',
     [
       `CHANGE: ${experiment.treatment}`,
+      `PAGE: ${experiment.page}`,
       `AREA: ${signal?.area ?? ""}`,
       `PROBLEM: ${signal?.title ?? ""}`,
       "FILES",
@@ -45,8 +48,17 @@ async function pickFiles(base: string, experiment: Experiment, signal: Signal | 
   return files;
 }
 
+/** Raised when the only files this change could edit are in use by another experiment. */
+class FileBusy extends Error {}
+
 async function writeChange(experiment: Experiment, files: GitHubFile[]): Promise<{ file: GitHubFile; content: string; summary: string }> {
-  const editable = files.filter((f) => /^\s*["']use client["']/.test(f.content));
+  const locked = await lockedFiles(experiment.id);
+  // Never two experiments in one file: the code would collide, and so would their cleanups. If the
+  // file this change belongs in is taken, wait for it rather than forcing the change somewhere else.
+  const primary = files[0];
+  const holder = primary ? locked.get(primary.path) : undefined;
+  if (holder) throw new FileBusy(`Waiting for “${holder.title}” to finish: it changes ${primary.path}, which this needs too.`);
+  const editable = files.filter((f) => /^\s*["']use client["']/.test(f.content) && !locked.has(f.path));
   if (editable.length === 0) throw new Error("None of the relevant files is a client component Autopilot can edit.");
   const text = await askForJson(
     [
@@ -56,6 +68,7 @@ async function writeChange(experiment: Experiment, files: GitHubFile[]): Promise
     ].join(" "),
     [
       `EXPERIMENT: ${experiment.title}`,
+      `PAGE: ${experiment.page}`,
       `HYPOTHESIS: ${experiment.hypothesis}`,
       `CONTROL: ${experiment.control}`,
       `TREATMENT: ${experiment.treatment}`,
@@ -120,6 +133,7 @@ export async function buildNext(): Promise<string | null> {
     if (autopilotDryRun() || isLocalSource()) {
       await updateExperiment(experiment.id, {
         status: "awaiting_approval",
+        overlap: null,
         draftPath: change.file.path,
         draft: change.content,
         original: change.file.content,
@@ -152,6 +166,10 @@ export async function buildNext(): Promise<string | null> {
     await log("build", `Opened PR #${pull.number} for “${experiment.title}”.`, experiment.id);
     return `Opened a pull request for “${experiment.title}”.`;
   } catch (error) {
+    if (error instanceof FileBusy) {
+      await updateExperiment(experiment.id, { overlap: error.message, note: null });
+      return null;
+    }
     const hint = error instanceof GitHubApiError ? error.hint ?? error.message : error instanceof Error ? error.message : String(error);
     await updateExperiment(experiment.id, { note: `Could not build yet: ${hint}` });
     throw new Error(hint);
@@ -159,7 +177,7 @@ export async function buildNext(): Promise<string | null> {
 }
 
 /** Follows open pull requests: preview build results, and merges or closes done on GitHub directly. */
-export async function followPulls(start: (experiment: Experiment) => Promise<void>): Promise<string | null> {
+export async function followPulls(start: (experiment: Experiment) => Promise<unknown>): Promise<string | null> {
   if (autopilotDryRun() || isLocalSource()) return null;
   const repo = autopilotRepo();
   const waiting = (await listExperiments()).filter((e) => e.status === "awaiting_approval" && e.prNumber);

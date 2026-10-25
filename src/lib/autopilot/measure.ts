@@ -1,6 +1,7 @@
 import "server-only";
 
 import { stop } from "@/lib/autopilot/lifecycle";
+import { findInteraction } from "@/lib/autopilot/overlap";
 import { countArms, listExperiments, log, updateExperiment } from "@/lib/autopilot/store";
 import type { Experiment, Readout } from "@/lib/autopilot/types";
 
@@ -53,6 +54,7 @@ async function readout(experiment: Experiment): Promise<Readout | null> {
     lift,
     pValue,
     verdict,
+    interaction: null,
     syntheticShare: visitors ? (control.syntheticVisitors + treatment.syntheticVisitors) / visitors : 0,
     at: new Date().toISOString(),
   };
@@ -65,8 +67,34 @@ export async function measureRunning(): Promise<string | null> {
   const running = (await listExperiments()).filter((e) => e.status === "running");
   const results: string[] = [];
   for (const experiment of running) {
+    // The experiment it interacted with has finished: start counting again, so the result reflects only
+    // what people will actually see from now on.
+    if (experiment.readout?.interaction && !(await findInteraction(experiment))) {
+      await updateExperiment(experiment.id, {
+        startedAt: new Date().toISOString(),
+        readout: null,
+        note: `Measuring again from now: “${experiment.readout.interaction}” no longer runs, so earlier numbers were mixed up with it.`,
+      });
+      await log("measure", `Restarted measuring “${experiment.title}” on clean traffic.`, experiment.id);
+      continue;
+    }
     const result = await readout(experiment);
     if (!result) continue;
+    // A result that depends on another running experiment can't be trusted yet: hold it until the
+    // other one finishes, then decide on clean data.
+    if (result.verdict !== "collecting") {
+      const other = await findInteraction(experiment);
+      if (other) {
+        result.interaction = other;
+        result.verdict = "collecting";
+        await updateExperiment(experiment.id, {
+          readout: result,
+          note: `Held: its effect changes depending on which version of “${other}” people saw. Once that one finishes, it measures again on clean traffic.`,
+        });
+        await log("measure", `Held “${experiment.title}”: it interacts with “${other}”.`, experiment.id);
+        continue;
+      }
+    }
     await updateExperiment(experiment.id, { readout: result });
     const fake = result.syntheticShare > 0.5 ? " (mostly synthetic traffic)" : "";
 

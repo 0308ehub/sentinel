@@ -44,6 +44,8 @@ function toExperiment(row: Row): Experiment {
     hypothesis: String(row.hypothesis ?? ""),
     metric: String(row.metric ?? ""),
     metricSpec: parseMetricSpec(row.metric_spec),
+    page: String(row.page ?? ""),
+    overlap: (row.overlap as string | null) ?? null,
     guardrail: String(row.guardrail ?? ""),
     control: String(row.control ?? ""),
     treatment: String(row.treatment ?? ""),
@@ -179,6 +181,7 @@ export async function createExperiment(input: {
   hypothesis: string;
   metric: string;
   metricSpec: MetricSpec;
+  page: string;
   guardrail: string;
   control: string;
   treatment: string;
@@ -188,10 +191,10 @@ export async function createExperiment(input: {
   const id = newId("exp");
   await sql`
     insert into kismet.experiments
-      (id, signal_id, version, title, hypothesis, metric, metric_spec, guardrail, control, treatment, flag, status)
+      (id, signal_id, version, title, hypothesis, metric, metric_spec, page, guardrail, control, treatment, flag, status)
     values
       (${id}, ${input.signalId}, ${input.version}, ${input.title.slice(0, 200)}, ${input.hypothesis.slice(0, 1000)},
-       ${input.metric.slice(0, 120)}, ${sql.json(input.metricSpec)}, ${input.guardrail.slice(0, 300)}, ${input.control.slice(0, 500)},
+       ${input.metric.slice(0, 120)}, ${sql.json(input.metricSpec)}, ${input.page.slice(0, 200)}, ${input.guardrail.slice(0, 300)}, ${input.control.slice(0, 500)},
        ${input.treatment.slice(0, 500)}, ${input.flag}, 'building')
   `;
   return id;
@@ -214,6 +217,7 @@ export async function updateExperiment(
     cleanupPrNumber: number | null;
     cleanupDraft: string | null;
     cleanupNote: string | null;
+    overlap: string | null;
     startedAt: string | null;
     endedAt: string | null;
   }>
@@ -234,6 +238,7 @@ export async function updateExperiment(
   if (patch.cleanupPrNumber !== undefined) columns.cleanup_pr_number = patch.cleanupPrNumber;
   if (patch.cleanupDraft !== undefined) columns.cleanup_draft = patch.cleanupDraft;
   if (patch.cleanupNote !== undefined) columns.cleanup_note = patch.cleanupNote;
+  if (patch.overlap !== undefined) columns.overlap = patch.overlap;
   if (patch.startedAt !== undefined) columns.started_at = patch.startedAt;
   if (patch.endedAt !== undefined) columns.ended_at = patch.endedAt;
   if (Object.keys(columns).length === 0) return;
@@ -297,18 +302,39 @@ export async function withTickLock<T>(fn: () => Promise<T>): Promise<T | null> {
   });
 }
 
-export async function listFlags(): Promise<FlagState[]> {
-  const sql = await db();
-  const rows = await sql`select * from kismet.flags where status <> 'off'`;
-  return rows.map((row) => ({
+function toFlag(row: Row): FlagState {
+  return {
     key: String(row.key),
     status: row.status as FlagState["status"],
     treatmentPct: Number(row.treatment_pct),
-  }));
+    layer: (row.layer as string | null) ?? null,
+    slotStart: Number(row.slot_start ?? 0),
+    slotEnd: Number(row.slot_end ?? 100),
+  };
 }
 
-export async function setFlag(key: string, status: FlagState["status"], treatmentPct = 50): Promise<void> {
+export async function listFlags(): Promise<FlagState[]> {
   const sql = await db();
+  const rows = await sql`select * from kismet.flags where status <> 'off'`;
+  return rows.map(toFlag);
+}
+
+export async function setFlag(
+  key: string,
+  status: FlagState["status"],
+  treatmentPct = 50,
+  slice?: { layer: string | null; slotStart: number; slotEnd: number }
+): Promise<void> {
+  const sql = await db();
+  if (slice) {
+    await sql`
+      insert into kismet.flags (key, status, treatment_pct, layer, slot_start, slot_end)
+      values (${key}, ${status}, ${treatmentPct}, ${slice.layer}, ${slice.slotStart}, ${slice.slotEnd})
+      on conflict (key) do update set status = excluded.status, treatment_pct = excluded.treatment_pct,
+        layer = excluded.layer, slot_start = excluded.slot_start, slot_end = excluded.slot_end, updated_at = now()
+    `;
+    return;
+  }
   await sql`
     insert into kismet.flags (key, status, treatment_pct) values (${key}, ${status}, ${treatmentPct})
     on conflict (key) do update set status = excluded.status, treatment_pct = excluded.treatment_pct, updated_at = now()
@@ -381,6 +407,43 @@ export async function countArms(flag: string, since: string, spec: MetricSpec): 
       syntheticVisitors: Number(row?.synthetic_visitors ?? 0),
     };
   });
+}
+
+export interface CrossCount {
+  arm: Arm;
+  otherArm: Arm;
+  visitors: number;
+  conversions: number;
+}
+
+/** One experiment's visitors and conversions, split by which version of another experiment they saw. */
+export async function countArmsAcross(flag: string, other: string, since: string, spec: MetricSpec): Promise<CrossCount[]> {
+  const sql = await db();
+  const converts =
+    spec.kind === "click"
+      ? sql`e.name = 'click' and e.element ilike ${"%" + spec.text + "%"}`
+      : sql`e.name = 'view' and e.page like ${spec.path.replace(/[%_]/g, "") + "%"}`;
+  const rows = await sql`
+    with exposed as (
+      select visitor, min(arms ->> ${flag}) as arm, min(arms ->> ${other}) as other_arm
+      from kismet.events
+      where at >= ${since} and arms ? ${flag} and arms ? ${other}
+      group by visitor
+    ),
+    converted as (
+      select distinct e.visitor from kismet.events e
+      where e.at >= ${since} and e.arms ? ${flag} and ${converts}
+    )
+    select x.arm, x.other_arm, count(*)::int as visitors, count(c.visitor)::int as conversions
+    from exposed x left join converted c on c.visitor = x.visitor
+    group by x.arm, x.other_arm
+  `;
+  return rows.map((row) => ({
+    arm: row.arm as Arm,
+    otherArm: row.other_arm as Arm,
+    visitors: Number(row.visitors),
+    conversions: Number(row.conversions),
+  }));
 }
 
 export interface ElementStat {

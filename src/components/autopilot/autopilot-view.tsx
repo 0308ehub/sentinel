@@ -106,7 +106,7 @@ export function AutopilotView() {
 
   const needsYou = state.experiments.filter((e) => e.status === "awaiting_approval" || e.status === "awaiting_rollout");
   const finishing = state.experiments.filter((e) => e.cleanup?.status === "awaiting");
-  const live = state.experiments.filter((e) => e.status === "running" || e.status === "building");
+  const live = state.experiments.filter((e) => e.status === "running" || e.status === "queued" || e.status === "building");
   const history = state.experiments.filter((e) => DONE.has(e.status));
   const problems = state.signals.filter((s) => s.status !== "dismissed");
 
@@ -344,6 +344,7 @@ function EvidenceRow({ item }: { item: Evidence }) {
 const STATUS_TEXT: Record<Experiment["status"], string> = {
   building: "Writing the change",
   awaiting_approval: "Ready to ship",
+  queued: "Queued",
   running: "Running",
   awaiting_rollout: "Won — ready to roll out",
   rolled_out: "Rolled out",
@@ -403,6 +404,9 @@ function ExperimentCard({
         </div>
       )}
       {experiment.note && <p className="text-xs text-muted-foreground">{experiment.note}</p>}
+      {experiment.overlap && !DONE.has(experiment.status) && (
+        <p className="rounded bg-muted/60 p-2 text-xs">{experiment.overlap}</p>
+      )}
       {experiment.cleanup && experiment.cleanup.status !== "awaiting" && (
         <p className="text-xs text-muted-foreground">
           {experiment.cleanup.status === "merged"

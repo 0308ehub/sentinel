@@ -4,7 +4,16 @@ export interface FlagState {
   key: string;
   status: "off" | "running" | "rolled_out";
   treatmentPct: number;
+  /**
+   * Experiments that touch the same page or metric share a layer: the layer's visitors are cut into
+   * 100 slots and each experiment owns its own range, so nobody is in two of them at once.
+   */
+  layer: string | null;
+  slotStart: number;
+  slotEnd: number;
 }
+
+export const LAYER_SLOTS = 100;
 
 /** How a metric is counted. Both forms exist in control and treatment, so the arms are comparable. */
 export type MetricSpec = { kind: "click"; text: string } | { kind: "visit"; path: string };
@@ -19,9 +28,18 @@ function hash(input: string): number {
   return h >>> 0;
 }
 
-export function armFor(visitor: string, flag: FlagState): Arm {
+/**
+ * The arm a visitor is in, or null when the experiment doesn't include them (they're in another
+ * experiment's slice of the same layer). Each experiment hashes with its own key, so experiments in
+ * different layers are randomized independently of each other.
+ */
+export function armFor(visitor: string, flag: FlagState): Arm | null {
   if (flag.status === "rolled_out") return "treatment";
-  if (flag.status !== "running") return "control";
+  if (flag.status !== "running") return null;
+  if (flag.layer) {
+    const slot = hash(`layer:${flag.layer}:${visitor}`) % LAYER_SLOTS;
+    if (slot < flag.slotStart || slot >= flag.slotEnd) return null;
+  }
   return hash(`${flag.key}:${visitor}`) % 100 < flag.treatmentPct ? "treatment" : "control";
 }
 

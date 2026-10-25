@@ -32,6 +32,7 @@ export interface Signal {
 export type ExperimentStatus =
   | "building"
   | "awaiting_approval"
+  | "queued"
   | "running"
   | "awaiting_rollout"
   | "rolled_out"
@@ -51,6 +52,8 @@ export interface Readout {
   lift: number | null;
   pValue: number | null;
   verdict: "collecting" | "won" | "lost" | "flat";
+  /** Set when this result depends on which version of another running experiment visitors saw. */
+  interaction: string | null;
   syntheticShare: number;
   at: string;
 }
@@ -77,6 +80,10 @@ export interface Experiment {
   hypothesis: string;
   metric: string;
   metricSpec: MetricSpec | null;
+  /** The page the change appears on, used to keep experiments on the same page apart. */
+  page: string;
+  /** How this experiment shares traffic with others, or what it waits for, in plain words. */
+  overlap: string | null;
   guardrail: string;
   control: string;
   treatment: string;

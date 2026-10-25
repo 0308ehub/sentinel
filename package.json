@@ -12,7 +12,8 @@
     "lint": "eslint",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
-    "db:seed": "prisma db seed"
+    "db:seed": "prisma db seed",
+    "test": "node --experimental-strip-types --no-warnings --test tests/*.test.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

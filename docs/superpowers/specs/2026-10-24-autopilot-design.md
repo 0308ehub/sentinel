@@ -58,3 +58,16 @@ something reaches real users.
 3. Tracker, flags, measurement (with a synthetic traffic simulator), readout,
    iterate.
 4. Cron, weekly summary, real Slack/Jira ingestion.
+
+## Running experiments at the same time
+Kismet decides by itself how experiments may coexist (`src/lib/autopilot/overlap.ts`):
+- **Same file → one at a time.** A change whose file another active experiment (or its pending
+  cleanup) still uses waits, rather than being forced into a different file.
+- **Same page or same metric → mutually exclusive.** They share a layer; each owns a separate slice
+  of the layer's visitors, so nobody is in both. A newcomer takes the largest free slice (at least
+  30%) or queues and starts automatically when one frees up. An experiment that starts while a
+  conflicting one is already on its way takes half, so the other doesn't have to queue.
+- **Everything else → overlapping, independently randomized** (each experiment hashes with its own
+  key), plus an interaction check: if one experiment's effect differs significantly (|z| > 2.58)
+  depending on the other's version, its decision is held; when the other finishes it measures again
+  from scratch on clean traffic.
