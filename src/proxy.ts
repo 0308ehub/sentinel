@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   // Clerk auth integrates here when NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is set.
   // For local development, the app runs without authentication.
   const clerkKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;

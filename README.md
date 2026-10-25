@@ -104,5 +104,4 @@ npx prisma db seed
 | Endpoint | Description |
 |----------|-------------|
 | `GET /api/graph` | Full graph snapshot |
-| `GET /api/search?q=` | Search graph nodes |
 | `GET /api/dashboard` | Dashboard summary data |
