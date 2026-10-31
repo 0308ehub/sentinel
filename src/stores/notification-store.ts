@@ -7,6 +7,7 @@ import type { Notification } from "@/types/graph";
 
 interface NotificationState {
   items: Notification[];
+  addNotification: (notification: Notification) => void;
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
   unreadCount: () => number;
@@ -16,6 +17,11 @@ export const useNotificationStore = create<NotificationState>()(
   persist(
     (set, get) => ({
       items: seedNotifications.map((n) => ({ ...n })),
+
+      addNotification: (notification) =>
+        set((state) => ({
+          items: [notification, ...state.items.filter((item) => item.id !== notification.id)].slice(0, 100),
+        })),
 
       markAsRead: (id) =>
         set((s) => ({
@@ -39,10 +45,12 @@ export const useNotificationStore = create<NotificationState>()(
         const p = persisted as { items?: Notification[] } | undefined;
         const saved = p?.items ?? [];
         const savedById = new Map(saved.map((n) => [n.id, n]));
-        const items = seedNotifications.map((seed) => {
+        const seeded = seedNotifications.map((seed) => {
           const prev = savedById.get(seed.id);
           return prev ? { ...seed, read: prev.read } : { ...seed };
         });
+        const custom = saved.filter((item) => !seedNotifications.some((seed) => seed.id === item.id));
+        const items = [...custom, ...seeded];
         return { ...current, items };
       },
     }

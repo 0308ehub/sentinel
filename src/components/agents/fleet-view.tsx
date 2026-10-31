@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { ArrowLeft, Pause, Play, Plus, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { LoopAgentRoom, LoopAgents, parseLoopAgentId } from "./loop-agents";
 import { getGraphNode, useGraphStore } from "@/lib/graph/graph-store";
 import {
   assignKismetAgents,
@@ -33,6 +34,7 @@ export function FleetView() {
   const router = useRouter();
   const openId = params.get("open");
   const open = agents.find((agent) => agent.id === openId) ?? null;
+  const openLoopId = parseLoopAgentId(openId);
   const [name, setName] = useState("");
   const [task, setTask] = useState("");
   const [model, setModel] = useState<AgentModel>("auto");
@@ -60,7 +62,7 @@ export function FleetView() {
       <div
         className={cn(
           "h-full overflow-auto transition duration-300 ease-out",
-          open && "pointer-events-none scale-[1.04] opacity-0",
+          (open || openLoopId) && "pointer-events-none scale-[1.04] opacity-0",
         )}
       >
         <div className="mx-auto flex max-w-6xl flex-col gap-5 p-6">
@@ -73,6 +75,10 @@ export function FleetView() {
               Have Kismet assign
             </Button>
           </div>
+
+          <LoopAgents onOpen={(id) => openAgent(`loop-${id}`)} />
+
+          <h2 className="text-[11px] font-semibold uppercase tracking-[.08em] text-muted-foreground">Your agents</h2>
 
           <form onSubmit={assign} className="flex flex-wrap gap-2 rounded-lg border border-border bg-card p-3">
             <input
@@ -137,6 +143,7 @@ export function FleetView() {
       </div>
 
       {open && <AgentRoom agent={open} onClose={closeAgent} />}
+      {openLoopId && <LoopAgentRoom id={openLoopId} onClose={closeAgent} />}
     </div>
   );
 }
