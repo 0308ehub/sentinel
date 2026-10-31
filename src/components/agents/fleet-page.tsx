@@ -5,10 +5,10 @@ import { Suspense } from "react";
 
 const FleetView = dynamic(() => import("./fleet-view").then((mod) => mod.FleetView), { ssr: false });
 
-export function FleetPage() {
+export function FleetPage({ showLoop }: { showLoop: boolean }) {
   return (
     <Suspense fallback={null}>
-      <FleetView />
+      <FleetView showLoop={showLoop} />
     </Suspense>
   );
 }

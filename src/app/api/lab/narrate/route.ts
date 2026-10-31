@@ -1,8 +1,10 @@
+import { labDemoEnabled } from "@/lib/lab/demo-mode";
 import { askForJson, readJson } from "@/lib/ai/respond";
 import type { Design, Readout } from "@/lib/lab/types";
 export const maxDuration = 15;
 const MAX_BODY = 60_000;
 export async function POST(request: Request) {
+  if (!labDemoEnabled()) return Response.json({ error: "Not found." }, { status: 404 });
   let body: { readout?: Readout; design?: Design };
   try {
     const raw = await request.text();

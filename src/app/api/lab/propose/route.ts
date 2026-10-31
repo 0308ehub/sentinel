@@ -1,3 +1,4 @@
+import { labDemoEnabled } from "@/lib/lab/demo-mode";
 import { askForJson, readJson } from "@/lib/ai/respond";
 import { PANTRY } from "@/lib/lab/company";
 import type { Objective, Proposal } from "@/lib/lab/types";
@@ -39,6 +40,7 @@ function fallback(idea: string): Proposal {
   };
 }
 export async function POST(request: Request) {
+  if (!labDemoEnabled()) return Response.json({ error: "Not found." }, { status: 404 });
   let idea = "";
   try {
     const body = (await request.json()) as { idea?: unknown };

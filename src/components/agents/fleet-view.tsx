@@ -27,14 +27,14 @@ const STATUS_LABEL: Record<AgentStatus, string> = {
   paused: "Paused",
 };
 
-export function FleetView() {
+export function FleetView({ showLoop }: { showLoop: boolean }) {
   const agents = useAgents();
   const nodes = useGraphStore((state) => state.nodes);
   const params = useSearchParams();
   const router = useRouter();
   const openId = params.get("open");
   const open = agents.find((agent) => agent.id === openId) ?? null;
-  const openLoopId = parseLoopAgentId(openId);
+  const openLoopId = showLoop ? parseLoopAgentId(openId) : null;
   const [name, setName] = useState("");
   const [task, setTask] = useState("");
   const [model, setModel] = useState<AgentModel>("auto");
@@ -76,9 +76,12 @@ export function FleetView() {
             </Button>
           </div>
 
-          <LoopAgents onOpen={(id) => openAgent(`loop-${id}`)} />
-
-          <h2 className="text-[11px] font-semibold uppercase tracking-[.08em] text-muted-foreground">Your agents</h2>
+          {showLoop && (
+            <>
+              <LoopAgents onOpen={(id) => openAgent(`loop-${id}`)} />
+              <h2 className="text-[11px] font-semibold uppercase tracking-[.08em] text-muted-foreground">Your agents</h2>
+            </>
+          )}
 
           <form onSubmit={assign} className="flex flex-wrap gap-2 rounded-lg border border-border bg-card p-3">
             <input
