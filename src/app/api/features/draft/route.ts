@@ -33,7 +33,8 @@ export async function POST(request: Request) {
         "If the sources include Databricks and the note depends on a number, call query_databricks once, then finish.",
         "Return JSON only, with keys title, description, problem, priority, prd, goal, metric.",
         "priority is one of CRITICAL, HIGH, MEDIUM, LOW.",
-        "description is two or three sentences. prd is a short requirements note. goal is the outcome. metric is how to know it worked.",
+        "description is the introduction: the problem, who it is for, and why it is being done now. Use the sources. Several sentences, plain language.",
+        "prd is the detailed requirements. Write each as 'The product shall ...' and only include a requirement a source supports. goal is the measurable outcome. metric is how success will be known. Leave a field empty rather than inventing a number.",
         sources,
       ]
         .filter(Boolean)

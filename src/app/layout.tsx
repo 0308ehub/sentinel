@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import { Geist, IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import { cookies } from "next/headers";
 import "./globals.css";
 import { Providers } from "@/components/providers";
@@ -15,6 +15,12 @@ const plexMono = IBM_Plex_Mono({
   variable: "--font-plex-mono",
   subsets: ["latin"],
   weight: ["400", "500"],
+});
+
+const marketing = Geist({
+  variable: "--font-marketing",
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
 });
 
 export const metadata: Metadata = {
@@ -33,7 +39,7 @@ export default async function RootLayout({
   const theme = (await cookies()).get(THEME_KEY)?.value;
   return (
     <html lang="en" className={theme === "dark" ? "dark" : undefined} suppressHydrationWarning>
-      <body className={`${plex.variable} ${plexMono.variable} antialiased`}>
+      <body className={`${plex.variable} ${plexMono.variable} ${marketing.variable} antialiased`}>
         <Providers>{children}</Providers>
       </body>
     </html>

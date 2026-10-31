@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { saveFeatureDraft, type FeatureDraft } from "@/lib/features/save-draft";
+import { graphStore } from "@/lib/graph/graph-store";
+import { CURRENT_USER } from "@/lib/settings";
 import { useGraphStore } from "@/lib/graph/graph-store";
 import { useUIStore } from "@/stores/ui-store";
 import type { GraphNode, NodeStatus, Priority } from "@/types/graph";
@@ -143,7 +145,28 @@ export default function FeaturesPage() {
             rows={5}
           />
           {error && <p className="text-xs text-muted-foreground">{error}</p>}
-          <div className="flex justify-end">
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              className="text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => {
+                const result = graphStore.getState().proposeFeature({
+                  title: "Untitled PRD",
+                  description: "",
+                  prdText: "",
+                  ownerId: CURRENT_USER.id,
+                  priority: "MEDIUM",
+                  primaryRepo: "",
+                  primaryRepoUrl: "",
+                  additionalRepos: [],
+                  scaffold: { customerProblem: false, prd: true, goal: false, metric: false },
+                  productId,
+                });
+                router.push(`/features/${result.featureId}`);
+              }}
+            >
+              Start a blank PRD
+            </button>
             <Button size="sm" onClick={create} disabled={creating || !prompt.trim()}>
               {creating ? "Writing…" : "Create"}
             </Button>

@@ -7,6 +7,7 @@ import type {
   GraphEdge,
   GraphNode,
   NodeStatus,
+  NodeType,
   Priority,
   TimelineEvent,
 } from "@/types/graph";
@@ -24,6 +25,7 @@ import {
   type ProposeFeatureInput,
   type ProposeFeatureResult,
 } from "@/lib/graph/propose-feature";
+import { figmaEmbed, isEvidenceType, livingFromShare, type LivingDoc, type PrdShare } from "@/lib/prd/document";
 
 export interface FileIssueInput {
   title: string;
@@ -84,6 +86,9 @@ interface GraphState {
   fileIssue: (input: FileIssueInput) => string;
   moveWork: (id: string, status: NodeStatus) => void;
   updateWorkDoc: (id: string, patch: { title?: string; body?: string }) => void;
+  saveLivingPrd: (prdId: string, doc: LivingDoc) => void;
+  ensureFeaturePrd: (featureId: string) => string | null;
+  importSharedPrd: (share: PrdShare, productId: string) => string | null;
   saveExperimentPlan: (id: string, plan: ExperimentAllocation) => void;
   noteExperimentReadout: (id: string, readout: { state: string; summary: string }) => void;
   attachSource: (input: { connectorId: string; name: string; filesAs: string; ownerId: string; productId: string }) => void;
@@ -565,6 +570,157 @@ export const graphStore = createStore<GraphState>()(
         }));
       },
 
+      ensureFeaturePrd: (featureId) => {
+        const state = get();
+        const feature = state.nodes.find((node) => node.id === featureId && node.type === "FEATURE");
+        if (!feature) return null;
+        const linked = state.edges
+          .filter((edge) => edge.sourceId === featureId || edge.targetId === featureId)
+          .map((edge) => (edge.sourceId === featureId ? edge.targetId : edge.sourceId));
+        const existing = state.nodes.find((node) => linked.includes(node.id) && node.type === "PRD");
+        if (existing) return existing.id;
+        const id = `prd-${featureId}`;
+        const now = new Date().toISOString();
+        set((current) => ({
+          nodes: [
+            ...current.nodes,
+            {
+              id,
+              type: "PRD" as const,
+              title: `${feature.title} PRD`,
+              description: "",
+              status: "DRAFT" as const,
+              ownerId: feature.ownerId,
+              productId: feature.productId,
+              metadata: { version: "0.1" },
+              tags: ["prd"],
+              createdAt: now,
+              updatedAt: now,
+            },
+          ],
+          edges: [
+            ...current.edges,
+            { id: `edge-${featureId}-${id}`, sourceId: featureId, targetId: id, type: "IMPLEMENTS" as const, createdAt: now },
+          ],
+        }));
+        return id;
+      },
+
+      saveLivingPrd: (prdId, doc) => {
+        const now = new Date().toISOString();
+        set((state) => {
+          const prd = state.nodes.find((node) => node.id === prdId && node.type === "PRD");
+          if (!prd) return state;
+          const featureId = state.edges
+            .filter((edge) => edge.sourceId === prdId || edge.targetId === prdId)
+            .map((edge) => (edge.sourceId === prdId ? edge.targetId : edge.sourceId))
+            .find((id) => state.nodes.find((node) => node.id === id)?.type === "FEATURE");
+          const figmaId = `figma-for-${prdId}`;
+          const embed = figmaEmbed(doc.figmaUrl);
+          let nodes = state.nodes
+            .filter((node) => node.id !== figmaId)
+            .map((node) =>
+              node.id === prdId
+                ? {
+                    ...node,
+                    description: doc.overview || doc.introduction || node.description,
+                    summary: (doc.introduction || doc.overview || node.summary || "").slice(0, 120),
+                    metadata: { ...node.metadata, living: doc },
+                    updatedAt: now,
+                  }
+                : node
+            );
+          let edges = state.edges.filter((edge) => edge.sourceId !== figmaId && edge.targetId !== figmaId);
+          if (embed) {
+            nodes = [
+              ...nodes,
+              {
+                id: figmaId,
+                type: "FIGMA_FRAME",
+                title: "Design",
+                description: doc.figmaUrl.trim(),
+                status: "ACTIVE",
+                ownerId: prd.ownerId,
+                productId: prd.productId,
+                metadata: { url: doc.figmaUrl.trim() },
+                tags: ["figma"],
+                createdAt: now,
+                updatedAt: now,
+              },
+            ];
+            edges = [
+              ...edges,
+              { id: `edge-${prdId}-${figmaId}`, sourceId: prdId, targetId: figmaId, type: "LINKED_TO", createdAt: now },
+            ];
+          }
+          const timeline = [
+            ...state.timeline.filter((event) => !event.id.startsWith(`prd-ms-${prdId}-`)),
+            ...doc.milestones
+              .filter((milestone) => milestone.label.trim())
+              .map((milestone) => ({
+                id: `prd-ms-${prdId}-${milestone.id}`,
+                nodeId: featureId ?? prdId,
+                title: milestone.label.trim(),
+                description: milestone.date,
+                eventType: "design",
+                timestamp: milestoneTime(milestone.date, now),
+                actorId: prd.ownerId,
+              })),
+          ];
+          return { nodes, edges, timeline };
+        });
+      },
+
+      importSharedPrd: (share, productId) => {
+        const result = get().proposeFeature({
+          title: share.title,
+          description: share.introduction,
+          prdText: share.overview,
+          ownerId: "person-you",
+          priority: "MEDIUM",
+          primaryRepo: "",
+          primaryRepoUrl: "",
+          additionalRepos: [],
+          scaffold: { customerProblem: false, prd: true, goal: false, metric: false },
+          productId,
+          source: share.introduction,
+        });
+        const prd = get().nodes.find((node) => node.type === "PRD" && result.createdNodeIds.includes(node.id));
+        if (!prd) return result.featureId;
+        get().saveLivingPrd(prd.id, livingFromShare(share));
+        const now = new Date().toISOString();
+        set((state) => {
+          const extraNodes: GraphNode[] = [];
+          const extraEdges: GraphEdge[] = [];
+          for (const item of share.evidence) {
+            if (!isEvidenceType(item.type)) continue;
+            const id = `shared-${item.type.toLowerCase()}-${slugify(item.title).slice(0, 24)}-${extraNodes.length}`;
+            extraNodes.push({
+              id,
+              type: item.type as NodeType,
+              title: item.title,
+              description: item.detail,
+              status: "ACTIVE",
+              ownerId: "person-you",
+              productId,
+              metadata: {},
+              tags: ["shared"],
+              createdAt: now,
+              updatedAt: now,
+            });
+            extraEdges.push({
+              id: `edge-${result.featureId}-${id}`,
+              sourceId: item.type === "CUSTOMER_PROBLEM" ? id : result.featureId,
+              targetId: item.type === "CUSTOMER_PROBLEM" ? result.featureId : id,
+              type: item.type === "CUSTOMER_PROBLEM" ? "ADDRESSES" : "RELATED_TO",
+              createdAt: now,
+            });
+          }
+          return { nodes: [...state.nodes, ...extraNodes], edges: [...state.edges, ...extraEdges] };
+        });
+        return result.featureId;
+      },
+
       resetGraph: () =>
         set({
           nodes: [...initialNodes],
@@ -594,6 +750,12 @@ export const graphStore = createStore<GraphState>()(
     }
   )
 );
+
+function milestoneTime(date: string, fallback: string): string {
+  if (!date) return fallback;
+  const parsed = new Date(`${date}T12:00:00`);
+  return Number.isNaN(parsed.getTime()) ? fallback : parsed.toISOString();
+}
 
 export function useGraphStore<T>(selector: (state: GraphState) => T): T {
   return useStore(graphStore, selector);

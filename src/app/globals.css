@@ -76,26 +76,6 @@
   display: none;
 }
 
-.glass-pill {
-  display: inline-flex;
-  height: 2rem;
-  align-items: center;
-  border-radius: 9999px;
-  padding: 0 0.8rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: #fff;
-  background:
-    radial-gradient(120% 90% at 50% -30%, rgba(255, 255, 255, 0.4), transparent 60%),
-    linear-gradient(180deg, #3c92e4 0%, #0571d3 100%);
-  box-shadow: 0 6px 14px rgba(5, 113, 211, 0.2);
-}
-
-.glass-pill:hover {
-  filter: brightness(1.06);
-}
-
 .dark {
   --background: #101113;
   --foreground: #f3f4f6;
@@ -169,6 +149,77 @@ body {
   color: var(--foreground);
   font-family: var(--font-plex), "IBM Plex Sans", sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+.marketing {
+  font-family: var(--font-marketing), Geist, ui-sans-serif, system-ui, sans-serif;
+  font-weight: 400;
+  letter-spacing: -0.015em;
+}
+
+.marketing h1,
+.marketing h2,
+.marketing h3 {
+  font-weight: 500;
+  letter-spacing: -0.04em;
+}
+
+.phrase-slot {
+  display: grid;
+  width: 100%;
+  justify-items: center;
+}
+
+.phrase-measure,
+.phrase-live {
+  grid-area: 1 / 1;
+  width: max-content;
+  max-width: 100%;
+}
+
+.phrase-measure {
+  visibility: hidden;
+}
+
+.phrase-word {
+  display: inline-block;
+}
+
+.phrase-word-exit {
+  animation: phrase-exit 0.42s cubic-bezier(0.22, 0.7, 0.2, 1) forwards;
+}
+
+.phrase-word-enter {
+  animation: phrase-enter 0.48s cubic-bezier(0.22, 0.7, 0.2, 1) both;
+}
+
+@keyframes phrase-exit {
+  to {
+    opacity: 0;
+    transform: translateY(-0.55em);
+  }
+}
+
+@keyframes agent-zoom {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes phrase-enter {
+  from {
+    opacity: 0;
+    transform: translateY(0.55em);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .recharts-wrapper,
@@ -308,7 +359,9 @@ body {
   .pixel-dot,
   .logo-drift,
   .rise,
-  .signal-swap {
+  .signal-swap,
+  .phrase-word-exit,
+  .phrase-word-enter {
     animation: none;
   }
 }

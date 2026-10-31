@@ -126,7 +126,7 @@ export function buildProposedFeatureGraph(input: ProposeFeatureInput): {
       id: prdId,
       type: "PRD",
       title: `${input.title} PRD`,
-      description: input.prdText?.trim() || "Draft product requirements — fill in specifications",
+      description: input.prdText !== undefined ? input.prdText.trim() : "Draft product requirements — fill in specifications",
       status: "DRAFT",
       ownerId: input.ownerId,
       productId: input.productId,

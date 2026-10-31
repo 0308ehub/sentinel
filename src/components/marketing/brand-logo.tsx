@@ -21,8 +21,8 @@ export function BrandLogo({
       <Image
         src="/kismetmark.png"
         alt="Kismet"
-        width={651}
-        height={627}
+        width={2000}
+        height={2000}
         priority={priority}
         className={cn("w-auto object-contain", className)}
       />
@@ -34,8 +34,8 @@ export function BrandLogo({
       <Image
         src="/kismetlogo.png"
         alt="Kismet"
-        width={1881}
-        height={627}
+        width={1839}
+        height={536}
         priority={priority}
         className={cn("h-full w-auto object-contain", tone === "auto" && "brand-logo-light")}
       />
@@ -43,8 +43,8 @@ export function BrandLogo({
         <Image
           src="/kismetlogo-on-dark.png"
           alt=""
-          width={1881}
-          height={627}
+          width={1839}
+          height={536}
           className="brand-logo-dark h-full w-auto object-contain"
           aria-hidden
         />

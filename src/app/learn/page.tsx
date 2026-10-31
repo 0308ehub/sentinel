@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BrandLogo } from "@/components/marketing/brand-logo";
+import { MarketingFrame } from "@/components/marketing/marketing-frame";
 
 export const metadata: Metadata = {
   title: "Learn — Kismet",
@@ -9,22 +9,8 @@ export const metadata: Metadata = {
 
 export default function LearnPage() {
   return (
-    <div className="force-light min-h-screen bg-white px-6 py-16 text-[#111] md:px-16 md:py-20">
-      <div className="flex items-center justify-between">
-        <Link href="/" className="inline-flex text-[#111]">
-          <BrandLogo className="h-8" />
-        </Link>
-        <div className="flex items-center gap-4 text-sm">
-          <Link href="/sign-in" className="hover:underline">
-            Sign in
-          </Link>
-          <Link href="/contact" className="hover:underline">
-            Talk to us
-          </Link>
-        </div>
-      </div>
-
-      <article className="mt-16 max-w-2xl space-y-10 text-[15px] leading-relaxed">
+    <MarketingFrame>
+      <article className="mx-6 mt-16 max-w-2xl space-y-10 pb-16 text-[15px] leading-relaxed md:mx-16">
         <header className="space-y-4">
           <h1 className="text-3xl font-medium tracking-tight">How Kismet works</h1>
           <p className="text-[#3c4250]">
@@ -162,6 +148,6 @@ export default function LearnPage() {
           </p>
         </section>
       </article>
-    </div>
+    </MarketingFrame>
   );
 }

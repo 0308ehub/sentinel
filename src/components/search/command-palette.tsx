@@ -20,11 +20,13 @@ import {
   MessageSquare,
   Search,
   Plus,
+  Boxes,
 } from "lucide-react";
 import type { NodeType } from "@/types/graph";
 
 const NAV_ITEMS = [
   { label: "Chat", href: "/ai", icon: MessageSquare },
+  { label: "Agents", href: "/agents", icon: Boxes },
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Explorer", href: "/explorer", icon: FolderTree },
   { label: "Features", href: "/features", icon: Layers },

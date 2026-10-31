@@ -25,6 +25,7 @@ import type { NodeType } from "@/types/graph";
 import { Filter } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
+import { useAgents, type FleetAgent } from "@/lib/agents/fleet";
 
 const FILTER_TYPES: NodeType[] = [
   "FEATURE",
@@ -36,14 +37,19 @@ const FILTER_TYPES: NodeType[] = [
   "LAUNCH",
 ];
 
-function GraphNodeComponent({ data }: { data: { label: string; type: NodeType; nodeId: string; selected?: boolean } }) {
+function GraphNodeComponent({
+  data,
+}: {
+  data: { label: string; type: NodeType; nodeId: string; selected?: boolean; agents?: { id: string; name: string; color: string }[] };
+}) {
   const color = getNodeColor(data.type);
+  const here = data.agents ?? [];
   return (
     <div
       className="rounded-md border bg-white px-3 py-2 shadow-sm min-w-[140px] max-w-[200px]"
       style={{
-        borderColor: data.selected ? color : "#dadce0",
-        boxShadow: data.selected ? `0 0 0 2px ${color}40` : undefined,
+        borderColor: here[0]?.color ?? (data.selected ? color : "#dadce0"),
+        boxShadow: here[0] ? `0 0 0 2px ${here[0].color}55` : data.selected ? `0 0 0 2px ${color}40` : undefined,
       }}
     >
       <Handle type="target" position={Position.Top} className="!bg-border !w-2 !h-2" />
@@ -51,6 +57,12 @@ function GraphNodeComponent({ data }: { data: { label: string; type: NodeType; n
         {getNodeLabel(data.type)}
       </div>
       <div className="text-xs font-medium leading-tight">{data.label}</div>
+      {here.map((agent) => (
+        <div key={agent.id} className="mt-1 flex items-center gap-1 text-[10px] text-[#3c4250]">
+          <span className="h-1.5 w-1.5 rounded-full" style={{ background: agent.color }} />
+          <span className="truncate">{agent.name}</span>
+        </div>
+      ))}
       <Handle type="source" position={Position.Bottom} className="!bg-border !w-2 !h-2" />
     </div>
   );
@@ -113,8 +125,21 @@ function layoutNodes(
   return result;
 }
 
+function hopColor(source: string, target: string, agents: FleetAgent[]): string | null {
+  for (const agent of agents) {
+    if (agent.status !== "working" && agent.status !== "thinking") continue;
+    const path = agent.path;
+    if (path.length < 2) continue;
+    const from = path[path.length - 2];
+    const to = path[path.length - 1];
+    if ((from === source && to === target) || (from === target && to === source)) return agent.color;
+  }
+  return null;
+}
+
 export function GraphView() {
   const searchParams = useSearchParams();
+  const agents = useAgents();
   const graphStateNodes = useGraphStore((s) => s.nodes);
   const centerNodeId =
     searchParams.get("node") ??
@@ -134,23 +159,36 @@ export function GraphView() {
   );
 
   const initialNodes = useMemo(
-    () => layoutNodes(graphNodes, centerNodeId),
-    [graphNodes, centerNodeId]
+    () =>
+      layoutNodes(graphNodes, centerNodeId).map((node) => ({
+        ...node,
+        data: {
+          ...node.data,
+          agents: agents
+            .filter((agent) => agent.focusNodeId === node.id && (agent.status === "working" || agent.status === "thinking"))
+            .map((agent) => ({ id: agent.id, name: agent.name, color: agent.color })),
+        },
+      })),
+    [graphNodes, centerNodeId, agents]
   );
 
   const initialEdges: Edge[] = useMemo(
     () =>
-      graphEdges.map((e) => ({
-        id: e.id,
-        source: e.sourceId,
-        target: e.targetId,
-        label: e.type.replace(/_/g, " ").toLowerCase(),
-        labelStyle: { fontSize: 9, fill: "#5f6368" },
-        style: { stroke: "#dadce0", strokeWidth: 1.5 },
-        markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 12, color: "#dadce0" },
-        animated: e.sourceId === centerNodeId || e.targetId === centerNodeId,
-      })),
-    [graphEdges, centerNodeId]
+      graphEdges.map((e) => {
+        const hop = hopColor(e.sourceId, e.targetId, agents);
+        const stroke = hop ?? "#dadce0";
+        return {
+          id: e.id,
+          source: e.sourceId,
+          target: e.targetId,
+          label: e.type.replace(/_/g, " ").toLowerCase(),
+          labelStyle: { fontSize: 9, fill: "#5f6368" },
+          style: { stroke, strokeWidth: hop ? 2.5 : 1.5 },
+          markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 12, color: stroke },
+          animated: Boolean(hop) || e.sourceId === centerNodeId || e.targetId === centerNodeId,
+        };
+      }),
+    [graphEdges, centerNodeId, agents]
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -222,6 +260,14 @@ export function GraphView() {
                 <Button size="sm" className="mt-3 w-full">Open Workspace</Button>
               </Link>
             )}
+            {agents
+              .filter((agent) => agent.focusNodeId === selectedNode.id)
+              .map((agent) => (
+                <Link key={agent.id} href={`/agents?open=${agent.id}`} className="mt-2 flex items-center gap-2 rounded-md border border-border px-2 py-1.5 text-xs hover:bg-muted">
+                  <span className="h-2 w-2 rounded-full" style={{ background: agent.color }} />
+                  <span className="min-w-0 truncate">{agent.name} · {agent.activity}</span>
+                </Link>
+              ))}
           </div>
           <ScrollArea className="flex-1">
             <div className="p-4 space-y-4">

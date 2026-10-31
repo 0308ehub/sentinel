@@ -17,6 +17,14 @@ export default function DocsPage() {
           Five parts of the product brain. Each one is a way Kismet works with the company you already run.
         </p>
         <ul className="mt-10 max-w-2xl divide-y divide-[#eceef1] border-y border-[#eceef1]">
+          <li>
+            <Link href="/any" className="block py-5 hover:bg-[#fafbfc]">
+              <span className="font-semibold">any%</span>
+              <p className="mt-1 text-sm leading-relaxed text-[#3c4250]">
+                The experimentation platform. The shortest valid test, then the next one.
+              </p>
+            </Link>
+          </li>
           {PRODUCT_DOCS.map((doc) => (
             <li key={doc.slug}>
               <Link href={`/docs/${doc.slug}`} className="block py-5 hover:bg-[#fafbfc]">

@@ -1,0 +1,18 @@
+---
+description: Ask clarifying questions when a prompt has more than one reasonable reading
+alwaysApply: true
+---
+
+# Clarify before guessing
+
+When a prompt is ambiguous, underspecified, or could reasonably mean more than one thing, ask a short clarifying question before writing code, committing, or pushing.
+
+Ask when:
+
+- The outcome is unclear (what "done" looks like, which app, which environment).
+- Two plausible interpretations would lead to different work.
+- A destructive or hard-to-undo action is implied (push to main, delete data, change auth).
+
+Do not ask when the request is already specific, or when the codebase answers it. One or two concrete questions are enough. Offer the reading you would take if they want you to proceed.
+
+Example: "fix npm run build so it runs" could mean a compile error or the shell's Node version. Ask which failure they hit before changing the build.

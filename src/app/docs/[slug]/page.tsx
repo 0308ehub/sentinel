@@ -40,6 +40,13 @@ export default async function DocPage({ params }: { params: Promise<{ slug: stri
               ))}
             </section>
           ))}
+          {doc.slug === "experiment" && (
+            <p>
+              <Link href="/any" className="font-medium text-[#111] underline underline-offset-4">
+                any% is this platform
+              </Link>
+            </p>
+          )}
           {doc.slug === "explore" && (
             <p>
               <Link href="/connectors" className="font-medium text-[#111] underline underline-offset-4">

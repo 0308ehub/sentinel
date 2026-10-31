@@ -6,6 +6,8 @@ import { CommandPalette } from "@/components/search/command-palette";
 import { ProposeFeatureDialog } from "@/components/propose/propose-feature-dialog";
 import { WorkWatcher } from "@/components/layout/work-watcher";
 import { ChatDock } from "@/components/ai/chat-dock";
+import { AgentRunner } from "@/components/agents/agent-runner";
+import { PendingPrd } from "@/components/prd/pending-prd";
 import { MentionWatcher } from "@/components/slack/mention-watcher";
 
 export function AppShell({
@@ -20,6 +22,7 @@ export function AppShell({
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden relative">
         {header && <Header />}
+        <PendingPrd />
         <main className="flex-1 overflow-hidden">{children}</main>
       </div>
       <CommandPalette />
@@ -27,6 +30,7 @@ export function AppShell({
       <WorkWatcher />
       <MentionWatcher />
       <ChatDock />
+      <AgentRunner />
     </div>
   );
 }
