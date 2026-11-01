@@ -10,6 +10,7 @@ import {
   Network,
   RefreshCw,
   Check,
+  Unplug,
 } from "lucide-react";
 import { SettingsShell } from "@/components/settings/settings-shell";
 import { Badge } from "@/components/ui/badge";
@@ -24,8 +25,8 @@ import type { SlackApiErrorBody, SlackChannel, SlackMessage, SlackStatus } from 
 const CHANNEL_STORAGE_KEY = "kismet-slack-channel";
 const REFRESH_INTERVAL_MS = 60_000;
 
-async function getJson<T>(url: string): Promise<T> {
-  const res = await fetch(url, { cache: "no-store" });
+async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, { ...init, cache: "no-store" });
   const body = await res.json();
   if (!res.ok) {
     const err = body as SlackApiErrorBody;
@@ -34,7 +35,7 @@ async function getJson<T>(url: string): Promise<T> {
   return body as T;
 }
 
-export function SlackChannelView() {
+export function SlackChannelView({ oauthError }: { oauthError?: string }) {
   const [status, setStatus] = useState<SlackStatus | null>(null);
   const [channels, setChannels] = useState<SlackChannel[] | null>(null);
   const [channelId, setChannelId] = useState<string>("");
@@ -43,10 +44,15 @@ export function SlackChannelView() {
   const [error, setError] = useState<string | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [connectionRefreshKey, setConnectionRefreshKey] = useState(0);
+  const [disconnecting, setDisconnecting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      setStatus(null);
+      setChannels(null);
+      setMessages(null);
       const s = await getJson<SlackStatus>("/api/slack/status").catch(
         (e: Error): SlackStatus => ({ connected: false, error: e.message })
       );
@@ -68,7 +74,21 @@ export function SlackChannelView() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [connectionRefreshKey]);
+
+  async function disconnect() {
+    setDisconnecting(true);
+    setError(null);
+    try {
+      await getJson<{ ok: true }>("/api/slack/oauth/disconnect", { method: "POST" });
+      setChannelId("");
+      setConnectionRefreshKey((key) => key + 1);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setDisconnecting(false);
+    }
+  }
 
   function refresh() {
     setLoadingMessages(true);
@@ -118,20 +138,26 @@ export function SlackChannelView() {
         Connected apps
       </Link>
 
+      {oauthError && (
+        <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+          {oauthError === "not_configured" ? "Slack sign-in isn't set up on this server yet." : oauthError}
+        </div>
+      )}
+
       {!status ? (
         <div className="flex items-center gap-2 py-10 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
           Checking Slack connection…
         </div>
       ) : !status.connected ? (
-        <SetupCard error={status.error} />
+        <SetupCard error={status.error?.startsWith("Connect Slack in Settings") ? undefined : status.error} />
       ) : (
         <div className="space-y-4">
           <Card>
             <CardContent className="flex flex-wrap items-center gap-3 p-4">
               <Badge variant="success">Connected</Badge>
               <span className="text-sm">
-                <span className="font-medium">{status.team}</span>
+                <span className="font-medium">{status.teamName ?? status.team}</span>
                 <span className="text-muted-foreground"> as @{status.botName}</span>
               </span>
               <p className="w-full text-sm text-muted-foreground">
@@ -139,6 +165,10 @@ export function SlackChannelView() {
                 issue, for example “@{status.botName} add a feature for saved filters and assign it to Maya” or “@{status.botName} assign Maya to SCRUM-5”.
               </p>
               <div className="ml-auto flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={disconnect} disabled={disconnecting}>
+                  {disconnecting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Unplug className="h-3 w-3" />}
+                  Disconnect
+                </Button>
                 <select
                   className="h-8 rounded-md border border-border bg-background px-2 text-xs"
                   value={channelId}
@@ -232,37 +262,14 @@ function SetupCard({ error }: { error?: string }) {
         <CardTitle>Slack isn&apos;t connected</CardTitle>
         {error && <CardDescription className="text-destructive">{error}</CardDescription>}
       </CardHeader>
-      <CardContent>
-        <ol className="list-decimal space-y-1.5 pl-4 text-sm text-muted-foreground">
-          <li>
-            Create an app at{" "}
-            <a
-              href="https://api.slack.com/apps"
-              target="_blank"
-              rel="noreferrer"
-              className="text-foreground underline underline-offset-2"
-            >
-              api.slack.com/apps
-            </a>
-            .
-          </li>
-          <li>
-            Under OAuth &amp; Permissions, add bot scopes <code className="font-mono text-xs">channels:read</code>,{" "}
-            <code className="font-mono text-xs">channels:history</code>,{" "}
-            <code className="font-mono text-xs">users:read</code>,{" "}
-            <code className="font-mono text-xs">chat:write</code> (plus{" "}
-            <code className="font-mono text-xs">groups:read</code> and{" "}
-            <code className="font-mono text-xs">groups:history</code> for private channels).
-          </li>
-          <li>Install the app to your workspace and copy the Bot User OAuth Token (xoxb-…).</li>
-          <li>
-            Add <code className="font-mono text-xs">SLACK_BOT_TOKEN=xoxb-…</code> to <code className="font-mono text-xs">.env</code>{" "}
-            and restart the dev server.
-          </li>
-          <li>
-            In Slack, type <code className="font-mono text-xs">/invite @YourAppName</code> in the channel you want Kismet to read.
-          </li>
-        </ol>
+      <CardContent className="space-y-3">
+        <Button asChild>
+          <a href="/api/slack/oauth/start">Add to Slack</a>
+        </Button>
+        <p className="text-sm text-muted-foreground">
+          After installing, invite the bot to channels with{" "}
+          <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">/invite @Kismet</code>.
+        </p>
       </CardContent>
     </Card>
   );

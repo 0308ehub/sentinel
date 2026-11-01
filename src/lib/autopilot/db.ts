@@ -120,6 +120,22 @@ create table if not exists kismet.activity (
   message text not null,
   ref text
 );
+
+create table if not exists kismet.connections (
+  user_id text not null,
+  provider text not null,
+  secret text not null,
+  meta jsonb not null default '{}'::jsonb,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  primary key (user_id, provider)
+);
+
+create table if not exists kismet.slack_mentions (
+  user_id text primary key,
+  state jsonb not null,
+  updated_at timestamptz default now()
+);
 `;
 
 export async function db(): Promise<Sql> {

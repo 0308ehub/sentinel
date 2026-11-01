@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server";
 import { exchangeGoogleCode } from "@/lib/google/client";
 
 export async function GET(request: Request) {
@@ -6,14 +7,14 @@ export async function GET(request: Request) {
   const oauthError = url.searchParams.get("error");
   if (oauthError) {
     destination.searchParams.set("error", oauthError);
-    return Response.redirect(destination);
+    return NextResponse.redirect(destination);
   }
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
   const cookie = readCookie(request.headers.get("cookie"), "kismet_google_state");
   if (!code || !state || !cookie || state !== cookie) {
     destination.searchParams.set("error", "state");
-    return Response.redirect(destination);
+    return NextResponse.redirect(destination);
   }
   try {
     await exchangeGoogleCode(code);
@@ -21,7 +22,7 @@ export async function GET(request: Request) {
   } catch (error) {
     destination.searchParams.set("error", error instanceof Error ? error.message : "connect_failed");
   }
-  const response = Response.redirect(destination);
+  const response = NextResponse.redirect(destination);
   response.headers.append("Set-Cookie", "kismet_google_state=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax");
   return response;
 }

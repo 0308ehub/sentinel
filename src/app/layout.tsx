@@ -41,7 +41,10 @@ export default async function RootLayout({
   const content = <Providers>{children}</Providers>;
   return (
     <html lang="en" className={theme === "dark" ? "dark" : undefined} suppressHydrationWarning>
-      <body className={`${plex.variable} ${plexMono.variable} ${marketing.variable} antialiased`}>
+      <body
+        className={`${plex.variable} ${plexMono.variable} ${marketing.variable} antialiased`}
+        suppressHydrationWarning
+      >
         {process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? (
           <ClerkProvider>{content}</ClerkProvider>
         ) : (

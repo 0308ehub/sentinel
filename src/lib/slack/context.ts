@@ -1,17 +1,19 @@
 import "server-only";
 
-import { getChannelMessages, getSlackStatus, listBotChannels } from "@/lib/slack/client";
+import { getChannelMessages, getSlackStatus, listBotChannels, slackConnectionKey } from "@/lib/slack/client";
 
 const CACHE_MS = 60_000;
 const MAX_CHANNELS = 6;
 const MESSAGES_PER_CHANNEL = 30;
 const MAX_CHARS = 24_000;
 
-let cache: { at: number; text: string; channels: string[] } | null = null;
+const cache = new Map<string, { at: number; text: string; channels: string[] }>();
 
 export async function getSlackContext(): Promise<{ text: string; channels: string[] }> {
-  if (cache && Date.now() - cache.at < CACHE_MS) {
-    return { text: cache.text, channels: cache.channels };
+  const key = await slackConnectionKey();
+  const cached = cache.get(key);
+  if (cached && Date.now() - cached.at < CACHE_MS) {
+    return { text: cached.text, channels: cached.channels };
   }
 
   await getSlackStatus();
@@ -41,6 +43,6 @@ export async function getSlackContext(): Promise<{ text: string; channels: strin
 
   const text = blocks.join("\n\n").slice(0, MAX_CHARS);
   const names = picked.map((channel) => channel.name);
-  cache = { at: Date.now(), text, channels: names };
+  cache.set(key, { at: Date.now(), text, channels: names });
   return { text, channels: names };
 }

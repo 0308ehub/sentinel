@@ -1,6 +1,7 @@
 export interface SlackStatus {
   connected: boolean;
   team?: string;
+  teamName?: string;
   teamUrl?: string;
   botName?: string;
   error?: string;

@@ -1,8 +1,9 @@
 import "server-only";
 
-import { mkdir, readFile, writeFile } from "fs/promises";
-import path from "path";
+import type postgres from "postgres";
 import { askForJson, readJson } from "@/lib/ai/respond";
+import { db } from "@/lib/autopilot/db";
+import { currentUserId } from "@/lib/connections/current";
 import { assignJiraIssue, createFeatureIssue, findJiraAccount, JiraApiError } from "@/lib/jira/client";
 import {
   getBotUserId,
@@ -33,64 +34,89 @@ interface Intent {
   issueKey: string;
 }
 
-const FILE = path.join(process.cwd(), ".data", "slack-mentions.json");
 const PRIORITIES = new Set(["CRITICAL", "HIGH", "MEDIUM", "LOW"]);
 const ISSUE_KEY = /\b[A-Z][A-Z0-9]+-\d+\b/;
 
-let memory: Store | null = null;
-let chain: Promise<void> = Promise.resolve();
-let scanning: Promise<SlackInboxItem[]> | null = null;
+const memory = new Map<string, Store>();
+const chains = new Map<string, Promise<void>>();
+const scanning = new Map<string, Promise<SlackInboxItem[]>>();
 
 function emptyStore(): Store {
   return { bootstrapped: false, cursor: 0, cursors: {}, seen: [], inbox: [] };
 }
 
-async function load(): Promise<Store> {
-  if (memory) return memory;
-  try {
-    memory = { ...emptyStore(), ...(JSON.parse(await readFile(FILE, "utf8")) as Partial<Store>) };
-  } catch {
-    memory = emptyStore();
-  }
-  return memory;
+async function load(userId: string): Promise<Store> {
+  const cached = memory.get(userId);
+  if (cached) return cached;
+  const sql = await db();
+  const rows = await sql<{ state: Partial<Store> }[]>`
+    select state from kismet.slack_mentions where user_id = ${userId} limit 1
+  `;
+  const store = { ...emptyStore(), ...(rows[0]?.state ?? {}) };
+  memory.set(userId, store);
+  return store;
 }
 
-async function save(store: Store): Promise<void> {
-  memory = store;
-  await mkdir(path.dirname(FILE), { recursive: true });
-  await writeFile(FILE, JSON.stringify(store));
+async function save(userId: string, store: Store): Promise<void> {
+  memory.set(userId, store);
+  const sql = await db();
+  await sql`
+    insert into kismet.slack_mentions (user_id, state)
+    values (${userId}, ${sql.json(store as unknown as postgres.JSONValue)})
+    on conflict (user_id) do update set state = excluded.state, updated_at = now()
+  `;
 }
 
-function update<T>(fn: (store: Store) => Promise<T>): Promise<T> {
-  const run = chain.then(() => load().then(fn));
-  chain = run.then(
+function update<T>(userId: string, fn: (store: Store) => Promise<T>): Promise<T> {
+  const chain = chains.get(userId) ?? Promise.resolve();
+  const run = chain.then(() => load(userId).then(fn));
+  chains.set(userId, run.then(
     () => undefined,
     () => undefined,
-  );
+  ));
   return run;
 }
 
-export function pollSlackMentions(): Promise<SlackInboxItem[]> {
-  if (!scanning) {
-    scanning = scan().finally(() => {
-      scanning = null;
-    });
-  }
-  return scanning;
+async function mentionUserId(): Promise<string> {
+  const userId = await currentUserId();
+  if (!userId) throw new SlackApiError("not_connected", "Connect Slack in Settings → Connectors → Slack.", 503);
+  return userId;
 }
 
-export function acknowledgeSlackInbox(ids: string[]): Promise<void> {
+export async function pollSlackMentions(): Promise<SlackInboxItem[]> {
+  const userId = await mentionUserId();
+  let active = scanning.get(userId);
+  if (!active) {
+    active = scan(userId).finally(() => {
+      scanning.delete(userId);
+    });
+    scanning.set(userId, active);
+  }
+  return active;
+}
+
+export async function acknowledgeSlackInbox(ids: string[]): Promise<void> {
+  const userId = await mentionUserId();
   const drop = new Set(ids);
-  return update(async (store) => {
+  return update(userId, async (store) => {
     store.inbox = store.inbox.filter((item) => !drop.has(item.id));
-    await save(store);
+    await save(userId, store);
   });
 }
 
-async function scan(): Promise<SlackInboxItem[]> {
+export async function deleteSlackMentionState(userId: string): Promise<void> {
+  await scanning.get(userId)?.catch(() => undefined);
+  memory.delete(userId);
+  chains.delete(userId);
+  scanning.delete(userId);
+  const sql = await db();
+  await sql`delete from kismet.slack_mentions where user_id = ${userId}`;
+}
+
+async function scan(userId: string): Promise<SlackInboxItem[]> {
   const botId = await getBotUserId();
   const channels = await listBotChannels();
-  const store = await load();
+  const store = await load(userId);
   const batch = channels.length <= 8 ? channels : channels.slice(store.cursor, store.cursor + 8);
   const wrapped = channels.length <= 8 ? batch : batch.length === 8 ? batch : [...batch, ...channels.slice(0, 8 - batch.length)];
   store.cursor = channels.length <= 8 ? 0 : (store.cursor + wrapped.length) % channels.length;
@@ -117,22 +143,23 @@ async function scan(): Promise<SlackInboxItem[]> {
     }
   }
   store.bootstrapped = true;
-  await save(store);
+  await save(userId, store);
 
   for (const mention of mentions.reverse().slice(-2)) {
-    await handleMention(botId, mention);
+    await handleMention(userId, botId, mention);
   }
-  return (await load()).inbox;
+  return (await load(userId)).inbox;
 }
 
 async function handleMention(
+  userId: string,
   botId: string,
   mention: { channelId: string; channelName: string; ts: string; userId: string; text: string; threadTs?: string },
 ) {
   const id = `${mention.channelId}:${mention.ts}`;
-  await update(async (store) => {
+  await update(userId, async (store) => {
     store.seen = [...store.seen, id].slice(-400);
-    await save(store);
+    await save(userId, store);
   });
 
   const people = await mentionedPeople(mention.text, botId);
@@ -170,9 +197,9 @@ async function handleMention(
 
   if (item) {
     item.note = reply;
-    await update(async (store) => {
+    await update(userId, async (store) => {
       store.inbox = [item, ...store.inbox.filter((existing) => existing.id !== id)].slice(0, 30);
-      await save(store);
+      await save(userId, store);
     });
   }
 }
