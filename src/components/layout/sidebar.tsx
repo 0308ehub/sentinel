@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import * as AvatarPrimitive from "@radix-ui/react-avatar";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -41,6 +42,7 @@ import { initialsFor, readOnboarding } from "@/lib/onboarding";
 import { CURRENT_USER } from "@/lib/settings";
 import { startNewChat } from "@/lib/chat/session";
 import { BrandLogo } from "@/components/marketing/brand-logo";
+import { useAccount } from "@/lib/auth/use-account";
 
 const GROUPS = [
   {
@@ -70,6 +72,7 @@ const GROUPS = [
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const account = useAccount();
   const { sidebarCollapsed, toggleSidebar } = useUIStore();
   const [profile, setProfile] = useState({
     name: CURRENT_USER.name,
@@ -78,6 +81,7 @@ export function Sidebar() {
   });
 
   useEffect(() => {
+    if (account) return;
     const draft = readOnboarding();
     if (!draft.name) return;
     setProfile({
@@ -85,9 +89,21 @@ export function Sidebar() {
       email: draft.email,
       initials: initialsFor(draft.name),
     });
-  }, []);
+  }, [account]);
+
+  const shownProfile = account
+    ? {
+        name: account.name || CURRENT_USER.name,
+        email: account.email || CURRENT_USER.email,
+        initials: initialsFor(account.name || CURRENT_USER.name),
+      }
+    : profile;
 
   function handleLogout() {
+    if (account) {
+      void account.signOut();
+      return;
+    }
     router.push("/");
   }
 
@@ -186,18 +202,25 @@ export function Sidebar() {
                 sidebarCollapsed && "justify-center px-0"
               )}
               aria-label="Open profile menu"
-              title={sidebarCollapsed ? profile.name : undefined}
+              title={sidebarCollapsed ? shownProfile.name : undefined}
             >
               <Avatar className="h-7 w-7 shrink-0">
+                {account?.imageUrl && (
+                  <AvatarPrimitive.Image
+                    src={account.imageUrl}
+                    alt={shownProfile.name}
+                    className="h-full w-full object-cover"
+                  />
+                )}
                 <AvatarFallback className="bg-accent text-[10px] text-accent-foreground">
-                  {profile.initials}
+                  {shownProfile.initials}
                 </AvatarFallback>
               </Avatar>
               {!sidebarCollapsed && (
                 <>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium leading-tight">{profile.name}</p>
-                    <p className="truncate text-[10px] text-muted-foreground">{profile.email}</p>
+                    <p className="truncate text-sm font-medium leading-tight">{shownProfile.name}</p>
+                    <p className="truncate text-[10px] text-muted-foreground">{shownProfile.email}</p>
                   </div>
                   <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                 </>
@@ -207,8 +230,8 @@ export function Sidebar() {
           <DropdownMenuContent side="top" align="start" className="w-56">
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col gap-0.5">
-                <span className="text-sm font-medium text-foreground">{profile.name}</span>
-                <span className="text-xs text-muted-foreground">{profile.email}</span>
+                <span className="text-sm font-medium text-foreground">{shownProfile.name}</span>
+                <span className="text-xs text-muted-foreground">{shownProfile.email}</span>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />

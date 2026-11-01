@@ -48,8 +48,10 @@ import { readOnboarding } from "@/lib/onboarding";
 import { fileBugFromChat } from "@/lib/issues/file-from-chat";
 import { useUIStore } from "@/stores/ui-store";
 import { cn } from "@/lib/utils";
+import { useAccount } from "@/lib/auth/use-account";
 
 export function ChatPane({ variant, onClose }: { variant: "page" | "dock"; onClose?: () => void }) {
+  const account = useAccount();
   const state = useChatState();
   const draft = useComposerDraft();
   const thread = activeThread(state);
@@ -62,10 +64,10 @@ export function ChatPane({ variant, onClose }: { variant: "page" | "dock"; onClo
 
   useEffect(() => {
     const draftProfile = readOnboarding();
-    const full = draftProfile.name || (CURRENT_USER.name === "You" ? "" : CURRENT_USER.name);
+    const full = account?.name || draftProfile.name || (CURRENT_USER.name === "You" ? "" : CURRENT_USER.name);
     const first = full.trim().split(/\s+/)[0] ?? "";
     setGreeting(greetingFor(first && first !== "You" ? first : ""));
-  }, []);
+  }, [account]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -730,4 +732,3 @@ async function takeFiles(list: FileList | null) {
   }
   if (next.length) addFiles(next);
 }
-

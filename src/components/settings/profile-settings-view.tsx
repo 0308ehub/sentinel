@@ -10,8 +10,10 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { SettingsShell } from "@/components/settings/settings-shell";
 import { readOnboarding } from "@/lib/onboarding";
 import { CURRENT_USER } from "@/lib/settings";
+import { useAccount } from "@/lib/auth/use-account";
 
 export function ProfileSettingsView() {
+  const account = useAccount();
   const [name, setName] = useState(CURRENT_USER.name);
   const [title, setTitle] = useState(CURRENT_USER.title);
   const [email, setEmail] = useState(CURRENT_USER.email);
@@ -19,12 +21,17 @@ export function ProfileSettingsView() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
+    if (account) {
+      setName(account.name || CURRENT_USER.name);
+      setEmail(account.email || CURRENT_USER.email);
+      return;
+    }
     const draft = readOnboarding();
     if (!draft.name) return;
     setName(draft.name);
     setEmail(draft.email);
     if (draft.role) setTitle(draft.role);
-  }, []);
+  }, [account]);
 
   function handleSave(e: FormEvent) {
     e.preventDefault();

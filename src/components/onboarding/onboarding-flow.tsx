@@ -17,6 +17,7 @@ import {
 } from "@/lib/onboarding";
 import type { JiraStatus } from "@/lib/jira/types";
 import type { SlackStatus } from "@/lib/slack/types";
+import { useAccount } from "@/lib/auth/use-account";
 import { cn } from "@/lib/utils";
 
 const TOUR = [
@@ -36,17 +37,25 @@ const TOUR = [
 
 export function OnboardingFlow({ step }: { step: string }) {
   const router = useRouter();
+  const account = useAccount();
   const [draft, setDraft] = useState<OnboardingDraft | null>(null);
   const [tourIndex, setTourIndex] = useState(0);
 
   useEffect(() => {
-    const saved = readOnboarding();
+    let saved = readOnboarding();
+    if (account && (!saved.name || !saved.email)) {
+      saved = writeOnboarding({
+        started: true,
+        name: saved.name || account.name,
+        email: saved.email || account.email,
+      });
+    }
     if (!isOnboardingStep(step)) {
       router.replace(`/onboarding/${saved.step}`);
       return;
     }
     setDraft(saved);
-  }, [router, step]);
+  }, [account, router, step]);
 
   if (!draft || !isOnboardingStep(step)) {
     return <div className="min-h-screen bg-white" />;
