@@ -1,13 +1,15 @@
 import "server-only";
 
-import { listDatabricksCatalogs, getDatabricksStatus } from "@/lib/databricks/client";
+import { databricksConnectionKey, listDatabricksCatalogs, getDatabricksStatus } from "@/lib/databricks/client";
 
 const CACHE_MS = 5 * 60_000;
 
-let cache: { at: number; text: string } | null = null;
+const cache = new Map<string, { at: number; text: string }>();
 
 export async function getDatabricksPrompt(): Promise<string> {
-  if (cache && Date.now() - cache.at < CACHE_MS) return cache.text;
+  const key = await databricksConnectionKey();
+  const cached = cache.get(key);
+  if (cached && Date.now() - cached.at < CACHE_MS) return cached.text;
 
   const status = await getDatabricksStatus();
   if (!status.connected) return "";
@@ -37,6 +39,6 @@ export async function getDatabricksPrompt(): Promise<string> {
   ]
     .filter(Boolean)
     .join("\n");
-  cache = { at: Date.now(), text };
+  cache.set(key, { at: Date.now(), text });
   return text;
 }

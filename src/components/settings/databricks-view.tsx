@@ -7,6 +7,8 @@ import { SettingsShell } from "@/components/settings/settings-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import type { DatabricksApiErrorBody, DatabricksCatalog, DatabricksStatus } from "@/lib/databricks/types";
 
 async function getJson<T>(url: string): Promise<T> {
@@ -24,6 +26,26 @@ export function DatabricksView() {
   const [catalogs, setCatalogs] = useState<DatabricksCatalog[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [form, setForm] = useState({ host: "", token: "", httpPath: "", catalog: "", schema: "" });
+  const [connecting, setConnecting] = useState(false);
+
+  async function connection(action: "connect" | "disconnect") {
+    setConnecting(true);
+    setError(null);
+    const res = await fetch(`/api/databricks/${action}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: action === "connect" ? JSON.stringify(form) : undefined,
+    });
+    const body = (await res.json()) as { error?: string };
+    setConnecting(false);
+    if (!res.ok) {
+      setError(body.error ?? "Could not update Databricks connection.");
+      return;
+    }
+    setForm({ host: "", token: "", httpPath: "", catalog: "", schema: "" });
+    setRefreshKey((key) => key + 1);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -53,7 +75,7 @@ export function DatabricksView() {
   }, [refreshKey]);
 
   return (
-    <SettingsShell title="Databricks" description="Read the Kismet SQL warehouse">
+    <SettingsShell title="Databricks" description="Read your SQL warehouse">
       <Link
         href="/settings/connectors"
         className="mb-4 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
@@ -70,32 +92,45 @@ export function DatabricksView() {
       ) : !status.connected ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">Add the Databricks workspace to .env</CardTitle>
-            <CardDescription className="text-xs leading-relaxed">{status.error}</CardDescription>
+            <CardTitle className="text-sm">Connect Databricks</CardTitle>
+            <CardDescription className="text-xs leading-relaxed">{status.error?.startsWith("Connect ") ? null : status.error}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-xs leading-relaxed text-muted-foreground">
+            {([
+              ["host", "Workspace URL", "https://dbc-xxxx.cloud.databricks.com"],
+              ["token", "Access token", ""],
+              ["httpPath", "HTTP path", "/sql/1.0/warehouses/abc123"],
+              ["catalog", "Catalog (optional)", ""],
+              ["schema", "Schema (optional)", ""],
+            ] as const).map(([key, label, placeholder]) => (
+              <div className="space-y-1" key={key}>
+                <Label htmlFor={`db-${key}`}>{label}</Label>
+                <Input
+                  id={`db-${key}`}
+                  type={key === "token" ? "password" : "text"}
+                  placeholder={placeholder}
+                  value={form[key]}
+                  onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+                />
+              </div>
+            ))}
             <p>
-              <span className="text-foreground">DATABRICKS_HOST.</span> The workspace URL in the
-              browser, like https://dbc-xxxx.cloud.databricks.com.
-            </p>
-            <p>
-              <span className="text-foreground">DATABRICKS_TOKEN.</span> Click your user icon,
+              <span className="text-foreground">Access token.</span> Click your user icon,
               then Settings, Developer, Access tokens, and generate a token.
             </p>
             <p>
-              <span className="text-foreground">DATABRICKS_HTTP_PATH.</span> Open SQL Warehouses,
-              choose the Kismet warehouse, then Connection details. Copy the HTTP path. It looks
+              <span className="text-foreground">HTTP path.</span> Open SQL Warehouses,
+              choose your warehouse, then Connection details. Copy the HTTP path. It looks
               like /sql/1.0/warehouses/abc123.
             </p>
             <p>
-              <span className="text-foreground">DATABRICKS_CATALOG and DATABRICKS_SCHEMA</span> are
+              <span className="text-foreground">Catalog and schema</span> are
               optional. Set them if Kismet should open one catalog instead of the workspace
               default.
             </p>
-            <p>Restart the dev server after saving .env, then check again.</p>
-            <Button type="button" size="sm" variant="outline" onClick={() => setRefreshKey((key) => key + 1)}>
-              <RefreshCw className="h-3 w-3" />
-              Check again
+            {error && <p className="text-destructive">{error}</p>}
+            <Button type="button" size="sm" disabled={connecting} onClick={() => void connection("connect")}>
+              {connecting ? "Connecting…" : "Connect"}
             </Button>
           </CardContent>
         </Card>
@@ -117,6 +152,9 @@ export function DatabricksView() {
               >
                 <RefreshCw className="h-3 w-3" />
                 Refresh
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => void connection("disconnect")}>
+                Disconnect
               </Button>
             </CardContent>
           </Card>

@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { graphStore } from "@/lib/graph/graph-store";
 import type { GoogleDoc, GoogleMessage, GooglePreview, GoogleStatus } from "@/lib/google/types";
 
-const REDIRECT = "http://localhost:3000/api/google/callback";
+const REDIRECT = "your Kismet origin + /api/google/callback";
 
 export function GoogleView() {
   const [status, setStatus] = useState<GoogleStatus | null>(null);
@@ -28,9 +28,11 @@ export function GoogleView() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const error = params.get("error");
-    if (params.get("connected") === "1") setNotice("Google Workspace is connected.");
-    else if (error) setNotice(errorMessage(error));
-    void load();
+    void Promise.resolve().then(() => {
+      if (params.get("connected") === "1") setNotice("Google Workspace is connected.");
+      else if (error) setNotice(errorMessage(error));
+      return load();
+    });
   }, []);
 
   async function load() {
@@ -43,7 +45,7 @@ export function GoogleView() {
       return;
     }
     const res = await fetch("/api/google/preview", { cache: "no-store" });
-    const body = (await res.json()) as GooglePreview & { error?: string };
+    const body = (await res.json()) as GooglePreview & { error?: string; };
     if (!res.ok) {
       setPreviewError(body.error ?? "Could not read Gmail or Docs.");
       return;
@@ -60,7 +62,7 @@ export function GoogleView() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ to: draftTo, subject: draftSubject, body: draftBody }),
     });
-    const body = (await res.json()) as { error?: string };
+    const body = (await res.json()) as { error?: string; };
     setSavingDraft(false);
     if (!res.ok) {
       setDraftState(body.error ?? "Could not save the draft.");
@@ -82,7 +84,10 @@ export function GoogleView() {
 
   return (
     <SettingsShell title="Google Workspace" description="Read Docs and Gmail, and save drafts">
-      <Link href="/settings/connectors" className="mb-4 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+      <Link
+        href="/settings/connectors"
+        className="mb-4 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+      >
         <ArrowLeft className="h-3 w-3" />
         Connected apps
       </Link>
@@ -99,14 +104,24 @@ export function GoogleView() {
           <CardHeader>
             <CardTitle className="text-sm">Create a Google OAuth client</CardTitle>
             <CardDescription className="text-xs leading-relaxed">
-              Kismet asks Google for read access to Gmail and Docs, plus permission to save drafts. It does not request permission to delete mail.
+              Kismet asks Google for read access to Gmail and Docs, plus permission to save drafts.
+              It does not request permission to delete mail.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-xs leading-relaxed text-muted-foreground">
-            <p>1. Open Google Cloud Console, create a project, and enable the Gmail API, Google Docs API, and Google Drive API.</p>
-            <p>2. Configure the OAuth consent screen. While it is in testing, add your own Gmail address as a test user.</p>
+            <p>
+              1. Open Google Cloud Console, create a project, and enable the Gmail API, Google Docs API,
+              and Google Drive API.
+            </p>
+            <p>
+              2. Configure the OAuth consent screen. While it is in testing, add your own Gmail address
+              as a test user.
+            </p>
             <p>3. Create an OAuth client of type Web application. Set the authorized redirect URI to {REDIRECT}.</p>
-            <p>4. Put the client ID and secret in .env as GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET, then restart the dev server and come back here.</p>
+            <p>
+              4. Put the client ID and secret in .env as GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET,
+              then restart the dev server and come back here.
+            </p>
           </CardContent>
         </Card>
       ) : !status.connected ? (
@@ -159,9 +174,24 @@ export function GoogleView() {
                   <CardDescription className="text-xs">This writes a Gmail draft and leaves it unsent.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-2 p-4 pt-0">
-                  <Input value={draftTo} onChange={(event) => setDraftTo(event.target.value)} placeholder="Recipient" className="h-9" />
-                  <Input value={draftSubject} onChange={(event) => setDraftSubject(event.target.value)} placeholder="Subject" className="h-9" />
-                  <Textarea value={draftBody} onChange={(event) => setDraftBody(event.target.value)} placeholder="Message" rows={4} />
+                  <Input
+                    value={draftTo}
+                    onChange={(event) => setDraftTo(event.target.value)}
+                    placeholder="Recipient"
+                    className="h-9"
+                  />
+                  <Input
+                    value={draftSubject}
+                    onChange={(event) => setDraftSubject(event.target.value)}
+                    placeholder="Subject"
+                    className="h-9"
+                  />
+                  <Textarea
+                    value={draftBody}
+                    onChange={(event) => setDraftBody(event.target.value)}
+                    placeholder="Message"
+                    rows={4}
+                  />
                   <Button type="button" size="sm" disabled={savingDraft} onClick={() => void saveDraft()}>
                     {savingDraft ? "Saving…" : "Save draft"}
                   </Button>
@@ -176,7 +206,15 @@ export function GoogleView() {
   );
 }
 
-function Section({ title, empty, children }: { title: string; empty: string; children: ReactNode }) {
+function Section({
+  title,
+  empty,
+  children,
+}: {
+  title: string;
+  empty: string;
+  children: ReactNode;
+}) {
   const list = Array.isArray(children) ? children : [children];
   const items = list.filter(Boolean);
   return (
@@ -191,7 +229,7 @@ function Section({ title, empty, children }: { title: string; empty: string; chi
   );
 }
 
-function MessageRow({ message }: { message: GoogleMessage }) {
+function MessageRow({ message }: { message: GoogleMessage; }) {
   return (
     <div className="border-b border-border pb-3 last:border-0 last:pb-0">
       <p className="text-sm font-medium">{message.subject}</p>
@@ -201,7 +239,7 @@ function MessageRow({ message }: { message: GoogleMessage }) {
   );
 }
 
-function DocRow({ doc }: { doc: GoogleDoc }) {
+function DocRow({ doc }: { doc: GoogleDoc; }) {
   return (
     <div className="border-b border-border pb-3 last:border-0 last:pb-0">
       {doc.link ? (

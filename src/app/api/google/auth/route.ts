@@ -1,11 +1,16 @@
 import { googleAuthUrl, readGoogleConfig } from "@/lib/google/client";
+import { currentUserId } from "@/lib/connections/current";
 
 export async function GET(request: Request) {
-  if (!readGoogleConfig()) {
+  if (!await currentUserId()) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const origin = new URL(request.url).origin;
+  if (!readGoogleConfig(origin)) {
     return Response.redirect(new URL("/settings/connectors/google?error=missing_client", request.url));
   }
   const state = crypto.randomUUID();
-  const target = googleAuthUrl(state);
+  const target = googleAuthUrl(state, origin);
   if (!target) {
     return Response.redirect(new URL("/settings/connectors/google?error=missing_client", request.url));
   }

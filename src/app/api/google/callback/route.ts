@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { exchangeGoogleCode } from "@/lib/google/client";
+import { currentUserId } from "@/lib/connections/current";
 
 export async function GET(request: Request) {
+  if (!await currentUserId()) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const url = new URL(request.url);
   const destination = new URL("/settings/connectors/google", url.origin);
   const oauthError = url.searchParams.get("error");
@@ -17,13 +21,16 @@ export async function GET(request: Request) {
     return NextResponse.redirect(destination);
   }
   try {
-    await exchangeGoogleCode(code);
+    await exchangeGoogleCode(code, url.origin);
     destination.searchParams.set("connected", "1");
   } catch (error) {
     destination.searchParams.set("error", error instanceof Error ? error.message : "connect_failed");
   }
   const response = NextResponse.redirect(destination);
-  response.headers.append("Set-Cookie", "kismet_google_state=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax");
+  response.headers.append(
+    "Set-Cookie",
+    "kismet_google_state=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax",
+  );
   return response;
 }
 

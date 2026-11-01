@@ -7,6 +7,8 @@ import { SettingsShell } from "@/components/settings/settings-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import type { JiraApiErrorBody, JiraIssue, JiraStatus } from "@/lib/jira/types";
 import { formatRelativeTime } from "@/lib/utils";
 
@@ -27,6 +29,8 @@ export function JiraIssuesView() {
   const [loading, setLoading] = useState(false);
   const [syncedAt, setSyncedAt] = useState<Date | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [form, setForm] = useState({ baseUrl: "", email: "", apiToken: "", projectKey: "" });
+  const [connecting, setConnecting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -44,8 +48,9 @@ export function JiraIssuesView() {
   useEffect(() => {
     if (!status?.connected) return;
     let current = true;
-    setLoading(true);
     (async () => {
+      await Promise.resolve();
+      if (current) setLoading(true);
       try {
         const body = await getJson<{ issues: JiraIssue[] }>("/api/jira/issues");
         if (!current) return;
@@ -63,8 +68,26 @@ export function JiraIssuesView() {
     };
   }, [status?.connected, refreshKey]);
 
+  async function connection(action: "connect" | "disconnect") {
+    setConnecting(true);
+    setError(null);
+    const res = await fetch(`/api/jira/${action}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: action === "connect" ? JSON.stringify(form) : undefined,
+    });
+    const body = (await res.json()) as { error?: string };
+    setConnecting(false);
+    if (!res.ok) {
+      setError(body.error ?? "Could not update Jira connection.");
+      return;
+    }
+    setForm({ baseUrl: "", email: "", apiToken: "", projectKey: "" });
+    setRefreshKey((key) => key + 1);
+  }
+
   return (
-    <SettingsShell title="Jira" description="Read recent issues from the Kismet Jira site">
+    <SettingsShell title="Jira" description="Read recent issues from your Jira site">
       <Link
         href="/settings/connectors"
         className="mb-4 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
@@ -81,22 +104,31 @@ export function JiraIssuesView() {
       ) : !status.connected ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">Add the Jira site to .env</CardTitle>
+            <CardTitle className="text-sm">Connect Jira</CardTitle>
             <CardDescription className="text-xs leading-relaxed">
-              {status.error}
+              {status.error?.startsWith("Connect ") ? null : status.error}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-xs leading-relaxed text-muted-foreground">
+            {([
+              ["baseUrl", "Site URL", "https://your-site.atlassian.net"],
+              ["email", "Email", "you@example.com"],
+              ["apiToken", "API token", ""],
+              ["projectKey", "Project key (optional)", "PROJ"],
+            ] as const).map(([key, label, placeholder]) => (
+              <div className="space-y-1" key={key}>
+                <Label htmlFor={`jira-${key}`}>{label}</Label>
+                <Input
+                  id={`jira-${key}`}
+                  type={key === "apiToken" ? "password" : "text"}
+                  placeholder={placeholder}
+                  value={form[key]}
+                  onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+                />
+              </div>
+            ))}
             <p>
-              <span className="text-foreground">JIRA_BASE_URL.</span> Open the Kismet workspace in
-              Jira and copy the site address, like https://your-site.atlassian.net.
-            </p>
-            <p>
-              <span className="text-foreground">JIRA_EMAIL.</span> The email of the Atlassian
-              account that can see that workspace.
-            </p>
-            <p>
-              <span className="text-foreground">JIRA_API_TOKEN.</span> While signed into that
+              <span className="text-foreground">API token.</span> While signed into that
               account, create a token at{" "}
               <a
                 href="https://id.atlassian.com/manage-profile/security/api-tokens"
@@ -108,10 +140,9 @@ export function JiraIssuesView() {
               </a>
               .
             </p>
-            <p>Restart the dev server after saving .env, then check again.</p>
-            <Button type="button" size="sm" variant="outline" onClick={() => setRefreshKey((key) => key + 1)}>
-              <RefreshCw className="h-3 w-3" />
-              Check again
+            {error && <p className="text-destructive">{error}</p>}
+            <Button type="button" size="sm" disabled={connecting} onClick={() => void connection("connect")}>
+              {connecting ? "Connecting…" : "Connect"}
             </Button>
           </CardContent>
         </Card>
@@ -134,6 +165,7 @@ export function JiraIssuesView() {
                 <RefreshCw className={loading ? "h-3 w-3 animate-spin" : "h-3 w-3"} />
                 Refresh
               </Button>
+              <Button variant="outline" size="sm" onClick={() => void connection("disconnect")}>Disconnect</Button>
             </CardContent>
           </Card>
 

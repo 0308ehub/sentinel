@@ -1,7 +1,7 @@
 import "server-only";
 
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import path from "node:path";
+import { currentUserId } from "@/lib/connections/current";
+import { deleteConnection, getConnection, saveConnection } from "@/lib/connections/store";
 import type { GoogleDoc, GoogleMessage, GooglePreview, GoogleStatus } from "@/lib/google/types";
 
 const SCOPES = [
@@ -14,8 +14,6 @@ const SCOPES = [
   "https://www.googleapis.com/auth/drive.readonly",
 ];
 
-const TOKEN_PATH = path.join(process.cwd(), ".data", "google-oauth.json");
-
 interface GoogleConfig {
   clientId: string;
   clientSecret: string;
@@ -26,7 +24,6 @@ interface StoredToken {
   refreshToken: string;
   accessToken?: string;
   expiresAt?: number;
-  email?: string;
 }
 
 interface TokenResponse {
@@ -41,16 +38,17 @@ export function googleScopes(): string[] {
   return SCOPES;
 }
 
-export function readGoogleConfig(): GoogleConfig | null {
+export function readGoogleConfig(origin?: string): GoogleConfig | null {
   const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
   if (!clientId || !clientSecret) return null;
-  const redirectUri = process.env.GOOGLE_REDIRECT_URI?.trim() || "http://localhost:3000/api/google/callback";
+  const redirectUri = process.env.GOOGLE_REDIRECT_URI?.trim() || (origin ? `${origin}/api/google/callback` : "");
+  if (!redirectUri) return null;
   return { clientId, clientSecret, redirectUri };
 }
 
-export function googleAuthUrl(state: string): string | null {
-  const config = readGoogleConfig();
+export function googleAuthUrl(state: string, origin: string): string | null {
+  const config = readGoogleConfig(origin);
   if (!config) return null;
   const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   url.searchParams.set("client_id", config.clientId);
@@ -64,8 +62,8 @@ export function googleAuthUrl(state: string): string | null {
   return url.toString();
 }
 
-export async function getGoogleStatus(): Promise<GoogleStatus> {
-  const config = readGoogleConfig();
+export async function getGoogleStatus(origin?: string): Promise<GoogleStatus> {
+  const config = readGoogleConfig(origin);
   if (!config) {
     return {
       configured: false,
@@ -78,8 +76,8 @@ export async function getGoogleStatus(): Promise<GoogleStatus> {
   return { configured: true, connected: true, email: stored.email };
 }
 
-export async function exchangeGoogleCode(code: string): Promise<void> {
-  const config = readGoogleConfig();
+export async function exchangeGoogleCode(code: string, origin: string): Promise<void> {
+  const config = readGoogleConfig(origin);
   if (!config) throw new Error("Google OAuth is not configured.");
   const token = await requestToken(config, {
     code,
@@ -87,11 +85,15 @@ export async function exchangeGoogleCode(code: string): Promise<void> {
     redirect_uri: config.redirectUri,
   });
   if (!token.refresh_token && !(await readToken())?.refreshToken) {
-    throw new Error("Google did not return a refresh token. Remove Kismet's access in your Google Account and connect again.");
+    throw new Error(
+      "Google did not return a refresh token. Remove Kismet's access in your Google Account and connect again.",
+    );
   }
   const previous = await readToken();
   const refreshToken = token.refresh_token || previous?.refreshToken;
-  if (!refreshToken || !token.access_token) throw new Error(token.error_description || "Google did not return an access token.");
+  if (!refreshToken || !token.access_token) {
+    throw new Error(token.error_description || "Google did not return an access token.");
+  }
   const email = await fetchEmail(token.access_token);
   await writeToken({
     refreshToken,
@@ -102,10 +104,16 @@ export async function exchangeGoogleCode(code: string): Promise<void> {
 }
 
 export async function disconnectGoogle(): Promise<void> {
-  await rm(TOKEN_PATH, { force: true });
+  const userId = await currentUserId();
+  if (!userId) throw new Error("Unauthorized");
+  await deleteConnection(userId, "google");
 }
 
-export async function createGmailDraft(input: { to: string; subject: string; body: string }): Promise<{ id: string }> {
+export async function createGmailDraft(input: {
+  to: string;
+  subject: string;
+  body: string;
+}): Promise<{ id: string }> {
   const to = input.to.trim().replace(/[\r\n]/g, "");
   const subject = input.subject.trim().replace(/[\r\n]/g, "");
   const body = input.body.trim();
@@ -115,12 +123,14 @@ export async function createGmailDraft(input: { to: string; subject: string; bod
   if (subject.length > 200 || body.length > 8000) throw new Error("That draft is too long.");
   const accessToken = await accessTokenOrThrow();
   const raw = Buffer.from(
-    [`To: ${to}`, `Subject: ${subject}`, 'Content-Type: text/plain; charset="UTF-8"', "", body].join("\r\n"),
-    "utf8"
+    [`To: ${to}`, `Subject: ${subject}`, "Content-Type: text/plain; charset=\"UTF-8\"", "", body].join("\r\n"),
+    "utf8",
   ).toString("base64url");
-  const created = await googleSend<{ id?: string }>(accessToken, "https://gmail.googleapis.com/gmail/v1/users/me/drafts", {
-    message: { raw },
-  });
+  const created = await googleSend<{ id?: string }>(
+    accessToken,
+    "https://gmail.googleapis.com/gmail/v1/users/me/drafts",
+    { message: { raw } },
+  );
   if (!created.id) throw new Error("Gmail did not return a draft.");
   return { id: created.id };
 }
@@ -136,7 +146,9 @@ async function accessTokenOrThrow(): Promise<string> {
   const config = readGoogleConfig();
   const stored = await readToken();
   if (!config || !stored?.refreshToken) throw new Error("Connect Google Workspace first.");
-  if (stored.accessToken && stored.expiresAt && stored.expiresAt > Date.now() + 60_000) return stored.accessToken;
+  if (stored.accessToken && stored.expiresAt && stored.expiresAt > Date.now() + 60_000) {
+    return stored.accessToken;
+  }
   const token = await requestToken(config, {
     grant_type: "refresh_token",
     refresh_token: stored.refreshToken,
@@ -176,7 +188,7 @@ async function fetchEmail(accessToken: string): Promise<string | undefined> {
 async function listInbox(accessToken: string): Promise<GoogleMessage[]> {
   const list = await googleGet<{ messages?: { id: string }[] }>(
     accessToken,
-    "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=6&q=in:inbox"
+    "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=6&q=in:inbox",
   );
   const messages = await Promise.all(
     (list.messages ?? []).map(async (item) => {
@@ -186,10 +198,11 @@ async function listInbox(accessToken: string): Promise<GoogleMessage[]> {
         payload?: { headers?: { name: string; value: string }[] };
       }>(
         accessToken,
-        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${item.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${item.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
       );
       const headers = full.payload?.headers ?? [];
-      const header = (name: string) => headers.find((entry) => entry.name.toLowerCase() === name.toLowerCase())?.value ?? "";
+      const header = (name: string) =>
+        headers.find((entry) => entry.name.toLowerCase() === name.toLowerCase())?.value ?? "";
       return {
         id: full.id,
         from: header("From"),
@@ -197,16 +210,18 @@ async function listInbox(accessToken: string): Promise<GoogleMessage[]> {
         date: header("Date"),
         snippet: full.snippet ?? "",
       };
-    })
+    }),
   );
   return messages;
 }
 
 async function listDocs(accessToken: string): Promise<GoogleDoc[]> {
   const query = encodeURIComponent("mimeType='application/vnd.google-apps.document' and trashed=false");
-  const listed = await googleGet<{ files?: { id: string; name: string; modifiedTime?: string; webViewLink?: string }[] }>(
+  const listed = await googleGet<{
+    files?: { id: string; name: string; modifiedTime?: string; webViewLink?: string }[];
+  }>(
     accessToken,
-    `https://www.googleapis.com/drive/v3/files?q=${query}&orderBy=modifiedTime desc&pageSize=6&fields=files(id,name,modifiedTime,webViewLink)`
+    `https://www.googleapis.com/drive/v3/files?q=${query}&orderBy=modifiedTime desc&pageSize=6&fields=files(id,name,modifiedTime,webViewLink)`,
   );
   const files = listed.files ?? [];
   const first = files[0];
@@ -223,14 +238,14 @@ async function listDocs(accessToken: string): Promise<GoogleDoc[]> {
 async function docExcerpt(accessToken: string, id: string): Promise<string | undefined> {
   const doc = await googleGet<{ body?: { content?: DocElement[] } }>(
     accessToken,
-    `https://docs.googleapis.com/v1/documents/${id}`
+    `https://docs.googleapis.com/v1/documents/${id}`,
   );
   const text = collectText(doc.body?.content ?? []).replace(/\s+/g, " ").trim();
   return text ? text.slice(0, 280) : undefined;
 }
 
 interface DocElement {
-  paragraph?: { elements?: { textRun?: { content?: string } }[] };
+  paragraph?: { elements?: { textRun?: { content?: string; }; }[]; };
   content?: DocElement[];
 }
 
@@ -261,15 +276,21 @@ async function googleGet<T>(accessToken: string, url: string): Promise<T> {
   return body;
 }
 
-async function readToken(): Promise<StoredToken | null> {
-  try {
-    return JSON.parse(await readFile(TOKEN_PATH, "utf8")) as StoredToken;
-  } catch {
-    return null;
-  }
+async function readToken(): Promise<(StoredToken & { email?: string }) | null> {
+  const userId = await currentUserId();
+  if (!userId) return null;
+  const connection = await getConnection<StoredToken>(userId, "google");
+  return connection
+    ? {
+        ...connection.secret,
+        email: typeof connection.meta.email === "string" ? connection.meta.email : undefined,
+      }
+    : null;
 }
 
-async function writeToken(token: StoredToken): Promise<void> {
-  await mkdir(path.dirname(TOKEN_PATH), { recursive: true });
-  await writeFile(TOKEN_PATH, JSON.stringify(token), { mode: 0o600 });
+async function writeToken(token: StoredToken & { email?: string }): Promise<void> {
+  const userId = await currentUserId();
+  if (!userId) throw new Error("Unauthorized");
+  const { email, ...secret } = token;
+  await saveConnection(userId, "google", secret, { email });
 }

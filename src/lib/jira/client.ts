@@ -1,5 +1,7 @@
 import "server-only";
 
+import { currentUserId } from "@/lib/connections/current";
+import { getConnection } from "@/lib/connections/store";
 import type { JiraIssue, JiraStatus } from "@/lib/jira/types";
 
 export class JiraApiError extends Error {
@@ -12,13 +14,21 @@ export class JiraApiError extends Error {
   }
 }
 
-const MISSING =
-  "Add JIRA_BASE_URL, JIRA_EMAIL, and JIRA_API_TOKEN to .env, then restart the dev server. The site URL is the address in the browser on the Kismet Jira workspace, like https://your-site.atlassian.net. Create the API token at https://id.atlassian.com/manage-profile/security/api-tokens while signed into that Atlassian account.";
+const CONNECT = "Connect Jira in Settings → Connectors → Jira.";
+const MISSING = "Add JIRA_BASE_URL, JIRA_EMAIL, and JIRA_API_TOKEN to .env, then restart the dev server.";
 
-interface JiraConfig {
+export interface JiraConfig {
   base: string;
   email: string;
   token: string;
+  projectKey?: string;
+}
+
+export interface JiraSecret {
+  baseUrl: string;
+  email: string;
+  apiToken: string;
+  projectKey?: string;
 }
 
 function blockedHost(hostname: string): boolean {
@@ -34,22 +44,52 @@ function blockedHost(hostname: string): boolean {
   return false;
 }
 
-function readConfig(): JiraConfig | null {
-  const raw = process.env.JIRA_BASE_URL?.trim();
-  const email = process.env.JIRA_EMAIL?.trim();
-  const token = process.env.JIRA_API_TOKEN?.trim();
-  if (!raw || !email || !token) return null;
-
+export function normalizeJiraConfig(secret: JiraSecret): JiraConfig {
+  const raw = secret.baseUrl.trim();
+  const email = secret.email.trim();
+  const token = secret.apiToken.trim();
+  if (!raw || !email || !token) throw new JiraApiError("missing_config", CONNECT, 503);
   let url: URL;
   try {
     url = new URL(raw);
   } catch {
-    throw new JiraApiError("invalid_site", "JIRA_BASE_URL should look like https://your-site.atlassian.net", 503);
+    throw new JiraApiError(
+      "invalid_site",
+      "Jira site URL should look like https://your-site.atlassian.net",
+      503,
+    );
   }
   if (url.protocol !== "https:" || blockedHost(url.hostname)) {
-    throw new JiraApiError("invalid_site", "JIRA_BASE_URL should be the https address of the Jira Cloud site.", 503);
+    throw new JiraApiError(
+      "invalid_site",
+      "Jira site URL should be the https address of the Jira Cloud site.",
+      503,
+    );
   }
-  return { base: url.origin, email, token };
+  return { base: url.origin, email, token, projectKey: secret.projectKey?.trim() || undefined };
+}
+
+async function readConfig(): Promise<JiraConfig | null> {
+  const userId = await currentUserId();
+  if (userId) {
+    try {
+      const stored = await getConnection<JiraSecret>(userId, "jira");
+      if (stored) return normalizeJiraConfig(stored.secret);
+    } catch (error) {
+      if (process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) throw error;
+    }
+  }
+  if (process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) return null;
+  const raw = process.env.JIRA_BASE_URL?.trim();
+  const email = process.env.JIRA_EMAIL?.trim();
+  const token = process.env.JIRA_API_TOKEN?.trim();
+  if (!raw || !email || !token) return null;
+  return normalizeJiraConfig({ baseUrl: raw, email, apiToken: token, projectKey: process.env.JIRA_PROJECT_KEY });
+}
+
+export async function jiraConnectionKey(): Promise<string> {
+  const c = await readConfig();
+  return c ? `${c.base}:${c.email}:${c.token}` : "";
 }
 
 async function callJira<T>(config: JiraConfig, path: string, init?: RequestInit): Promise<T> {
@@ -123,23 +163,23 @@ interface SearchResponse {
       summary?: string;
       description?: unknown;
       updated?: string;
-      status?: { name?: string };
-      issuetype?: { name?: string };
+      status?: { name?: string; };
+      issuetype?: { name?: string; };
       project?: { name?: string; key?: string };
-      assignee?: { displayName?: string } | null;
+      assignee?: { displayName?: string; } | null;
     };
   }[];
 }
 
-export async function getJiraStatus(): Promise<JiraStatus> {
+export async function getJiraStatus(candidate?: JiraConfig): Promise<JiraStatus> {
   let config: JiraConfig | null;
   try {
-    config = readConfig();
+    config = candidate ?? await readConfig();
   } catch (error) {
     if (error instanceof JiraApiError) return { connected: false, error: error.hint ?? error.code };
     throw error;
   }
-  if (!config) return { connected: false, error: MISSING };
+  if (!config) return { connected: false, error: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? CONNECT : MISSING };
 
   const [me, projects] = await Promise.all([
     callJira<Myself>(config, "/rest/api/3/myself"),
@@ -159,8 +199,14 @@ export async function getJiraStatus(): Promise<JiraStatus> {
 }
 
 export async function listRecentIssues(limit = 20): Promise<JiraIssue[]> {
-  const config = readConfig();
-  if (!config) throw new JiraApiError("missing_config", MISSING, 503);
+  const config = await readConfig();
+  if (!config) {
+    throw new JiraApiError(
+      "missing_config",
+      process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? CONNECT : MISSING,
+      503,
+    );
+  }
 
   const body = await callJira<SearchResponse>(config, "/rest/api/3/search/jql", {
     method: "POST",
@@ -186,8 +232,10 @@ export async function listRecentIssues(limit = 20): Promise<JiraIssue[]> {
     }));
 }
 
-export async function findJiraAccount(name: string): Promise<{ accountId: string; displayName: string } | null> {
-  const config = readConfig();
+export async function findJiraAccount(
+  name: string,
+): Promise<{ accountId: string; displayName: string } | null> {
+  const config = await readConfig();
   const query = name.trim();
   if (!config || !query) return null;
   const users = await callJira<{ accountId?: string; displayName?: string }[]>(
@@ -207,8 +255,14 @@ export async function assignJiraIssue(key: string, accountId: string): Promise<v
   if (!/^[A-Z][A-Z0-9]+-\d+$/.test(key)) {
     throw new JiraApiError("bad_key", "That is not a Jira issue key.", 400);
   }
-  const config = readConfig();
-  if (!config) throw new JiraApiError("missing_config", MISSING, 503);
+  const config = await readConfig();
+  if (!config) {
+    throw new JiraApiError(
+      "missing_config",
+      process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? CONNECT : MISSING,
+      503,
+    );
+  }
   await callJira(config, `/rest/api/3/issue/${encodeURIComponent(key)}/assignee`, {
     method: "PUT",
     body: JSON.stringify({ accountId }),
@@ -220,14 +274,20 @@ export async function createFeatureIssue(input: {
   description: string;
   assigneeAccountId?: string;
 }): Promise<{ key: string; url: string; sprint?: string }> {
-  const config = readConfig();
-  if (!config) throw new JiraApiError("missing_config", MISSING, 503);
+  const config = await readConfig();
+  if (!config) {
+    throw new JiraApiError(
+      "missing_config",
+      process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? CONNECT : MISSING,
+      503,
+    );
+  }
 
   const [me, projects] = await Promise.all([
     callJira<Myself>(config, "/rest/api/3/myself"),
     callJira<ProjectSearch>(config, "/rest/api/3/project/search?maxResults=20"),
   ]);
-  const projectKey = process.env.JIRA_PROJECT_KEY?.trim() || projects.values?.find((project) => project.key)?.key;
+  const projectKey = config.projectKey || projects.values?.find((project) => project.key)?.key;
   if (!projectKey) throw new JiraApiError("no_project", "No Jira project was found for this site.", 404);
 
   const description = {
@@ -243,22 +303,22 @@ export async function createFeatureIssue(input: {
       })),
   };
 
-  let created: { key?: string } | null = null;
+  let created: { key?: string; } | null = null;
   let lastError: unknown;
   const attempts = input.assigneeAccountId
     ? [
-        { issueType: "Task", accountId: input.assigneeAccountId },
-        { issueType: "Story", accountId: input.assigneeAccountId },
-        { issueType: "Task", accountId: undefined },
-      ]
+      { issueType: "Task", accountId: input.assigneeAccountId },
+      { issueType: "Story", accountId: input.assigneeAccountId },
+      { issueType: "Task", accountId: undefined },
+    ]
     : [
-        { issueType: "Task", accountId: me.accountId },
-        { issueType: "Story", accountId: me.accountId },
-        { issueType: "Task", accountId: undefined },
-      ];
+      { issueType: "Task", accountId: me.accountId },
+      { issueType: "Story", accountId: me.accountId },
+      { issueType: "Task", accountId: undefined },
+    ];
   for (const attempt of attempts) {
     try {
-      created = await callJira<{ key?: string }>(config, "/rest/api/3/issue", {
+      created = await callJira<{ key?: string; }>(config, "/rest/api/3/issue", {
         method: "POST",
         body: JSON.stringify({
           fields: {
@@ -283,7 +343,7 @@ export async function createFeatureIssue(input: {
 
   let sprint: string | undefined;
   try {
-    const boards = await callJira<AgileList<{ id?: number }>>(
+    const boards = await callJira<AgileList<{ id?: number; }>>(
       config,
       `/rest/agile/1.0/board?projectKeyOrId=${encodeURIComponent(projectKey)}`
     );

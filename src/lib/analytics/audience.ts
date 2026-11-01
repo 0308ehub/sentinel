@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { Audience, AudienceCustomer } from "@/lib/analytics/library";
-import { runDatabricksQuery } from "@/lib/databricks/client";
+import { databricksConnectionKey, runDatabricksQuery } from "@/lib/databricks/client";
 
 const CUSTOMERS = "samples.bakehouse.sales_customers";
 const TRANSACTIONS = "samples.bakehouse.sales_transactions";
@@ -15,7 +15,7 @@ export interface CustomerColumnMap {
 }
 
 const EMPTY_COLUMNS: CustomerColumnMap = { city: null, state: null, firstName: null, lastName: null };
-let columnsCache: CustomerColumnMap | null = null;
+const columnsCache = new Map<string, CustomerColumnMap>();
 
 function field(row: Record<string, string | null>, key: string): string {
   const found = Object.keys(row).find((item) => item.toLowerCase() === key);
@@ -27,7 +27,9 @@ function ident(name: string): string | null {
 }
 
 export async function customerColumns(): Promise<CustomerColumnMap> {
-  if (columnsCache) return columnsCache;
+  const key = await databricksConnectionKey();
+  const cached = columnsCache.get(key);
+  if (cached) return cached;
   try {
     const described = await runDatabricksQuery(`DESCRIBE TABLE ${CUSTOMERS}`);
     const names = described.rows.map((row) => field(row, "col_name")).filter((name) => name && !name.startsWith("#"));
@@ -35,16 +37,18 @@ export async function customerColumns(): Promise<CustomerColumnMap> {
       const match = names.find((name) => candidates.includes(name.toLowerCase()));
       return match ? ident(match) : null;
     };
-    columnsCache = {
+    const columns = {
       city: find("city"),
       state: find("state", "statecode", "state_code"),
       firstName: find("firstname", "first_name"),
       lastName: find("lastname", "last_name"),
     };
+    columnsCache.set(key, columns);
+    return columns;
   } catch {
-    columnsCache = EMPTY_COLUMNS;
+    columnsCache.set(key, EMPTY_COLUMNS);
+    return EMPTY_COLUMNS;
   }
-  return columnsCache;
 }
 
 export async function loadAudience(): Promise<Audience> {
@@ -73,7 +77,10 @@ export async function loadAudience(): Promise<Audience> {
         WHERE CAST(customerID AS STRING) IN (${ids})
       `);
       const byId = new Map(
-        names.rows.map((row) => [String(row.id ?? ""), `${row.first_name ?? ""} ${row.last_name ?? ""}`.replace(/\s+/g, " ").trim()])
+        names.rows.map((row) => [
+          String(row.id ?? ""),
+          `${row.first_name ?? ""} ${row.last_name ?? ""}`.replace(/\s+/g, " ").trim(),
+        ])
       );
       for (const customer of customers) {
         const name = byId.get(customer.id);

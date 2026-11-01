@@ -1,8 +1,11 @@
 import "server-only";
 
+import { currentUserId } from "@/lib/connections/current";
+import { getConnection } from "@/lib/connections/store";
+
 const API = "https://api.github.com";
-const MISSING =
-  "Add GITHUB_TOKEN to .env and restart the dev server. Create a fine-grained token at https://github.com/settings/tokens with Contents read and write, Pull requests read and write, and Metadata read on the repository you will test. A classic token needs the repo scope. Fork the app into your account first.";
+const CONNECT = "Connect GitHub in Settings → Connectors → GitHub.";
+const MISSING = "Add GITHUB_TOKEN to .env and restart the dev server.";
 
 export class GitHubApiError extends Error {
   constructor(
@@ -42,7 +45,7 @@ interface RepoPayload {
   private?: boolean;
   default_branch?: string;
   description?: string | null;
-  permissions?: { push?: boolean };
+  permissions?: { push?: boolean; };
 }
 
 interface ContentPayload {
@@ -58,7 +61,18 @@ interface TreePayload {
   tree?: { path?: string; type?: string }[];
 }
 
-function token(): string {
+async function token(): Promise<string> {
+  const userId = await currentUserId();
+  if (userId) {
+    try {
+      const stored = await getConnection<{ token?: unknown }>(userId, "github");
+      const value = typeof stored?.secret.token === "string" ? stored.secret.token.trim() : "";
+      if (value) return value;
+    } catch (error) {
+      if (process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) throw error;
+    }
+  }
+  if (process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) throw new GitHubApiError("missing_token", CONNECT, 503);
   const value = process.env.GITHUB_TOKEN?.trim();
   if (!value) throw new GitHubApiError("missing_token", MISSING, 503);
   return value;
@@ -70,11 +84,12 @@ export function repoName(value: string): { owner: string; repo: string } | null 
   return { owner: match[1], repo: match[2] };
 }
 
-async function github<T>(path: string, init?: RequestInit): Promise<T> {
+async function github<T>(path: string, init?: RequestInit, candidateToken?: string): Promise<T> {
+  const resolvedToken = candidateToken ?? await token();
   const res = await fetch(`${API}${path}`, {
     ...init,
     headers: {
-      Authorization: `Bearer ${token()}`,
+      Authorization: `Bearer ${resolvedToken}`,
       Accept: "application/vnd.github+json",
       "X-GitHub-Api-Version": "2022-11-28",
       "User-Agent": "kismet",
@@ -84,24 +99,30 @@ async function github<T>(path: string, init?: RequestInit): Promise<T> {
     cache: "no-store",
   });
   if (res.status === 401) {
-    throw new GitHubApiError("unauthorized", "GitHub rejected GITHUB_TOKEN. Create a new token and restart the dev server.", 401);
+    throw new GitHubApiError(
+      "unauthorized",
+      "GitHub rejected the token. Create a new token at https://github.com/settings/tokens.",
+      401,
+    );
   }
   if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { message?: string };
+    const body = (await res.json().catch(() => ({}))) as { message?: string; };
     throw new GitHubApiError("github_error", body.message || "GitHub request failed.", res.status);
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }
 
-export async function githubAccount(): Promise<GitHubAccount> {
-  const user = await github<{ login?: string }>("/user");
+export async function githubAccount(candidateToken?: string): Promise<GitHubAccount> {
+  const user = await github<{ login?: string; }>("/user", undefined, candidateToken);
   if (!user.login) throw new GitHubApiError("github_error", "GitHub did not return an account.", 502);
   return { login: user.login };
 }
 
 export async function listWritableRepos(): Promise<GitHubRepoSummary[]> {
-  const rows = await github<RepoPayload[]>("/user/repos?per_page=50&sort=updated&affiliation=owner,collaborator,organization_member");
+  const rows = await github<RepoPayload[]>(
+    "/user/repos?per_page=50&sort=updated&affiliation=owner,collaborator,organization_member",
+  );
   return rows
     .filter((row) => row.full_name && row.permissions?.push !== false)
     .map((row) => ({
@@ -160,7 +181,7 @@ export async function openPullRequest(input: {
 }): Promise<GitHubPull> {
   const parsed = repoName(input.fullName);
   if (!parsed) throw new GitHubApiError("bad_repo", "Use a repository like owner/name.", 400);
-  const head = await github<{ object?: { sha?: string } }>(
+  const head = await github<{ object?: { sha?: string; }; }>(
     `/repos/${parsed.owner}/${parsed.repo}/git/ref/heads/${encodeURIComponent(input.base)}`
   );
   const sha = head.object?.sha;
@@ -187,7 +208,9 @@ export async function openPullRequest(input: {
       body: input.body.slice(0, 6000),
     }),
   });
-  if (!pull.number || !pull.html_url) throw new GitHubApiError("github_error", "GitHub did not open the pull request.", 502);
+  if (!pull.number || !pull.html_url) {
+    throw new GitHubApiError("github_error", "GitHub did not open the pull request.", 502);
+  }
   return { number: pull.number, url: pull.html_url, branch: input.branch };
 }
 
@@ -200,10 +223,14 @@ export interface GitHubPullState {
 export async function getPull(fullName: string, number: number): Promise<GitHubPullState> {
   const parsed = repoName(fullName);
   if (!parsed) throw new GitHubApiError("bad_repo", "Use a repository like owner/name.", 400);
-  const pull = await github<{ state?: string; merged?: boolean; head?: { sha?: string } }>(
+  const pull = await github<{ state?: string; merged?: boolean; head?: { sha?: string; }; }>(
     `/repos/${parsed.owner}/${parsed.repo}/pulls/${number}`
   );
-  return { state: pull.state === "closed" ? "closed" : "open", merged: Boolean(pull.merged), headSha: pull.head?.sha ?? "" };
+  return {
+    state: pull.state === "closed" ? "closed" : "open",
+    merged: Boolean(pull.merged),
+    headSha: pull.head?.sha ?? "",
+  };
 }
 
 export async function mergePull(fullName: string, number: number, title: string): Promise<void> {
@@ -238,7 +265,13 @@ export async function commitChecks(fullName: string, sha: string): Promise<"pend
   if (status.total_count) results.push(status.state ?? "pending");
   for (const run of runs.check_runs ?? []) {
     if (run.status !== "completed") results.push("pending");
-    else results.push(run.conclusion === "success" || run.conclusion === "neutral" || run.conclusion === "skipped" ? "success" : "failure");
+    else {
+      results.push(
+        run.conclusion === "success" || run.conclusion === "neutral" || run.conclusion === "skipped"
+          ? "success"
+          : "failure",
+      );
+    }
   }
   if (results.length === 0) return "none";
   if (results.includes("failure") || results.includes("error")) return "failure";

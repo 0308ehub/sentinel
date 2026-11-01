@@ -1,5 +1,7 @@
 import "server-only";
 
+import { currentUserId } from "@/lib/connections/current";
+import { getConnection } from "@/lib/connections/store";
 import type {
   DatabricksCatalog,
   DatabricksQueryResult,
@@ -16,13 +18,20 @@ export class DatabricksApiError extends Error {
   }
 }
 
-const MISSING =
-  "Add DATABRICKS_HOST, DATABRICKS_TOKEN, and DATABRICKS_HTTP_PATH to .env, then restart the dev server. The host is the workspace URL in the browser. The token is under your user icon, Settings, Developer, Access tokens. The HTTP path is on the SQL warehouse, under Connection details.";
+const CONNECT = "Connect Databricks in Settings → Connectors → Databricks.";
+const MISSING = "Add DATABRICKS_HOST, DATABRICKS_TOKEN, and DATABRICKS_HTTP_PATH to .env, then restart the dev server.";
 
-interface DatabricksConfig {
+export interface DatabricksConfig {
   host: string;
   token: string;
   warehouseId: string;
+  catalog?: string;
+  schema?: string;
+}
+export interface DatabricksSecret {
+  host: string;
+  token: string;
+  httpPath: string;
   catalog?: string;
   schema?: string;
 }
@@ -45,26 +54,25 @@ function warehouseIdFrom(raw: string): string {
   return match?.[1] ?? raw.replace(/^\/+/, "");
 }
 
-function readConfig(): DatabricksConfig | null {
-  const hostRaw = process.env.DATABRICKS_HOST?.trim();
-  const token = process.env.DATABRICKS_TOKEN?.trim();
-  const pathRaw = process.env.DATABRICKS_HTTP_PATH?.trim() || process.env.DATABRICKS_WAREHOUSE_ID?.trim();
-  if (!hostRaw || !token || !pathRaw) return null;
-
+export function normalizeDatabricksConfig(secret: DatabricksSecret): DatabricksConfig {
+  const hostRaw = secret.host.trim();
+  const token = secret.token.trim();
+  const pathRaw = secret.httpPath.trim();
+  if (!hostRaw || !token || !pathRaw) throw new DatabricksApiError("missing_config", CONNECT, 503);
   let url: URL;
   try {
     url = new URL(hostRaw);
   } catch {
     throw new DatabricksApiError(
       "invalid_host",
-      "DATABRICKS_HOST should look like https://dbc-xxxx.cloud.databricks.com",
+      "The workspace URL should look like https://dbc-xxxx.cloud.databricks.com",
       503
     );
   }
   if (url.protocol !== "https:" || blockedHost(url.hostname)) {
     throw new DatabricksApiError(
       "invalid_host",
-      "DATABRICKS_HOST should be the https address of the Databricks workspace.",
+      "The workspace URL should be the https address of the Databricks workspace.",
       503
     );
   }
@@ -72,7 +80,7 @@ function readConfig(): DatabricksConfig | null {
   if (!warehouseId) {
     throw new DatabricksApiError(
       "invalid_warehouse",
-      "DATABRICKS_HTTP_PATH should look like /sql/1.0/warehouses/your-warehouse-id",
+      "The HTTP path should look like /sql/1.0/warehouses/your-warehouse-id",
       503
     );
   }
@@ -80,9 +88,38 @@ function readConfig(): DatabricksConfig | null {
     host: url.origin,
     token,
     warehouseId,
-    catalog: process.env.DATABRICKS_CATALOG?.trim() || undefined,
-    schema: process.env.DATABRICKS_SCHEMA?.trim() || undefined,
+    catalog: secret.catalog?.trim() || undefined,
+    schema: secret.schema?.trim() || undefined,
   };
+}
+
+async function readConfig(): Promise<DatabricksConfig | null> {
+  const userId = await currentUserId();
+  if (userId) {
+    try {
+      const stored = await getConnection<DatabricksSecret>(userId, "databricks");
+      if (stored) return normalizeDatabricksConfig(stored.secret);
+    } catch (error) {
+      if (process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) throw error;
+    }
+  }
+  if (process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) return null;
+  const host = process.env.DATABRICKS_HOST?.trim();
+  const token = process.env.DATABRICKS_TOKEN?.trim();
+  const httpPath = process.env.DATABRICKS_HTTP_PATH?.trim() || process.env.DATABRICKS_WAREHOUSE_ID?.trim();
+  if (!host || !token || !httpPath) return null;
+  return normalizeDatabricksConfig({
+    host,
+    token,
+    httpPath,
+    catalog: process.env.DATABRICKS_CATALOG,
+    schema: process.env.DATABRICKS_SCHEMA,
+  });
+}
+
+export async function databricksConnectionKey(): Promise<string> {
+  const c = await readConfig();
+  return c ? `${c.host}:${c.warehouseId}:${c.token}` : "";
 }
 
 async function callDatabricks<T>(config: DatabricksConfig, path: string, init?: RequestInit): Promise<T> {
@@ -108,21 +145,21 @@ async function callDatabricks<T>(config: DatabricksConfig, path: string, init?: 
   if (res.status === 403) {
     throw new DatabricksApiError(
       "forbidden",
-      "This token can sign in, but it cannot read the warehouse or catalogs. Use a token for an account that can open the Kismet SQL warehouse.",
+      "This token can sign in, but it cannot read the warehouse or catalogs. Use a token for an account that can open this SQL warehouse.",
       403
     );
   }
   if (res.status === 404) {
     throw new DatabricksApiError(
       "not_found",
-      "That workspace or warehouse was not found. Check DATABRICKS_HOST and the HTTP path on the SQL warehouse.",
+      "That workspace or warehouse was not found. Check the workspace URL and the HTTP path on the SQL warehouse.",
       404
     );
   }
   if (!res.ok) {
     let detail = "";
     try {
-      const body = (await res.json()) as { message?: string };
+      const body = (await res.json()) as { message?: string; };
       detail = body.message ? ` ${body.message}` : "";
     } catch {
       detail = "";
@@ -143,26 +180,26 @@ interface ScimMe {
 }
 
 interface CatalogList {
-  catalogs?: { name?: string }[];
+  catalogs?: { name?: string; }[];
 }
 
 interface SchemaList {
-  schemas?: { name?: string }[];
+  schemas?: { name?: string; }[];
 }
 
 interface TableList {
-  tables?: { name?: string }[];
+  tables?: { name?: string; }[];
 }
 
-export async function getDatabricksStatus(): Promise<DatabricksStatus> {
+export async function getDatabricksStatus(candidate?: DatabricksConfig): Promise<DatabricksStatus> {
   let config: DatabricksConfig | null;
   try {
-    config = readConfig();
+    config = candidate ?? await readConfig();
   } catch (error) {
     if (error instanceof DatabricksApiError) return { connected: false, error: error.hint ?? error.code };
     throw error;
   }
-  if (!config) return { connected: false, error: MISSING };
+  if (!config) return { connected: false, error: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? CONNECT : MISSING };
 
   const [me, warehouse] = await Promise.all([
     callDatabricks<ScimMe>(config, "/api/2.0/preview/scim/Me").catch(() => ({}) as ScimMe),
@@ -182,8 +219,14 @@ export async function getDatabricksStatus(): Promise<DatabricksStatus> {
 }
 
 export async function listDatabricksCatalogs(): Promise<DatabricksCatalog[]> {
-  const config = readConfig();
-  if (!config) throw new DatabricksApiError("missing_config", MISSING, 503);
+  const config = await readConfig();
+  if (!config) {
+    throw new DatabricksApiError(
+      "missing_config",
+      process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? CONNECT : MISSING,
+      503,
+    );
+  }
 
   const catalogBody = await callDatabricks<CatalogList>(config, "/api/2.0/unity-catalog/catalogs");
   const names = (catalogBody.catalogs ?? [])
@@ -209,7 +252,7 @@ export async function listDatabricksCatalogs(): Promise<DatabricksCatalog[]> {
     for (const schema of withTables) {
       const tableBody = await callDatabricks<TableList>(
         config,
-        `/api/2.0/unity-catalog/tables?catalog_name=${encodeURIComponent(name)}&schema_name=${encodeURIComponent(schema.name)}&max_results=40`
+        `/api/2.0/unity-catalog/tables?catalog_name=${encodeURIComponent(name)}&schema_name=${encodeURIComponent(schema.name)}&max_results=40`,
       );
       schema.tables = (tableBody.tables ?? [])
         .map((table) => table.name)
@@ -224,8 +267,14 @@ export async function listDatabricksCatalogs(): Promise<DatabricksCatalog[]> {
 const READ_ONLY = /^(select|with|show|describe|desc|explain)\b/i;
 
 export async function runDatabricksQuery(statement: string): Promise<DatabricksQueryResult> {
-  const config = readConfig();
-  if (!config) throw new DatabricksApiError("missing_config", MISSING, 503);
+  const config = await readConfig();
+  if (!config) {
+    throw new DatabricksApiError(
+      "missing_config",
+      process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? CONNECT : MISSING,
+      503,
+    );
+  }
 
   const stripped = statement.replace(/\/\*[\s\S]*?\*\//g, "").replace(/--.*$/gm, "").trim().replace(/;+\s*$/, "");
   if (!READ_ONLY.test(stripped) || /;\s*\S/.test(stripped)) {
@@ -252,7 +301,11 @@ export async function runDatabricksQuery(statement: string): Promise<DatabricksQ
   });
 
   let payload = initial;
-  for (let attempt = 0; attempt < 10 && (payload.status?.state === "PENDING" || payload.status?.state === "RUNNING"); attempt++) {
+  for (
+    let attempt = 0;
+    attempt < 10 && (payload.status?.state === "PENDING" || payload.status?.state === "RUNNING");
+    attempt++
+  ) {
     await new Promise((resolve) => setTimeout(resolve, 1000));
     payload = await callDatabricks<StatementResponse>(config, `/api/2.0/sql/statements/${payload.statement_id}`);
   }
@@ -284,9 +337,9 @@ export async function runDatabricksQuery(statement: string): Promise<DatabricksQ
 
 interface StatementResponse {
   statement_id?: string;
-  status?: { state?: string; error?: { message?: string } };
-  manifest?: { schema?: { columns?: { name: string }[] } };
-  result?: { data_array?: (string | null)[][] };
+  status?: { state?: string; error?: { message?: string; }; };
+  manifest?: { schema?: { columns?: { name: string; }[]; }; };
+  result?: { data_array?: (string | null)[][]; };
 }
 
 export function databricksErrorResponse(error: unknown): Response {

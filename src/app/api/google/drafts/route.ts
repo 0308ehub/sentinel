@@ -1,8 +1,18 @@
 import { createGmailDraft } from "@/lib/google/client";
+import { currentUserId } from "@/lib/connections/current";
 
 export async function POST(request: Request) {
-  const body = (await request.json().catch(() => null)) as { to?: string; subject?: string; body?: string } | null;
-  if (!body) return Response.json({ error: "Send a recipient, subject, and body." }, { status: 400 });
+  if (!await currentUserId()) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const body = (await request.json().catch(() => null)) as {
+    to?: string;
+    subject?: string;
+    body?: string;
+  } | null;
+  if (!body) {
+    return Response.json({ error: "Send a recipient, subject, and body." }, { status: 400 });
+  }
   try {
     const draft = await createGmailDraft({
       to: body.to ?? "",
