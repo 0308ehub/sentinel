@@ -394,6 +394,17 @@ export async function addEvents(events: NewEvent[]): Promise<void> {
   await sql`insert into kismet.events ${sql(rows)}`;
 }
 
+/** Number of events received for this account during the trailing window. */
+export async function eventsSince(hours: number): Promise<number> {
+  const sql = await db();
+  const safeHours = Math.max(1, Math.min(24 * 30, Math.floor(hours)));
+  const rows = await sql<{ count: number }[]>`
+    select count(*)::int as count from kismet.events
+    where user_id = ${scopeUser()} and at >= now() - (${safeHours} * interval '1 hour')
+  `;
+  return Number(rows[0]?.count ?? 0);
+}
+
 export interface ArmCount {
   arm: Arm;
   visitors: number;

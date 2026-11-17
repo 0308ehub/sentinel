@@ -171,6 +171,12 @@ create table if not exists kismet.autopilot_repo (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists kismet.autopilot_sites (
+  user_id text primary key,
+  site_key text not null unique,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists kismet.connections (
   user_id text not null,
   provider text not null,

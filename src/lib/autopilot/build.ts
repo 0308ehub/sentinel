@@ -1,7 +1,7 @@
 import "server-only";
 
 import { askForJson, readJson } from "@/lib/ai/respond";
-import { autopilotDryRun, autopilotRepo } from "@/lib/autopilot/repo";
+import { autopilotDryRun, autopilotRepo, defaultAutopilotRepo } from "@/lib/autopilot/repo";
 import { listExperiments, listSignals, log, setSignalStatus, updateExperiment } from "@/lib/autopilot/store";
 import type { Experiment, Signal } from "@/lib/autopilot/types";
 import { lockedFiles } from "@/lib/autopilot/overlap";
@@ -10,7 +10,23 @@ import { closePull, commitChecks, getPull, GitHubApiError, openPullRequest, type
 
 const IMPORT_LINE = 'import { useVariant } from "@/lib/autopilot/variant";';
 
-function codeRules(flag: string): string {
+function codeRules(flag: string, external: boolean): string {
+  if (external) {
+    return [
+      "Gate the new version with a small local React hook in the edited file.",
+      'It must default to useState("control") and, after mount, read const kismet = window.kismet; if it is missing, return.',
+      "When it exists, call",
+      `kismet.ready.then(() => setVariant(kismet.variant("${flag}"))).`,
+      "For a TypeScript file, add declare global with an optional Window.kismet whose ready is Promise<void> and whose",
+      'variant(flag: string) returns "control" or "treatment".',
+      "Control must render exactly what it renders today, including during server rendering and hydration.",
+      "The hook must be called at the top level of a client component, never conditionally.",
+      "The change must appear only where the experiment says, never on other pages: no global or fixed-position elements.",
+      "Use only components and imports that already exist in the file or React hooks. Match the existing style.",
+      `Add data-track="${flag}" to the new element.`,
+      "Do not invent data, results or claims.",
+    ].join(" ");
+  }
   return [
     `Gate the new version with the hook: ${IMPORT_LINE}`,
     `const variant = useVariant("${flag}"); render the change only when variant === "treatment".`,
@@ -51,7 +67,11 @@ async function pickFiles(base: string, experiment: Experiment, signal: Signal | 
 /** Raised when the only files this change could edit are in use by another experiment. */
 class FileBusy extends Error {}
 
-async function writeChange(experiment: Experiment, files: GitHubFile[]): Promise<{ file: GitHubFile; content: string; summary: string }> {
+async function writeChange(
+  experiment: Experiment,
+  files: GitHubFile[],
+  external: boolean
+): Promise<{ file: GitHubFile; content: string; summary: string }> {
   const locked = await lockedFiles(experiment.id);
   // Never two experiments in one file: the code would collide, and so would their cleanups. If the
   // file this change belongs in is taken, wait for it rather than forcing the change somewhere else.
@@ -64,7 +84,7 @@ async function writeChange(experiment: Experiment, files: GitHubFile[]): Promise
     [
       "Edit exactly one file to add an A/B experiment. Return JSON {path, content, summary}.",
       "path must be one of the files marked EDITABLE. content is the full new file. summary is one sentence for the pull request.",
-      codeRules(experiment.flag),
+      codeRules(experiment.flag, external),
     ].join(" "),
     [
       `EXPERIMENT: ${experiment.title}`,
@@ -84,7 +104,10 @@ async function writeChange(experiment: Experiment, files: GitHubFile[]): Promise
   const file = editable.find((f) => f.path === draft.path?.trim());
   const content = draft.content?.replace(/\r\n/g, "\n");
   if (!file || !content || content === file.content) throw new Error("The draft did not change an editable file.");
-  if (!content.includes(`useVariant("${experiment.flag}")`) || !content.includes("@/lib/autopilot/variant")) {
+  const gated = external
+    ? content.includes(`kismet.variant("${experiment.flag}")`)
+    : content.includes(`useVariant("${experiment.flag}")`) && content.includes("@/lib/autopilot/variant");
+  if (!gated) {
     throw new Error("The draft did not gate the change behind its experiment flag.");
   }
   if (content.length > 80_000) throw new Error("The edited file is too large.");
@@ -129,7 +152,7 @@ export async function buildNext(): Promise<string | null> {
     const base = await baseBranch();
     const files = await pickFiles(base, experiment, signal);
     if (files.length === 0) throw new Error("Could not find the files for this change.");
-    const change = await writeChange(experiment, files);
+    const change = await writeChange(experiment, files, repo !== defaultAutopilotRepo());
     if (autopilotDryRun() || isLocalSource()) {
       await updateExperiment(experiment.id, {
         status: "awaiting_approval",
