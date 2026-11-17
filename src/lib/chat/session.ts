@@ -373,13 +373,18 @@ export function sendChat(text: string) {
   return run;
 }
 
+/** A request to change the repository, as opposed to a question about the product. */
+export function asksForCodeChange(text: string): boolean {
+  return /\b(pull request|code change|open a pr|raise a pr|commit and push|edit the code|change the code|implement (this|a|the))\b/i.test(text);
+}
+
 export async function sendCode(text: string): Promise<void> {
   const content = text.trim();
   if (!content) return;
   const state = readStored();
   const now = new Date().toISOString();
   let thread = state.threads.find((item) => item.id === state.activeId);
-  if (!thread) {
+  if (!thread || thread.mode !== "code") {
     thread = {
       id: crypto.randomUUID(),
       title: content.replace(/\s+/g, " ").slice(0, 64),
@@ -392,7 +397,6 @@ export async function sendCode(text: string): Promise<void> {
     state.threads.unshift(thread);
     state.activeId = thread.id;
   }
-  if (thread.mode !== "code") return;
   thread.messages.push({ id: crypto.randomUUID(), role: "user", content, at: now });
   thread.updatedAt = now;
   pendingIds.add(thread.id);

@@ -101,6 +101,25 @@ export function AutopilotView() {
     }
   }
 
+  async function testSignal(signal: Signal) {
+    setBusy(signal.id);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/autopilot/signals/${signal.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "test" }),
+      });
+      const body = (await res.json()) as { message?: string; error?: string };
+      setMessage(body.message ?? body.error ?? null);
+      await load();
+    } catch {
+      setMessage("Could not start a test. Try again.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function dismissSignal(signal: Signal) {
     setBusy(signal.id);
     setMessage(null);
@@ -293,9 +312,20 @@ export function AutopilotView() {
           title="What's not working"
           count={problems.length}
           empty={state.lastRunAt ? "No problems found yet." : "Press Run now to start collecting evidence."}
+          note={
+            problems.some((signal) => signal.status === "open" && !signal.ready)
+              ? "Kismet starts a test on its own once a problem has 5 pieces of evidence. Test a fix starts one now."
+              : undefined
+          }
         >
           {problems.map((signal) => (
-            <SignalCard key={signal.id} signal={signal} onDismiss={() => dismissSignal(signal)} busy={busy === signal.id} />
+            <SignalCard
+              key={signal.id}
+              signal={signal}
+              onDismiss={() => dismissSignal(signal)}
+              onTest={() => testSignal(signal)}
+              busy={busy === signal.id}
+            />
           ))}
             </Section>
 
@@ -337,11 +367,13 @@ function Section({
   title,
   count,
   empty,
+  note,
   children,
 }: {
   title: string;
   count: number;
   empty?: string;
+  note?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -349,17 +381,29 @@ function Section({
       <h2 className="text-sm font-semibold">
         {title} <span className="font-normal text-muted-foreground">{count}</span>
       </h2>
+      {note && count > 0 && <p className="text-sm text-muted-foreground">{note}</p>}
       {count === 0 && empty ? <p className="text-sm text-muted-foreground">{empty}</p> : <div className="space-y-2">{children}</div>}
     </section>
   );
 }
 
-function SignalCard({ signal, onDismiss, busy }: { signal: Signal; onDismiss: () => void; busy: boolean }) {
+function SignalCard({
+  signal,
+  onDismiss,
+  onTest,
+  busy,
+}: {
+  signal: Signal;
+  onDismiss: () => void;
+  onTest: () => void;
+  busy: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const synthetic = signal.evidence.filter((e) => e.synthetic).length;
   return (
     <div className="rounded-md border border-border">
-      <button onClick={() => setOpen(!open)} className="flex w-full items-start gap-3 p-3 text-left hover:bg-muted/50">
+      <div className="flex items-start">
+      <button onClick={() => setOpen(!open)} className="flex min-w-0 flex-1 items-start gap-3 p-3 text-left hover:bg-muted/50">
         {open ? <ChevronDown className="mt-0.5 h-4 w-4 shrink-0" /> : <ChevronRight className="mt-0.5 h-4 w-4 shrink-0" />}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -382,6 +426,15 @@ function SignalCard({ signal, onDismiss, busy }: { signal: Signal; onDismiss: ()
           </p>
         </div>
       </button>
+      {signal.status !== "experimenting" && (
+        <div className="shrink-0 p-3 pl-0">
+          <Button size="sm" onClick={onTest} disabled={busy}>
+            {busy && <Loader2 className="animate-spin" />}
+            Test a fix
+          </Button>
+        </div>
+      )}
+      </div>
       {open && (
         <>
           <ul className="divide-y divide-border border-t border-border">

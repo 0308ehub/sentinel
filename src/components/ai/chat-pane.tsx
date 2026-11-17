@@ -32,6 +32,7 @@ import {
   removeFolder,
   runScheduled,
   schedulePrompt,
+  asksForCodeChange,
   sendChat,
   sendCode,
   setDraft,
@@ -260,7 +261,8 @@ function Composer({ utilities = false }: { utilities?: boolean }) {
     }
     const pulled = pullChipsForSend(draft.text, draft.chips);
     setDraft({ text: pulled.text, chips: pulled.chips, files: draft.files });
-    if (thread?.mode === "code" || (!thread && codeMode === "code")) {
+    const codeRequest = asksForCodeChange(pulled.text);
+    if (thread?.mode === "code" || (!thread && codeMode === "code") || (codeRequest && codeStatus?.configured)) {
       if (!codeStatus?.github || !codeStatus.repo) {
         setCodeError("Connect GitHub and choose a repository first.");
         return;

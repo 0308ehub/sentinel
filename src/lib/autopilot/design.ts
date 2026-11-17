@@ -52,15 +52,8 @@ function attemptsSummary(previous: Experiment[]): string {
     .join("\n");
 }
 
-/** Turns the strongest ready problem into an experiment brief. One per run keeps cost and noise down. */
-export async function designNext(): Promise<string | null> {
-  const [signals, experiments] = await Promise.all([listSignals(), listExperiments()]);
-  // One change in the build pipeline at a time, so a blocked build doesn't pile up drafts.
-  if (experiments.some((e) => e.status === "building")) return null;
-  const busy = new Set(experiments.filter((e) => ACTIVE.has(e.status)).map((e) => e.signalId));
-  const candidate: Signal | undefined = signals.find((s) => s.ready && s.status === "open" && !busy.has(s.id));
-  if (!candidate) return null;
-
+/** Designs one experiment for a problem. Returns null once the problem has used its attempts. */
+async function designCandidate(candidate: Signal, experiments: Experiment[]): Promise<string | null> {
   const previous = experiments.filter((e) => e.signalId === candidate.id).sort((a, b) => a.version - b.version);
   if (previous.length >= MAX_VERSIONS) {
     await setSignalStatus(candidate.id, "dismissed");
@@ -115,4 +108,31 @@ export async function designNext(): Promise<string | null> {
   await setSignalStatus(candidate.id, "experimenting");
   await log("design", `Designed “${answer.title}” for “${candidate.title}”.`, candidate.id);
   return `Designed an experiment for “${candidate.title}”.`;
+}
+
+/** Turns the strongest ready problem into an experiment brief. One per run keeps cost and noise down. */
+export async function designNext(): Promise<string | null> {
+  const [signals, experiments] = await Promise.all([listSignals(), listExperiments()]);
+  // One change in the build pipeline at a time, so a blocked build doesn't pile up drafts.
+  if (experiments.some((e) => e.status === "building")) return null;
+  const busy = new Set(experiments.filter((e) => ACTIVE.has(e.status)).map((e) => e.signalId));
+  const candidate = signals.find((s) => s.ready && s.status === "open" && !busy.has(s.id));
+  if (!candidate) return null;
+  return designCandidate(candidate, experiments);
+}
+
+/** Starts a test for one problem the person chose, including one that is still short of the evidence bar. */
+export async function designSignal(signalId: string): Promise<string> {
+  const [signals, experiments] = await Promise.all([listSignals(), listExperiments()]);
+  const candidate = signals.find((s) => s.id === signalId);
+  if (!candidate || candidate.status === "dismissed") throw new Error("That problem is not available.");
+  if (experiments.some((e) => e.status === "building")) {
+    throw new Error("Kismet is already building a change. This one starts when that build finishes.");
+  }
+  if (experiments.some((e) => e.signalId === candidate.id && ACTIVE.has(e.status))) {
+    throw new Error("Kismet is already testing this problem.");
+  }
+  const message = await designCandidate(candidate, experiments);
+  if (!message) throw new Error(`“${candidate.title}” needs a person after ${MAX_VERSIONS} attempts.`);
+  return message;
 }

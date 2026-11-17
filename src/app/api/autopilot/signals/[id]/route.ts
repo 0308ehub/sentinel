@@ -1,3 +1,5 @@
+import { buildNext } from "@/lib/autopilot/build";
+import { designSignal } from "@/lib/autopilot/design";
 import { withAutopilotUser } from "@/lib/autopilot/scope";
 import { setSignalStatus } from "@/lib/autopilot/store";
 import { currentUserId } from "@/lib/connections/current";
@@ -10,6 +12,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!userId) return Response.json({ error: "Sign in required." }, { status: 401 });
   const { id } = await params;
   const body = (await request.json().catch(() => ({}))) as { action?: string };
+  if (body.action === "test") {
+    try {
+      const message = await withAutopilotUser(userId, async () => {
+        const designed = await designSignal(id);
+        const built = await buildNext();
+        return [designed, built].filter(Boolean).join(" ");
+      });
+      return Response.json({ message });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not start a test.";
+      console.error("[autopilot] test signal", error);
+      return Response.json({ error: message }, { status: 400 });
+    }
+  }
   if (body.action !== "dismiss") return Response.json({ error: "Unknown action." }, { status: 400 });
   try {
     await withAutopilotUser(userId, () => setSignalStatus(id, "dismissed"));
