@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode, useSyncExternalStore } from "react";
 import Link from "next/link";
 import {
   ArrowUp,
@@ -49,25 +49,24 @@ import { fileBugFromChat } from "@/lib/issues/file-from-chat";
 import { useUIStore } from "@/stores/ui-store";
 import { cn } from "@/lib/utils";
 import { useAccount } from "@/lib/auth/use-account";
+import { GettingStarted } from "@/components/onboarding/getting-started";
+
+const noSubscribe = () => () => {};
 
 export function ChatPane({ variant, onClose }: { variant: "page" | "dock"; onClose?: () => void }) {
   const account = useAccount();
   const state = useChatState();
-  const draft = useComposerDraft();
   const thread = activeThread(state);
   const pending = threadPending(state.activeId);
   const [list, setList] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(true);
-  const [greeting, setGreeting] = useState("What should we look at?");
+  // Read after hydration so the server and client render the same greeting first.
+  const draftName = useSyncExternalStore(noSubscribe, () => readOnboarding().name, () => "");
   const bottomRef = useRef<HTMLDivElement>(null);
   const empty = !thread || thread.messages.length === 0;
-
-  useEffect(() => {
-    const draftProfile = readOnboarding();
-    const full = account?.name || draftProfile.name || (CURRENT_USER.name === "You" ? "" : CURRENT_USER.name);
-    const first = full.trim().split(/\s+/)[0] ?? "";
-    setGreeting(greetingFor(first && first !== "You" ? first : ""));
-  }, [account]);
+  const fullName = account?.name || draftName || (CURRENT_USER.name === "You" ? "" : CURRENT_USER.name);
+  const firstName = fullName.trim().split(/\s+/)[0] ?? "";
+  const greeting = greetingFor(firstName && firstName !== "You" ? firstName : "");
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -164,6 +163,7 @@ export function ChatPane({ variant, onClose }: { variant: "page" | "dock"; onClo
 function EmptyState({ greeting, dock }: { greeting: string; dock: boolean }) {
   return (
     <div className="m-auto flex w-full max-w-2xl flex-col items-center pb-6">
+      {!dock ? <GettingStarted /> : null}
       <h1 className={cn("text-center font-medium tracking-tight text-foreground/80", dock ? "text-xl" : "text-3xl")}>{greeting}</h1>
       <div className="mt-8 w-full">
         <Composer utilities />
@@ -562,6 +562,7 @@ function SchedulePanel() {
   const state = useChatState();
   const draft = useComposerDraft();
   const [when, setWhen] = useState("");
+  const [renderedAt] = useState(() => Date.now());
   return (
     <div className="mt-3 w-full max-w-md rounded-xl border border-border bg-card p-3">
       <form
@@ -582,7 +583,7 @@ function SchedulePanel() {
       </form>
       <div className="mt-2 space-y-2">
         {state.schedules.filter((item) => !item.done).map((item) => {
-          const due = new Date(item.at).getTime() <= Date.now();
+          const due = new Date(item.at).getTime() <= renderedAt;
           return (
             <div key={item.id} className="flex items-start justify-between gap-2 text-xs">
               <div>

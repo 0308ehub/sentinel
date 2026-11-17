@@ -1,4 +1,4 @@
-export const ONBOARDING_STEPS = ["you", "company", "goals", "database", "connect", "organize", "tour"] as const;
+export const ONBOARDING_STEPS = ["you", "github", "evidence"] as const;
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 
@@ -29,9 +29,9 @@ export interface OnboardingDraft {
   email: string;
   role: string;
   company: string;
-  website: string;
-  size: string;
-  goals: string[];
+  website?: string;
+  size?: string;
+  goals?: string[];
 }
 
 const KEY = "kismet-onboarding";
@@ -62,7 +62,7 @@ function text(value: unknown): string {
 export function normalizeOnboarding(value: unknown): OnboardingDraft {
   if (!value || typeof value !== "object" || Array.isArray(value)) return EMPTY_ONBOARDING;
   const parsed = value as Partial<OnboardingDraft>;
-  const step = typeof parsed.step === "string" && isOnboardingStep(parsed.step) ? parsed.step : "you";
+  const step = normalizeStep(parsed.step);
   return {
     started: parsed.started === true,
     completed: parsed.completed === true,
@@ -75,6 +75,14 @@ export function normalizeOnboarding(value: unknown): OnboardingDraft {
     size: text(parsed.size),
     goals: Array.isArray(parsed.goals) ? parsed.goals.filter((goal) => typeof goal === "string") : [],
   };
+}
+
+function normalizeStep(value: unknown): OnboardingStep {
+  if (typeof value !== "string") return "you";
+  if (isOnboardingStep(value)) return value;
+  if (["goals", "database"].includes(value)) return "github";
+  if (["connect", "organize", "tour"].includes(value)) return "evidence";
+  return "you";
 }
 
 function publish(next: OnboardingDraft): void {

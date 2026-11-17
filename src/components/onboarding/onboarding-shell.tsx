@@ -65,7 +65,7 @@ export function OnboardingShell({
               type="button"
               onClick={onNext}
               disabled={nextDisabled}
-              className="inline-flex h-10 items-center rounded-md bg-[#111] px-4 text-sm font-medium text-white disabled:opacity-30"
+              className="inline-flex h-10 items-center rounded-md bg-[#111] px-4 text-sm font-medium text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-30"
             >
               {nextLabel}
             </button>

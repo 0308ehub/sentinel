@@ -3,11 +3,8 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2 } from "lucide-react";
-import { ConnectorCatalog } from "@/components/connectors/connector-catalog";
 import { OnboardingShell } from "@/components/onboarding/onboarding-shell";
 import {
-  COMPANY_SIZES,
-  GOALS,
   ROLES,
   isOnboardingStep,
   readOnboarding,
@@ -15,56 +12,46 @@ import {
   type OnboardingDraft,
   type OnboardingStep,
 } from "@/lib/onboarding";
-import type { JiraStatus } from "@/lib/jira/types";
-import type { SlackStatus } from "@/lib/slack/types";
 import { useAccount } from "@/lib/auth/use-account";
 import { cn } from "@/lib/utils";
 
-const TOUR = [
-  {
-    title: "Ask in the chat",
-    body: "The front door is a conversation. Ask what people are saying, what to build next, or what a decision should be. When Slack is connected, the answer uses those messages and names the channel.",
-  },
-  {
-    title: "The workspace holds the picture",
-    body: "Explorer, Features, Timeline, and Graph are where Kismet files what it organizes. A feature, a problem, and a Slack thread can sit on the same product.",
-  },
-  {
-    title: "Decisions stay attached to evidence",
-    body: "Decisions, Analytics, and Settings are the rest of the workspace. Settings holds the connector list, and each tool files what it produces onto the product graph.",
-  },
-];
+const LEGACY_STEPS: Record<string, OnboardingStep> = {
+  company: "you",
+  goals: "github",
+  database: "github",
+  connect: "evidence",
+  organize: "evidence",
+  tour: "evidence",
+};
 
 export function OnboardingFlow({ step }: { step: string }) {
   const router = useRouter();
   const account = useAccount();
-  const [draft, setDraft] = useState<OnboardingDraft | null>(null);
-  const [tourIndex, setTourIndex] = useState(0);
+  const [draft, setDraft] = useState<OnboardingDraft>(readOnboarding);
 
   useEffect(() => {
-    let saved = readOnboarding();
+    const saved = readOnboarding();
     if (account && (!saved.name || !saved.email)) {
-      saved = writeOnboarding({
-        started: true,
-        name: saved.name || account.name,
-        email: saved.email || account.email,
+      void Promise.resolve().then(() => {
+        const next = writeOnboarding({
+          started: true,
+          name: saved.name || account.name,
+          email: saved.email || account.email,
+        });
+        setDraft(next);
       });
     }
     if (!isOnboardingStep(step)) {
-      router.replace(`/onboarding/${saved.step}`);
+      router.replace(`/onboarding/${LEGACY_STEPS[step] ?? saved.step}`);
       return;
     }
-    setDraft(saved);
   }, [account, router, step]);
 
-  if (!draft || !isOnboardingStep(step)) {
-    return <div className="min-h-screen bg-white" />;
-  }
+  if (!isOnboardingStep(step)) return <div className="min-h-screen bg-white" />;
 
   function save(patch: Partial<OnboardingDraft>) {
     const next = writeOnboarding(patch);
     setDraft(next);
-    return next;
   }
 
   function go(next: OnboardingStep, patch?: Partial<OnboardingDraft>) {
@@ -73,188 +60,96 @@ export function OnboardingFlow({ step }: { step: string }) {
   }
 
   if (step === "you") {
-    return (
-      <OnboardingShell
-        step="you"
-        title="What should we call you?"
-        description="Kismet uses this on your workspace and when it files something you added."
-        nextDisabled={!draft.name.trim() || !draft.role}
-        onNext={() => go("company", { name: draft.name.trim(), role: draft.role })}
-      >
-        <Field label="Name">
-          <input
-            value={draft.name}
-            onChange={(event) => setDraft({ ...draft, name: event.target.value })}
-            className={inputClass}
-            autoFocus
-          />
-        </Field>
-        <Field label="Role" className="mt-6">
-          <div className="grid grid-cols-2 gap-2">
-            {ROLES.map((role) => (
-              <Choice
-                key={role}
-                selected={draft.role === role}
-                onClick={() => setDraft({ ...draft, role })}
-                label={role}
-              />
-            ))}
-          </div>
-        </Field>
-      </OnboardingShell>
-    );
+    return <YouStep draft={draft} setDraft={setDraft} onNext={() => go("github", profilePatch(draft))} />;
   }
-
-  if (step === "company") {
-    return (
-      <OnboardingShell
-        step="company"
-        title="Tell us about the company"
-        description="This is the product workspace Kismet will organize."
-        onBack={() => go("you")}
-        nextDisabled={!draft.company.trim() || !draft.size}
-        onNext={() => go("goals", { company: draft.company.trim(), website: draft.website.trim(), size: draft.size })}
-      >
-        <Field label="Company">
-          <input
-            value={draft.company}
-            onChange={(event) => setDraft({ ...draft, company: event.target.value })}
-            placeholder="Company name"
-            className={inputClass}
-            autoFocus
-          />
-        </Field>
-        <Field label="Website" className="mt-5">
-          <input
-            value={draft.website}
-            onChange={(event) => setDraft({ ...draft, website: event.target.value })}
-            placeholder="company.com"
-            className={inputClass}
-          />
-        </Field>
-        <Field label="Team size" className="mt-5">
-          <div className="flex flex-wrap gap-2">
-            {COMPANY_SIZES.map((size) => (
-              <Choice
-                key={size}
-                selected={draft.size === size}
-                onClick={() => setDraft({ ...draft, size })}
-                label={size}
-                className="w-auto"
-              />
-            ))}
-          </div>
-        </Field>
-      </OnboardingShell>
-    );
+  if (step === "github") {
+    return <GitHubStep onBack={() => go("you")} onNext={() => go("evidence")} />;
   }
-
-  if (step === "goals") {
-    return (
-      <OnboardingShell
-        step="goals"
-        title="What do you want Kismet to help with?"
-        description="Pick everything that fits. This steers what gets filed first."
-        onBack={() => go("company")}
-        nextDisabled={draft.goals.length === 0}
-        onNext={() => go("database", { goals: draft.goals })}
-      >
-        <div className="space-y-2">
-          {GOALS.map((goal) => {
-            const selected = draft.goals.includes(goal.id);
-            return (
-              <Choice
-                key={goal.id}
-                selected={selected}
-                label={goal.label}
-                onClick={() => {
-                  setDraft((current) => {
-                    if (!current) return current;
-                    const goals = current.goals.includes(goal.id)
-                      ? current.goals.filter((id) => id !== goal.id)
-                      : [...current.goals, goal.id];
-                    return { ...current, goals };
-                  });
-                }}
-              />
-            );
-          })}
-        </div>
-      </OnboardingShell>
-    );
-  }
-
-  if (step === "database") {
-    return <DatabaseStep onBack={() => go("goals")} onNext={() => go("connect")} />;
-  }
-
-  if (step === "connect") {
-    return (
-      <ConnectStep onBack={() => go("goals")} onNext={() => go("organize")} />
-    );
-  }
-
-  if (step === "organize") {
-    return <OrganizeStep draft={draft} onBack={() => go("connect")} onNext={() => go("tour")} />;
-  }
-
-  const slide = TOUR[tourIndex];
-  const last = tourIndex === TOUR.length - 1;
   return (
-    <OnboardingShell
-      step="tour"
-      title={slide.title}
-      description={slide.body}
-      onBack={() => {
-        if (tourIndex === 0) go("organize");
-        else setTourIndex((n) => n - 1);
-      }}
-      nextLabel={last ? "Open Kismet" : "Next"}
-      onNext={() => {
-        if (!last) {
-          setTourIndex((n) => n + 1);
-          return;
-        }
-        writeOnboarding({ completed: true, step: "tour" });
+    <EvidenceStep
+      onBack={() => go("github")}
+      onFinish={() => {
+        writeOnboarding({ completed: true, step: "evidence" });
         router.push("/ai");
       }}
+    />
+  );
+}
+
+function profilePatch(draft: OnboardingDraft): Partial<OnboardingDraft> {
+  return { name: draft.name.trim(), role: draft.role, company: draft.company.trim() };
+}
+
+function YouStep({
+  draft,
+  setDraft,
+  onNext,
+}: {
+  draft: OnboardingDraft;
+  setDraft: (draft: OnboardingDraft) => void;
+  onNext: () => void;
+}) {
+  return (
+    <OnboardingShell
+      step="you"
+      title="Tell Kismet about you"
+      description="A few basics to set up your product workspace."
+      nextDisabled={!draft.name.trim() || !draft.role || !draft.company.trim()}
+      onNext={onNext}
     >
-      <div className="flex gap-2">
-        {TOUR.map((item, index) => (
-          <span
-            key={item.title}
-            className={cn("h-1.5 w-8 rounded-full", index === tourIndex ? "bg-[#111]" : "bg-[#e6e8ec]")}
-          />
-        ))}
-      </div>
+      <Field label="Name">
+        <input
+          value={draft.name}
+          onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+          className={inputClass}
+          autoFocus
+        />
+      </Field>
+      <Field label="Role" className="mt-5">
+        <div className="grid grid-cols-2 gap-2">
+          {ROLES.map((role) => (
+            <Choice key={role} selected={draft.role === role} onClick={() => setDraft({ ...draft, role })} label={role} />
+          ))}
+        </div>
+      </Field>
+      <Field label="Company name" className="mt-5">
+        <input
+          value={draft.company}
+          onChange={(event) => setDraft({ ...draft, company: event.target.value })}
+          className={inputClass}
+          placeholder="Acme"
+        />
+      </Field>
     </OnboardingShell>
   );
 }
 
-function DatabaseStep({ onBack, onNext }: { onBack: () => void; onNext: () => void }) {
-  const [url, setUrl] = useState("");
-  const [status, setStatus] = useState<{
-    configured?: boolean;
-    connected?: boolean;
-    database?: string;
-    tables?: { schema: string; name: string }[];
-    error?: string;
-  } | null>(null);
-  const [busy, setBusy] = useState(false);
+interface GitHubRepo {
+  fullName: string;
+}
+
+function GitHubStep({ onBack, onNext }: { onBack: () => void; onNext: () => void }) {
+  const [connected, setConnected] = useState(false);
+  const [login, setLogin] = useState("");
+  const [token, setToken] = useState("");
+  const [repos, setRepos] = useState<GitHubRepo[]>([]);
+  const [repo, setRepo] = useState("");
+  const [busy, setBusy] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    let cancel = false;
-    void fetch("/api/postgres/status")
-      .then((response) => response.json())
-      .then((body) => {
-        if (!cancel) setStatus(body);
-      })
-      .catch(() => {
-        if (!cancel) setStatus({ configured: false, connected: false });
-      });
+    let cancelled = false;
+    void loadGitHub().then((result) => {
+      if (cancelled) return;
+      setConnected(result.connected);
+      setLogin(result.login);
+      setRepos(result.repos);
+      setRepo(result.repo);
+      setError(result.error);
+      setBusy(false);
+    });
     return () => {
-      cancel = true;
+      cancelled = true;
     };
   }, []);
 
@@ -262,270 +157,307 @@ function DatabaseStep({ onBack, onNext }: { onBack: () => void; onNext: () => vo
     setBusy(true);
     setError("");
     try {
-      const response = await fetch("/api/postgres/connect", {
+      const body = await requestJson<{ connected?: boolean; login?: string; error?: string }>("/api/github/connect", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ token }),
       });
-      const body = (await response.json()) as typeof status;
-      setStatus(body);
-      if (!body?.connected) setError(body?.error || "Could not connect to that database.");
-      else setUrl("");
-    } catch {
-      setError("Could not connect to that database.");
+      if (!body.connected) throw new Error(body.error || "Could not connect GitHub.");
+      const repoBody = await requestJson<{ repos?: GitHubRepo[]; error?: string }>("/api/github/repos");
+      if (repoBody.error) throw new Error(repoBody.error);
+      setConnected(true);
+      setLogin(body.login ?? "");
+      setRepos(repoBody.repos ?? []);
+      setToken("");
+    } catch (caught) {
+      setError(errorMessage(caught, "Could not connect GitHub."));
     } finally {
       setBusy(false);
     }
   }
 
-  const connected = Boolean(status?.connected);
-  const tables = status?.tables ?? [];
+  async function chooseRepo(value: string) {
+    setRepo(value);
+    setError("");
+    if (!value) return;
+    setBusy(true);
+    try {
+      const body = await requestJson<{ repo?: string; error?: string }>("/api/autopilot/repo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repo: value }),
+      });
+      if (!body.repo) throw new Error(body.error || "Could not save the repository.");
+      setRepo(body.repo);
+    } catch (caught) {
+      setRepo("");
+      setError(errorMessage(caught, "Could not save the repository."));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <OnboardingShell
-      step="database"
-      title="Connect a database"
-      description="Paste a read-only Postgres URL for the database Kismet should read. Kismet checks the connection, saves it for this workspace, and does not write to it. You can skip this and add it later."
+      step="github"
+      title="Connect GitHub"
+      description="Autopilot opens pull requests on your repository."
       onBack={onBack}
       onNext={onNext}
-      nextLabel={connected ? "Continue" : "Skip for now"}
+      nextDisabled={!repo || busy}
     >
       {connected ? (
-        <div className="rounded-xl border border-[#e6e8ec] px-4 py-3 text-sm">
-          <p>Connected to {status?.database}.</p>
-          {tables.length > 0 ? (
-            <p className="mt-2 text-[#5c6570]">{tables.map((table) => `${table.schema}.${table.name}`).join(", ")}</p>
-          ) : null}
-        </div>
+        <RepoChoice login={login} repos={repos} repo={repo} busy={busy} onChange={(value) => void chooseRepo(value)} />
       ) : (
-        <>
-          <Field label="Connection URL">
-            <input
-              value={url}
-              onChange={(event) => setUrl(event.target.value)}
-              placeholder="postgres://user:password@host:5432/database"
-              className={inputClass}
-              autoComplete="off"
-              spellCheck={false}
-              type="text"
-            />
-          </Field>
-          <button
-            type="button"
-            onClick={() => void connect()}
-            disabled={busy || !url.trim()}
-            className="mt-3 inline-flex h-10 items-center rounded-md bg-[#111] px-4 text-sm font-medium text-white disabled:opacity-30"
-          >
-            {busy ? "Checking…" : "Test and save"}
-          </button>
-        </>
+        <GitHubToken token={token} busy={busy} onChange={setToken} onConnect={() => void connect()} />
       )}
-      {status && status.configured === false ? (
-        <p className="mt-4 text-sm text-[#5c6570]">
-          This deploy still needs its own database. Set DATABASE_URL to the Supabase pooler URI, then connect the database you want Kismet to read.
-        </p>
-      ) : null}
-      {error ? <p className="mt-4 text-sm text-[#5c6570]">{error}</p> : null}
+      {error ? <p role="alert" className="mt-3 text-sm text-red-600">{error}</p> : null}
+      <button type="button" onClick={onNext} className={skipClass}>Skip for now</button>
     </OnboardingShell>
   );
 }
 
-function ConnectStep({ onBack, onNext }: { onBack: () => void; onNext: () => void }) {
-  const [ready, setReady] = useState(false);
-
-  return (
-    <OnboardingShell
-      step="connect"
-      wide
-      title="Connect your tools"
-      description="Pick the systems the company already uses. Each one asks for the URL or key it needs. Kismet files what that source produces onto the product graph."
-      onBack={onBack}
-      onNext={onNext}
-      nextLabel={ready ? "Continue" : "Skip for now"}
-    >
-      <ConnectorCatalog onConnectionsChange={setReady} />
-    </OnboardingShell>
-  );
+async function loadGitHub() {
+  try {
+    const status = await requestJson<{ connected?: boolean; login?: string }>("/api/github/status");
+    if (!status.connected) return { connected: false, login: "", repos: [], repo: "", error: "" };
+    const [repoList, selected] = await Promise.all([
+      requestJson<{ repos?: GitHubRepo[]; error?: string }>("/api/github/repos"),
+      requestJson<{ repo?: string }>("/api/autopilot/repo"),
+    ]);
+    return {
+      connected: true,
+      login: status.login ?? "",
+      repos: repoList.repos ?? [],
+      repo: selected.repo ?? "",
+      error: repoList.error ?? "",
+    };
+  } catch (caught) {
+    return { connected: false, login: "", repos: [], repo: "", error: errorMessage(caught, "Could not load GitHub.") };
+  }
 }
 
-function OrganizeStep({
-  draft,
-  onBack,
-  onNext,
+function GitHubToken({
+  token,
+  busy,
+  onChange,
+  onConnect,
 }: {
-  draft: OnboardingDraft;
-  onBack: () => void;
-  onNext: () => void;
+  token: string;
+  busy: boolean;
+  onChange: (value: string) => void;
+  onConnect: () => void;
 }) {
-  const [lines, setLines] = useState<{ id: string; label: string; state: "wait" | "run" | "done" }[]>([
-    { id: "profile", label: "Saving your profile", state: "wait" },
-    { id: "company", label: "Saving the company", state: "wait" },
-    { id: "goals", label: "Noting what you want to accomplish", state: "wait" },
-    { id: "slack", label: "Checking Slack", state: "wait" },
-    { id: "database", label: "Checking the database", state: "wait" },
-    { id: "jira", label: "Checking Jira", state: "wait" },
-    { id: "ready", label: "Preparing the workspace", state: "wait" },
-  ]);
-  const [finished, setFinished] = useState(false);
+  return (
+    <>
+      <Field label="Personal access token">
+        <input
+          type="password"
+          value={token}
+          onChange={(event) => onChange(event.target.value)}
+          className={inputClass}
+          placeholder="github_pat_…"
+          autoComplete="off"
+        />
+      </Field>
+      <p className="mt-3 text-sm leading-relaxed text-[#5c6570]">
+        <a
+          href="https://github.com/settings/personal-access-tokens/new"
+          target="_blank"
+          rel="noreferrer"
+          className="text-[#0571d3] underline underline-offset-2 focus-visible:outline focus-visible:outline-2"
+        >
+          Create a fine-grained token
+        </a>{" "}
+        with Contents read/write, Pull requests read/write, Commit statuses read, Checks read, and Metadata read.
+      </p>
+      <button type="button" onClick={onConnect} disabled={busy || !token.trim()} className={primaryClass}>
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+        Connect GitHub
+      </button>
+    </>
+  );
+}
+
+function RepoChoice({
+  login,
+  repos,
+  repo,
+  busy,
+  onChange,
+}: {
+  login: string;
+  repos: GitHubRepo[];
+  repo: string;
+  busy: boolean;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="rounded-xl border border-[#e6e8ec] p-4">
+      <p className="flex items-center gap-2 text-sm font-medium"><Check className="h-4 w-4 text-[#0571d3]" />Connected{login ? ` as ${login}` : ""}</p>
+      <Field label="Repository Autopilot ships to" className="mt-4">
+        <select value={repo} onChange={(event) => onChange(event.target.value)} disabled={busy} className={inputClass}>
+          <option value="">Choose a repository</option>
+          {repos.map((item) => <option key={item.fullName} value={item.fullName}>{item.fullName}</option>)}
+        </select>
+      </Field>
+    </div>
+  );
+}
+
+function EvidenceStep({ onBack, onFinish }: { onBack: () => void; onFinish: () => void }) {
+  const [slackConnected, setSlackConnected] = useState(false);
+  const [jiraConnected, setJiraConnected] = useState(false);
+  const [slackTeam, setSlackTeam] = useState("");
+  const [jiraSite, setJiraSite] = useState("");
 
   useEffect(() => {
     let cancelled = false;
-    const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
-    const mark = (id: string, label: string, state: "run" | "done") => {
+    void Promise.all([
+      requestJson<{ connected?: boolean; team?: string }>("/api/slack/status").catch(
+        (): { connected?: boolean; team?: string } => ({}),
+      ),
+      requestJson<{ connected?: boolean; siteName?: string }>("/api/jira/status").catch(
+        (): { connected?: boolean; siteName?: string } => ({}),
+      ),
+    ]).then(([slack, jira]) => {
       if (cancelled) return;
-      setLines((current) => current.map((line) => (line.id === id ? { ...line, label, state } : line)));
-    };
-
-    async function run() {
-      mark("profile", `Saved ${draft.name || "your profile"}`, "run");
-      await wait(450);
-      mark("profile", `Saved ${draft.name || "your profile"}`, "done");
-      mark("company", draft.company ? `Saved ${draft.company}` : "Saving the company", "run");
-      await wait(450);
-      mark("company", draft.company ? `Saved ${draft.company}` : "Saved the company", "done");
-      mark("goals", "Noting what you want to accomplish", "run");
-      await wait(400);
-      mark("goals", `${draft.goals.length} goal${draft.goals.length === 1 ? "" : "s"} saved`, "done");
-      mark("slack", "Checking Slack", "run");
-      try {
-        const statusRes = await fetch("/api/slack/status");
-        const status = (await statusRes.json()) as SlackStatus;
-        if (status.connected) {
-          const channelsRes = await fetch("/api/slack/channels");
-          const body = (await channelsRes.json()) as { channels?: { name: string }[]; error?: string };
-          const names = (body.channels ?? []).slice(0, 4).map((channel) => `#${channel.name}`);
-          mark(
-            "slack",
-            names.length
-              ? `Slack · ${status.team ?? "workspace"} · ${names.join("  ")}`
-              : `Slack connected${status.team ? ` · ${status.team}` : ""}. Invite the bot to a channel to read it.`,
-            "done"
-          );
-        } else {
-          mark("slack", "Slack is not connected yet. You can add it in Settings.", "done");
-        }
-      } catch {
-        mark("slack", "Slack could not be reached. You can try again in Settings.", "done");
-      }
-      mark("database", "Checking the database", "run");
-      try {
-        const databaseRes = await fetch("/api/postgres/status");
-        const database = (await databaseRes.json()) as {
-          connected?: boolean;
-          database?: string;
-          tables?: { name: string }[];
-        };
-        const count = database.tables?.length ?? 0;
-        mark(
-          "database",
-          database.connected
-            ? `Postgres · ${database.database ?? "database"}${count ? ` · ${count} table${count === 1 ? "" : "s"}` : ""}`
-            : "No database connected yet. You can add one in Settings.",
-          "done",
-        );
-      } catch {
-        mark("database", "The database could not be reached. You can try again in Settings.", "done");
-      }
-      mark("jira", "Checking Jira", "run");
-      try {
-        const jiraRes = await fetch("/api/jira/status");
-        const jira = (await jiraRes.json()) as JiraStatus;
-        mark(
-          "jira",
-          jira.connected
-            ? `Jira connected${jira.siteName ? ` · ${jira.siteName}` : ""}`
-            : "Jira is not connected yet. You can add it in Settings.",
-          "done"
-        );
-      } catch {
-        mark("jira", "Jira could not be reached. You can try again in Settings.", "done");
-      }
-      mark("ready", "Workspace is ready", "run");
-      await wait(500);
-      mark("ready", "Workspace is ready", "done");
-      if (!cancelled) setFinished(true);
-    }
-
-    void run();
+      setSlackConnected(Boolean(slack.connected));
+      setSlackTeam(slack.team ?? "");
+      setJiraConnected(Boolean(jira.connected));
+      setJiraSite(jira.siteName ?? "");
+    });
     return () => {
       cancelled = true;
     };
-  }, [draft.company, draft.goals.length, draft.name]);
+  }, []);
 
+  const connected = slackConnected || jiraConnected;
   return (
     <OnboardingShell
-      step="organize"
-      title="Setting up your workspace"
-      description="Kismet is saving what you told us and checking what you connected."
-      onBack={finished ? onBack : undefined}
-      onNext={finished ? onNext : undefined}
-      nextLabel="See how Kismet works"
-      nextDisabled={!finished}
-      hideFooter={!finished}
+      step="evidence"
+      title="Where do customer problems show up?"
+      description="Connect an evidence source now, or add one later in Settings."
+      onBack={onBack}
+      onNext={onFinish}
+      nextLabel={connected ? "Finish" : "Skip for now"}
     >
-      <ul className="space-y-3">
-        {lines.map((line) => (
-          <li key={line.id} className="flex items-start gap-3 text-sm">
-            <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center">
-              {line.state === "done" ? (
-                <Check className="h-4 w-4 text-[#0571d3]" />
-              ) : line.state === "run" ? (
-                <Loader2 className="h-4 w-4 animate-spin text-[#5c6570]" />
-              ) : (
-                <span className="h-1.5 w-1.5 rounded-full bg-[#d5d8de]" />
-              )}
-            </span>
-            <span className={line.state === "wait" ? "text-[#8b939e]" : "text-[#111]"}>{line.label}</span>
-          </li>
-        ))}
-      </ul>
+      <div className="space-y-3">
+        <SlackOption connected={slackConnected} team={slackTeam} onConnected={(team) => { setSlackConnected(true); setSlackTeam(team); }} />
+        <JiraOption connected={jiraConnected} site={jiraSite} onConnected={(site) => { setJiraConnected(true); setJiraSite(site); }} />
+      </div>
     </OnboardingShell>
   );
 }
 
-function Field({
-  label,
-  children,
-  className,
-}: {
-  label: string;
-  children: ReactNode;
-  className?: string;
-}) {
+function SlackOption({ connected, team, onConnected }: { connected: boolean; team: string; onConnected: (team: string) => void }) {
+  const [token, setToken] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function connect() {
+    setBusy(true);
+    setError("");
+    try {
+      const body = await requestJson<{ connected?: boolean; team?: string; error?: string }>("/api/slack/connect", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token }),
+      });
+      if (!body.connected) throw new Error(body.error || "Could not connect Slack.");
+      onConnected(body.team ?? "");
+      setToken("");
+    } catch (caught) {
+      setError(errorMessage(caught, "Could not connect Slack."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
-    <label className={cn("block", className)}>
-      <span className="mb-2 block text-sm text-[#5c6570]">{label}</span>
-      {children}
-    </label>
+    <EvidenceCard title="Slack" connected={connected} detail={team}>
+      <Field label="Bot User OAuth Token">
+        <input type="password" value={token} onChange={(event) => setToken(event.target.value)} placeholder="xoxb-…" className={inputClass} autoComplete="off" />
+      </Field>
+      <p className={helpClass}>Create a Slack app, add bot scopes channels:history, channels:read, and users:read, install it, copy the Bot User OAuth Token, then invite the bot to channels.</p>
+      <ConnectButton busy={busy} disabled={!token.trim()} onClick={() => void connect()}>Connect Slack</ConnectButton>
+      {error ? <p role="alert" className="mt-2 text-sm text-red-600">{error}</p> : null}
+    </EvidenceCard>
   );
 }
 
-function Choice({
-  label,
-  selected,
-  onClick,
-  className,
-}: {
-  label: string;
-  selected: boolean;
-  onClick: () => void;
-  className?: string;
-}) {
+function JiraOption({ connected, site, onConnected }: { connected: boolean; site: string; onConnected: (site: string) => void }) {
+  const [fields, setFields] = useState({ baseUrl: "", email: "", apiToken: "" });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function connect() {
+    setBusy(true);
+    setError("");
+    try {
+      const body = await requestJson<{ connected?: boolean; siteName?: string; error?: string }>("/api/jira/connect", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(fields),
+      });
+      if (!body.connected) throw new Error(body.error || "Could not connect Jira.");
+      onConnected(body.siteName ?? "");
+      setFields({ baseUrl: "", email: "", apiToken: "" });
+    } catch (caught) {
+      setError(errorMessage(caught, "Could not connect Jira."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const ready = fields.baseUrl.trim() && fields.email.trim() && fields.apiToken.trim();
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left text-sm transition-colors",
-        selected ? "border-[#111] bg-[#f7f8fa]" : "border-[#e6e8ec] hover:bg-[#fafbfc]",
-        className
-      )}
-    >
-      <span>{label}</span>
-      {selected && <Check className="h-4 w-4" />}
+    <EvidenceCard title="Jira" connected={connected} detail={site}>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Site URL"><input value={fields.baseUrl} onChange={(event) => setFields({ ...fields, baseUrl: event.target.value })} placeholder="https://company.atlassian.net" className={inputClass} /></Field>
+        <Field label="Email"><input type="email" value={fields.email} onChange={(event) => setFields({ ...fields, email: event.target.value })} className={inputClass} /></Field>
+      </div>
+      <Field label="API token" className="mt-3"><input type="password" value={fields.apiToken} onChange={(event) => setFields({ ...fields, apiToken: event.target.value })} className={inputClass} autoComplete="off" /></Field>
+      <ConnectButton busy={busy} disabled={!ready} onClick={() => void connect()}>Connect Jira</ConnectButton>
+      {error ? <p role="alert" className="mt-2 text-sm text-red-600">{error}</p> : null}
+    </EvidenceCard>
+  );
+}
+
+function EvidenceCard({ title, connected, detail, children }: { title: string; connected: boolean; detail: string; children: ReactNode }) {
+  return (
+    <section className="rounded-xl border border-[#e6e8ec] p-4">
+      <div className="flex items-center justify-between">
+        <h2 className="font-medium">{title}</h2>
+        {connected ? <span className="flex items-center gap-1 text-sm text-[#0571d3]"><Check className="h-4 w-4" />Connected{detail ? ` · ${detail}` : ""}</span> : null}
+      </div>
+      {!connected ? <div className="mt-4">{children}</div> : null}
+    </section>
+  );
+}
+
+function ConnectButton({ busy, disabled, onClick, children }: { busy: boolean; disabled: boolean; onClick: () => void; children: ReactNode }) {
+  return <button type="button" onClick={onClick} disabled={busy || disabled} className={primaryClass}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}{children}</button>;
+}
+
+async function requestJson<T>(input: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(input, { cache: "no-store", ...init });
+  return response.json() as Promise<T>;
+}
+
+function errorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
+
+function Field({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
+  return <label className={cn("block", className)}><span className="mb-2 block text-sm text-[#5c6570]">{label}</span>{children}</label>;
+}
+
+function Choice({ label, selected, onClick }: { label: string; selected: boolean; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className={cn("flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left text-sm transition-colors focus-visible:outline focus-visible:outline-2", selected ? "border-[#111] bg-[#f7f8fa]" : "border-[#e6e8ec] hover:bg-[#fafbfc]")}>
+      <span>{label}</span>{selected ? <Check className="h-4 w-4" /> : null}
     </button>
   );
 }
 
-const inputClass =
-  "h-11 w-full rounded-lg border border-[#e6e8ec] px-3 text-sm outline-none focus:border-[#111]";
+const inputClass = "h-11 w-full rounded-lg border border-[#e6e8ec] bg-white px-3 text-sm outline-none focus-visible:border-[#111] focus-visible:ring-2 focus-visible:ring-[#111]/20";
+const primaryClass = "mt-3 inline-flex h-10 items-center gap-2 rounded-md bg-[#111] px-4 text-sm font-medium text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-30";
+const skipClass = "mt-5 text-sm text-[#5c6570] underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2";
+const helpClass = "mt-2 text-xs leading-relaxed text-[#5c6570]";
