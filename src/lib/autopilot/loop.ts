@@ -13,6 +13,7 @@ import { workspaceEvidence } from "@/lib/autopilot/filed";
 import { analyticsFindings } from "@/lib/autopilot/findings";
 import { startExperiment, startQueued } from "@/lib/autopilot/lifecycle";
 import { measureRunning } from "@/lib/autopilot/measure";
+import { sampleEvidenceCount } from "@/lib/autopilot/sample-data";
 import { simulateTraffic } from "@/lib/autopilot/simulate";
 import {
   claimLegacyRows,
@@ -108,6 +109,7 @@ export async function autopilotState(): Promise<AutopilotState> {
     synthetic: syntheticEnabled(),
     dryRun: autopilotDryRun() || isLocalSource(),
     repo: null,
+    sampleEvidence: 0,
     summary: { evidenceThisWeek: 0, realThisWeek: 0, readySignals: 0, running: 0, needsYou: 0 },
   };
   if (!empty.configured) return empty;
@@ -116,17 +118,19 @@ export async function autopilotState(): Promise<AutopilotState> {
   try {
     await claimLegacyRows(userId);
     return await withAutopilotUser(userId, async () => {
-      const [signals, experiments, activity, last, counts, repo] = await Promise.all([
+      const [signals, experiments, activity, last, counts, repo, sampleEvidence] = await Promise.all([
         listSignals(),
         listExperiments(),
         listActivity(),
         lastRunAt(),
         evidenceCounts(7),
         sourceLabel(),
+        sampleEvidenceCount(),
       ]);
       return {
         ...empty,
         repo,
+        sampleEvidence,
         signals,
         experiments,
         activity,

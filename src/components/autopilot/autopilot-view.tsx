@@ -75,6 +75,26 @@ export function AutopilotView() {
     }
   }
 
+  async function removeSample() {
+    if (!window.confirm("Remove all sample evidence, and the problems and unbuilt experiments that rest only on it?")) return;
+    setBusy("sample");
+    setMessage(null);
+    try {
+      const res = await fetch("/api/autopilot/sample-data", { method: "DELETE" });
+      const body = (await res.json()) as { evidence?: number; signals?: number; experiments?: number; error?: string };
+      setMessage(
+        res.ok
+          ? `Removed ${body.evidence ?? 0} pieces of sample evidence, ${body.signals ?? 0} problems and ${body.experiments ?? 0} experiments.`
+          : body.error ?? "Could not remove the sample data."
+      );
+      await load();
+    } catch {
+      setMessage("Could not remove the sample data. Try again.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function act(
     experiment: Experiment,
     action: "approve" | "reject" | "rollout" | "stop" | "approve-cleanup" | "dismiss-cleanup"
@@ -157,6 +177,18 @@ export function AutopilotView() {
                 )}
               </span>
             </p>
+          )}
+
+          {!state.synthetic && state.sampleEvidence > 0 && (
+            <div className="flex items-center justify-between gap-4 rounded-md border border-border p-3 text-sm">
+              <p className="text-muted-foreground">
+                {state.sampleEvidence} pieces of sample evidence from before sample data was turned off are still here.
+              </p>
+              <Button variant="outline" size="sm" onClick={removeSample} disabled={busy === "sample"}>
+                {busy === "sample" && <Loader2 className="animate-spin" />}
+                Remove sample data
+              </Button>
+            </div>
           )}
           {state.dryRun && (
             <p className="rounded-md bg-muted p-3 text-xs text-muted-foreground">

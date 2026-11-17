@@ -19,7 +19,7 @@ export interface ConnectorDefinition {
   filesAs: string;
   /** Existing setup page for connectors the server already reads. */
   setupHref?: string;
-  live?: "slack" | "jira" | "databricks" | "google" | "postgres";
+  live?: "github" | "slack" | "jira" | "databricks" | "google" | "postgres";
   /** How records move between the tool and the product graph. */
   flow?: string;
 }
@@ -221,6 +221,7 @@ const RAW_CONNECTORS: ConnectorDefinition[] = [
     logo: "/connectors/github.svg",
     filesAs: "pull requests",
     setupHref: "/settings/connectors/github",
+    live: "github",
     fields: [secret("token", "Personal access token", "github_pat_…"), text("org", "Organization", "org name", false)],
   },
   {

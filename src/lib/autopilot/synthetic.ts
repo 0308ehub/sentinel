@@ -108,6 +108,10 @@ export function syntheticEvidence(count = 3 + Math.floor(Math.random() * 4)): Ne
   return items;
 }
 
+/** Made-up evidence and traffic for demos. Off in production unless AUTOPILOT_SYNTHETIC=on. */
 export function syntheticEnabled(): boolean {
-  return process.env.AUTOPILOT_SYNTHETIC?.trim() !== "off";
+  const setting = process.env.AUTOPILOT_SYNTHETIC?.trim();
+  if (setting === "off") return false;
+  if (setting === "on") return true;
+  return process.env.NODE_ENV !== "production";
 }

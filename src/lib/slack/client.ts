@@ -52,6 +52,13 @@ export async function slackConnectionKey(): Promise<string> {
 
 type SlackResponse = { ok: boolean; error?: string; needed?: string } & Record<string, unknown>;
 
+export interface SlackAuthResult {
+  [key: string]: unknown;
+  teamId?: string;
+  teamName?: string;
+  botUserId?: string;
+}
+
 async function callSlack<T extends SlackResponse>(
   method: string,
   params: Record<string, string | number | boolean | undefined> = {},
@@ -91,6 +98,11 @@ async function callSlack<T extends SlackResponse>(
   }
 
   throw new SlackApiError("ratelimited", HINTS.ratelimited, 429);
+}
+
+export async function validateSlackToken(token: string): Promise<SlackAuthResult> {
+  const auth = await callSlack<SlackResponse & { team?: string; team_id?: string; user_id?: string }>("auth.test", {}, token);
+  return { teamId: auth.team_id, teamName: auth.team, botUserId: auth.user_id };
 }
 
 const teamUrlCache = new Map<string, string>();

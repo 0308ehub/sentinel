@@ -121,6 +121,8 @@ export interface AutopilotState {
   dryRun: boolean;
   /** Where this account's changes go; null until the account chooses a repository. */
   repo: string | null;
+  /** Synthetic evidence this account still holds, of any age. */
+  sampleEvidence: number;
   summary: {
     evidenceThisWeek: number;
     realThisWeek: number;

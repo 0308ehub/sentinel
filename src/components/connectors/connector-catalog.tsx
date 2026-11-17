@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { CONNECTOR_CATEGORIES, CONNECTORS, type ConnectorDefinition, type ConnectorField } from "@/lib/connectors/catalog";
@@ -19,10 +19,72 @@ interface LiveState {
   label?: string;
 }
 
+type LiveProvider = NonNullable<ConnectorDefinition["live"]>;
+
+const SERVER_CREDENTIAL_PROVIDERS = new Set<LiveProvider>(["github", "slack", "jira", "databricks"]);
+
+async function responseJson(response: Response): Promise<Record<string, unknown>> {
+  try {
+    return (await response.json()) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
+async function fetchLiveState(provider: LiveProvider): Promise<LiveState> {
+  try {
+    const response = await fetch(`/api/${provider}/status`, { cache: "no-store" });
+    const body = await responseJson(response);
+    const connected = Boolean(body.connected);
+    if (provider === "github") return { connected, label: connected ? textValue(body.login) : textValue(body.hint) };
+    if (provider === "slack") return { connected, label: connected ? textValue(body.team) : textValue(body.error) };
+    if (provider === "jira") return { connected, label: connected ? textValue(body.siteName) : textValue(body.error) };
+    if (provider === "databricks") {
+      return { connected, label: connected ? textValue(body.warehouseName) || textValue(body.host) : textValue(body.error) };
+    }
+    if (provider === "google") {
+      return {
+        connected,
+        label: connected ? textValue(body.email) : body.configured ? undefined : "Needs a Google Cloud client",
+      };
+    }
+    return { connected, label: connected ? textValue(body.database) : textValue(body.error) };
+  } catch {
+    return { connected: false };
+  }
+}
+
+function textValue(value: unknown): string | undefined {
+  return typeof value === "string" && value ? value : undefined;
+}
+
+function isServerCredentialConnector(id: string): boolean {
+  return SERVER_CREDENTIAL_PROVIDERS.has(id as LiveProvider);
+}
+
+async function postConnection(provider: LiveProvider, values: Record<string, string>) {
+  const body = connectionBody(provider, values);
+  const response = await fetch(`/api/${provider}/connect`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const result = await responseJson(response);
+  return { ok: response.ok, error: textValue(result.error) || `Could not connect ${provider}.` };
+}
+
+function connectionBody(provider: LiveProvider, values: Record<string, string>): Record<string, string | undefined> {
+  if (provider === "github" || provider === "slack") return { token: values.token };
+  if (provider === "jira") {
+    return { baseUrl: values.site, email: values.email, apiToken: values.token };
+  }
+  return values;
+}
+
 export function ConnectorCatalog({ onConnectionsChange }: { onConnectionsChange?: (anyConnected: boolean) => void }) {
   const productId = useUIStore((s) => s.activeProductId);
   const [query, setQuery] = useState("");
-  const [savedIds, setSavedIds] = useState<string[]>([]);
+  const [savedIds, setSavedIds] = useState<string[]>(() => readSavedConnectors().map((item) => item.id));
   const [live, setLive] = useState<Record<string, LiveState>>({});
   const [openId, setOpenId] = useState<string | null>(null);
 
@@ -31,46 +93,30 @@ export function ConnectorCatalog({ onConnectionsChange }: { onConnectionsChange?
     setSavedIds(ids);
   }
 
+  const refreshLive = useCallback(async (provider: LiveProvider) => {
+    const state = await fetchLiveState(provider);
+    setLive((current) => ({ ...current, [provider]: state }));
+  }, []);
+
   useEffect(() => {
-    refreshSaved();
     let cancelled = false;
     Promise.all([
-      fetch("/api/slack/status", { cache: "no-store" }).then((res) => res.json()).catch(() => ({ connected: false })),
-      fetch("/api/jira/status", { cache: "no-store" }).then((res) => res.json()).catch(() => ({ connected: false })),
-      fetch("/api/databricks/status", { cache: "no-store" }).then((res) => res.json()).catch(() => ({ connected: false })),
-      fetch("/api/google/status", { cache: "no-store" }).then((res) => res.json()).catch(() => ({ connected: false })),
-      fetch("/api/postgres/status", { cache: "no-store" }).then((res) => res.json()).catch(() => ({ connected: false })),
-    ]).then(([slack, jira, databricks, google, postgres]) => {
+      fetchLiveState("github"),
+      fetchLiveState("slack"),
+      fetchLiveState("jira"),
+      fetchLiveState("databricks"),
+      fetchLiveState("google"),
+      fetchLiveState("postgres"),
+    ]).then(([github, slack, jira, databricks, google, postgres]) => {
       if (cancelled) return;
-      setLive({
-        slack: {
-          connected: Boolean(slack.connected),
-          label: slack.connected ? slack.team : slack.error,
-        },
-        jira: {
-          connected: Boolean(jira.connected),
-          label: jira.connected ? jira.siteName : jira.error,
-        },
-        databricks: {
-          connected: Boolean(databricks.connected),
-          label: databricks.connected ? databricks.warehouseName || databricks.host : databricks.error,
-        },
-        google: {
-          connected: Boolean(google.connected),
-          label: google.connected ? google.email : google.configured ? undefined : "Needs a Google Cloud client",
-        },
-        postgres: {
-          connected: Boolean(postgres.connected),
-          label: postgres.connected ? postgres.database : postgres.error,
-        },
-      });
+      setLive({ github, slack, jira, databricks, google, postgres });
     });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const anyConnected = savedIds.length > 0 || Object.values(live).some((item) => item.connected);
+  const anyConnected = savedIds.some((id) => !isServerCredentialConnector(id)) || Object.values(live).some((item) => item.connected);
   useEffect(() => {
     onConnectionsChange?.(anyConnected);
   }, [anyConnected, onConnectionsChange]);
@@ -125,6 +171,9 @@ export function ConnectorCatalog({ onConnectionsChange }: { onConnectionsChange?
                   const server = connector.live ? live[connector.live] : undefined;
                   const saved = savedIds.includes(connector.id);
                   const connected = Boolean(server?.connected);
+                  const serverCredential = isServerCredentialConnector(connector.id);
+                  const browserOnly = serverCredential && saved && !connected;
+                  const locallyConnected = !serverCredential && saved;
                   return (
                     <div key={connector.id} className="flex items-center gap-3 px-3 py-2.5">
                       <Mark name={connector.name} logo={connector.logo} />
@@ -132,14 +181,25 @@ export function ConnectorCatalog({ onConnectionsChange }: { onConnectionsChange?
                         <p className="text-sm font-medium">{connector.name}</p>
                         <p className="text-[11px] text-muted-foreground">
                           Files {connector.filesAs}. {connector.flow}
-                          {connected && server?.label ? ` · ${server.label}` : saved ? " · key saved in this browser" : ""}
+                          {connected && server?.label
+                            ? ` · ${server.label}`
+                            : browserOnly
+                              ? " · key saved in this browser only — open and save to connect"
+                              : saved
+                                ? " · key saved in this browser"
+                                : ""}
                         </p>
                       </div>
-                      <span className={cn("text-[11px]", connected || saved ? "text-foreground" : "text-muted-foreground")}>
-                        {connected ? "Connected" : saved ? "Saved" : "Not connected"}
+                      <span className={cn("text-[11px]", connected || locallyConnected ? "text-foreground" : "text-muted-foreground")}>
+                        {connected ? "Connected" : locallyConnected ? "Saved" : "Not connected"}
                       </span>
-                      <Button type="button" size="sm" variant={connected || saved ? "outline" : "default"} onClick={() => setOpenId(connector.id)}>
-                        {connected || saved ? "Edit" : "Connect"}
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={connected || locallyConnected || browserOnly ? "outline" : "default"}
+                        onClick={() => setOpenId(connector.id)}
+                      >
+                        {connected || locallyConnected || browserOnly ? "Edit" : "Connect"}
                       </Button>
                     </div>
                   );
@@ -157,19 +217,15 @@ export function ConnectorCatalog({ onConnectionsChange }: { onConnectionsChange?
             live={open.live ? live[open.live] : undefined}
             onClose={() => setOpenId(null)}
             onSaved={() => {
-              const label = writeAndFile(open, productId);
-              if (label) refreshSaved();
+              writeAndFile(open, productId);
+              refreshSaved();
               setOpenId(null);
             }}
+            onRefreshLive={refreshLive}
             onRemoved={() => {
-              void (async () => {
-                if (open.id === "postgres") await fetch("/api/postgres/disconnect", { method: "POST" });
-                removeConnector(open.id);
-                graphStore.getState().detachSource(open.id);
-                refreshSaved();
-                setLive((current) => ({ ...current, postgres: open.id === "postgres" ? { connected: false } : current.postgres }));
-                setOpenId(null);
-              })();
+              graphStore.getState().detachSource(open.id);
+              refreshSaved();
+              setOpenId(null);
             }}
           />
         )}
@@ -186,7 +242,6 @@ function writeAndFile(connector: ConnectorDefinition, productId: string) {
     ownerId: CURRENT_USER.id,
     productId,
   });
-  return true;
 }
 
 function ConnectorForm({
@@ -195,15 +250,17 @@ function ConnectorForm({
   onClose,
   onSaved,
   onRemoved,
+  onRefreshLive,
 }: {
   connector: ConnectorDefinition;
   live?: LiveState;
   onClose: () => void;
   onSaved: () => void;
   onRemoved: () => void;
+  onRefreshLive: (provider: LiveProvider) => Promise<void>;
 }) {
   const existing = savedConnector(connector.id);
-  const [values, setValues] = useState<Record<string, string>>({});
+  const [values, setValues] = useState<Record<string, string>>(() => ({ ...(existing?.values ?? {}) }));
   const [error, setError] = useState("");
 
   async function save() {
@@ -218,7 +275,15 @@ function ConnectorForm({
       setError(`Add ${missing.map((field) => field.label).join(", ")}.`);
       return;
     }
-    if (connector.id === "postgres" && next.url) {
+    if (connector.live && SERVER_CREDENTIAL_PROVIDERS.has(connector.live)) {
+      const response = await postConnection(connector.live, next);
+      if (!response.ok) {
+        setError(response.error);
+        return;
+      }
+      removeConnector(connector.id);
+      await onRefreshLive(connector.live);
+    } else if (connector.id === "postgres" && next.url) {
       const response = await fetch("/api/postgres/connect", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -233,6 +298,20 @@ function ConnectorForm({
       writeConnector(connector.id, next);
     }
     onSaved();
+  }
+
+  async function disconnect() {
+    if (connector.live && (SERVER_CREDENTIAL_PROVIDERS.has(connector.live) || connector.live === "postgres")) {
+      const response = await fetch(`/api/${connector.live}/disconnect`, { method: "POST" });
+      const body = await responseJson(response);
+      if (!response.ok) {
+        setError(textValue(body.error) || "Could not disconnect this connector.");
+        return;
+      }
+      await onRefreshLive(connector.live);
+    }
+    removeConnector(connector.id);
+    onRemoved();
   }
 
   return (
@@ -257,8 +336,8 @@ function ConnectorForm({
       </div>
       {error && <p className="text-xs text-muted-foreground">{error}</p>}
       <div className="flex items-center justify-between gap-2">
-        {existing ? (
-          <Button type="button" variant="outline" size="sm" onClick={onRemoved}>
+        {existing || live?.connected ? (
+          <Button type="button" variant="outline" size="sm" onClick={() => void disconnect()}>
             Disconnect
           </Button>
         ) : (
