@@ -21,6 +21,8 @@ jobs:
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
+          # A pasted secret can carry a trailing newline; the server trims its copy, so trim this one too.
+          CRON_SECRET=$(printf '%s' "$CRON_SECRET" | tr -d '[:space:]')
           if [ -z "$CRON_SECRET" ]; then
             echo "::error::Set the CRON_SECRET repository secret to the value in Vercel."
             exit 1
