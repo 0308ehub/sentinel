@@ -16,7 +16,7 @@ interface ChecklistStatus {
 const ITEMS = [
   { key: "github", label: "Connect GitHub", href: "/settings/connectors/github" },
   { key: "repo", label: "Choose the repository experiments ship to", href: "/settings/connectors/github" },
-  { key: "evidence", label: "Connect Slack or Jira", href: "/settings/connectors" },
+  { key: "evidence", label: "Connect Slack or Jira, or tell Kismet what customers say", href: "/settings/connectors" },
   { key: "autopilot", label: "Run your first experiment loop", href: "/autopilot" },
 ] as const;
 
@@ -53,7 +53,7 @@ export function GettingStarted() {
     <section className="mb-6 w-full rounded-xl border border-border bg-card p-4 text-left shadow-sm" aria-labelledby="getting-started-title">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 id="getting-started-title" className="text-sm font-medium">Get Autopilot working for you</h2>
+          <h2 id="getting-started-title" className="text-sm font-medium">Get Kismet running</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">{count} of {ITEMS.length}</p>
         </div>
         <button type="button" onClick={dismiss} aria-label="Dismiss getting started checklist" className="rounded p-1 text-muted-foreground hover:bg-muted focus-visible:outline focus-visible:outline-2">
@@ -94,12 +94,12 @@ async function loadStatus(): Promise<ChecklistStatus> {
     getJson<{ repo?: string }>("/api/autopilot/repo"),
     getJson<{ connected?: boolean }>("/api/slack/status"),
     getJson<{ connected?: boolean }>("/api/jira/status"),
-    getJson<{ lastRunAt?: string | null }>("/api/autopilot"),
+    getJson<{ lastRunAt?: string | null; summary?: { realThisWeek?: number } }>("/api/autopilot"),
   ]);
   return {
     github: Boolean(github?.connected),
     repo: Boolean(repo?.repo),
-    evidence: Boolean(slack?.connected || jira?.connected),
+    evidence: Boolean(slack?.connected || jira?.connected || (autopilot?.summary?.realThisWeek ?? 0) > 0),
     autopilot: Boolean(autopilot?.lastRunAt),
   };
 }

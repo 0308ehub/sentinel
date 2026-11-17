@@ -42,7 +42,7 @@ export async function addWorkspaceNote(userId: string, title: string, body: stri
   const note: WorkspaceNote = {
     id: `note_${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`,
     title: title.slice(0, 120),
-    body: body.slice(0, 4000),
+    body: body.slice(0, 8000),
     at: new Date().toISOString(),
   };
   return sql.begin(async (tx) => {

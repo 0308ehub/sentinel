@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Check, Loader2 } from "lucide-react";
 import { OnboardingShell } from "@/components/onboarding/onboarding-shell";
 import {
@@ -70,7 +70,8 @@ export function OnboardingFlow({ step }: { step: string }) {
       onBack={() => go("github")}
       onFinish={() => {
         writeOnboarding({ completed: true, step: "evidence" });
-        router.push("/ai");
+        void fetch("/api/autopilot/tick", { method: "POST", keepalive: true }).catch(() => undefined);
+        router.push("/autopilot");
       }}
     />
   );
@@ -306,8 +307,11 @@ function RepoChoice({
 }
 
 function EvidenceStep({ onBack, onFinish }: { onBack: () => void; onFinish: () => void }) {
+  const searchParams = useSearchParams();
   const [slackConnected, setSlackConnected] = useState(false);
   const [jiraConnected, setJiraConnected] = useState(false);
+  const [oauthAvailable, setOauthAvailable] = useState(false);
+  const [savedPoints, setSavedPoints] = useState(0);
   const [slackTeam, setSlackTeam] = useState("");
   const [jiraSite, setJiraSite] = useState("");
 
@@ -320,19 +324,24 @@ function EvidenceStep({ onBack, onFinish }: { onBack: () => void; onFinish: () =
       requestJson<{ connected?: boolean; siteName?: string }>("/api/jira/status").catch(
         (): { connected?: boolean; siteName?: string } => ({}),
       ),
-    ]).then(([slack, jira]) => {
+      requestJson<{ available?: boolean }>("/api/slack/oauth/available").catch(
+        (): { available?: boolean } => ({}),
+      ),
+    ]).then(([slack, jira, oauth]) => {
       if (cancelled) return;
       setSlackConnected(Boolean(slack.connected));
       setSlackTeam(slack.team ?? "");
       setJiraConnected(Boolean(jira.connected));
       setJiraSite(jira.siteName ?? "");
+      setOauthAvailable(Boolean(oauth.available));
     });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const connected = slackConnected || jiraConnected;
+  const ready = slackConnected || jiraConnected || savedPoints > 0;
+  const slackError = searchParams.get("slack_error");
   return (
     <OnboardingShell
       step="evidence"
@@ -340,18 +349,38 @@ function EvidenceStep({ onBack, onFinish }: { onBack: () => void; onFinish: () =
       description="Connect an evidence source now, or add one later in Settings."
       onBack={onBack}
       onNext={onFinish}
-      nextLabel={connected ? "Finish" : "Skip for now"}
+      nextLabel={ready ? "Start Kismet" : "Skip for now"}
     >
       <div className="space-y-3">
-        <SlackOption connected={slackConnected} team={slackTeam} onConnected={(team) => { setSlackConnected(true); setSlackTeam(team); }} />
+        <SlackOption
+          connected={slackConnected}
+          team={slackTeam}
+          oauthAvailable={oauthAvailable}
+          oauthError={slackError}
+          onConnected={(team) => { setSlackConnected(true); setSlackTeam(team); }}
+        />
         <JiraOption connected={jiraConnected} site={jiraSite} onConnected={(site) => { setJiraConnected(true); setJiraSite(site); }} />
+        <ContextOption saved={savedPoints} onSaved={setSavedPoints} />
       </div>
     </OnboardingShell>
   );
 }
 
-function SlackOption({ connected, team, onConnected }: { connected: boolean; team: string; onConnected: (team: string) => void }) {
+function SlackOption({
+  connected,
+  team,
+  oauthAvailable,
+  oauthError,
+  onConnected,
+}: {
+  connected: boolean;
+  team: string;
+  oauthAvailable: boolean;
+  oauthError: string | null;
+  onConnected: (team: string) => void;
+}) {
   const [token, setToken] = useState("");
+  const [showToken, setShowToken] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -374,11 +403,60 @@ function SlackOption({ connected, team, onConnected }: { connected: boolean; tea
 
   return (
     <EvidenceCard title="Slack" connected={connected} detail={team}>
-      <Field label="Bot User OAuth Token">
-        <input type="password" value={token} onChange={(event) => setToken(event.target.value)} placeholder="xoxb-…" className={inputClass} autoComplete="off" />
+      {oauthAvailable && !showToken ? (
+        <>
+          <a href="/api/slack/oauth/start?return=/onboarding/evidence" className={primaryClass}>Add to Slack</a>
+          <button type="button" onClick={() => setShowToken(true)} className={skipClass}>Use a bot token instead</button>
+        </>
+      ) : (
+        <>
+          <Field label="Bot User OAuth Token">
+            <input type="password" value={token} onChange={(event) => setToken(event.target.value)} placeholder="xoxb-…" className={inputClass} autoComplete="off" />
+          </Field>
+          <p className={helpClass}>Create a Slack app, add bot scopes channels:history, channels:read, and users:read, install it, copy the Bot User OAuth Token, then invite the bot to channels.</p>
+          <ConnectButton busy={busy} disabled={!token.trim()} onClick={() => void connect()}>Connect Slack</ConnectButton>
+        </>
+      )}
+      {oauthError ? <p role="alert" className="mt-2 text-sm text-red-600">Slack could not connect ({oauthError}).</p> : null}
+      {error ? <p role="alert" className="mt-2 text-sm text-red-600">{error}</p> : null}
+    </EvidenceCard>
+  );
+}
+
+function ContextOption({ saved, onSaved }: { saved: number; onSaved: (count: number) => void }) {
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function save() {
+    setBusy(true);
+    setError("");
+    try {
+      const body = await requestJson<{ saved?: number; error?: string }>("/api/autopilot/context", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }),
+      });
+      if (typeof body.saved !== "number") throw new Error(body.error || "Could not save your context.");
+      onSaved(body.saved);
+      setText("");
+    } catch (caught) {
+      setError(errorMessage(caught, "Could not save your context."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <EvidenceCard title="Or tell Kismet in your own words" connected={saved > 0} detail={saved ? `Saved ${saved} points` : ""}>
+      <Field label="Product and customer context">
+        <textarea
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+          placeholder="What your product does and what customers complain about or ask for"
+          className={cn(inputClass, "h-32 py-3")}
+          maxLength={8000}
+        />
       </Field>
-      <p className={helpClass}>Create a Slack app, add bot scopes channels:history, channels:read, and users:read, install it, copy the Bot User OAuth Token, then invite the bot to channels.</p>
-      <ConnectButton busy={busy} disabled={!token.trim()} onClick={() => void connect()}>Connect Slack</ConnectButton>
+      <ConnectButton busy={busy} disabled={text.trim().length < 20} onClick={() => void save()}>Save context</ConnectButton>
       {error ? <p role="alert" className="mt-2 text-sm text-red-600">{error}</p> : null}
     </EvidenceCard>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   ChevronDown,
@@ -45,19 +45,25 @@ const SOURCE_LABEL: Record<EvidenceSource, string> = {
 const DONE = new Set(["rolled_out", "stopped", "rejected", "failed"]);
 
 export function AutopilotView() {
+  const [polling, setPolling] = useState(true);
   const query = useQuery({
     queryKey: ["autopilot"],
     queryFn: async () => {
       const res = await fetch("/api/autopilot", { cache: "no-store" });
       return (await res.json()) as AutopilotState;
     },
-    refetchInterval: 15000,
+    refetchInterval: polling ? 15000 : false,
   });
   const state = query.data ?? null;
   const load = query.refetch;
   const [running, setRunning] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setPolling(false), 5 * 60 * 1000);
+    return () => window.clearTimeout(timeout);
+  }, []);
 
   async function runNow() {
     setRunning(true);
@@ -128,6 +134,7 @@ export function AutopilotView() {
   const live = state.experiments.filter((e) => e.status === "running" || e.status === "queued" || e.status === "building");
   const history = state.experiments.filter((e) => DONE.has(e.status));
   const problems = state.signals.filter((s) => s.status !== "dismissed");
+  const waitingForFirstResults = state.signals.length === 0 && state.experiments.length === 0;
 
   return (
     <ScrollArea className="h-full">
@@ -198,7 +205,20 @@ export function AutopilotView() {
           {message && <p className="rounded-md bg-muted p-3 text-xs text-muted-foreground">{message}</p>}
         </header>
 
-        <Section title="Needs you" count={needsYou.length + finishing.length} empty="Nothing needs you right now.">
+        {waitingForFirstResults ? (
+          <section className="rounded-lg border border-border bg-muted/30 p-5">
+            <h2 className="text-sm font-medium">Kismet is reading your evidence.</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              It runs every hour and will propose experiments here. So far, it has {state.summary.evidenceThisWeek}{" "}
+              {state.summary.evidenceThisWeek === 1 ? "piece" : "pieces"} of evidence from this week.
+            </p>
+            <a href="/settings/connectors" className="mt-3 inline-block text-sm underline underline-offset-2">
+              Add more sources
+            </a>
+          </section>
+        ) : (
+          <>
+            <Section title="Needs you" count={needsYou.length + finishing.length} empty="Nothing needs you right now.">
           {needsYou.map((experiment) => (
             <ExperimentCard
               key={experiment.id}
@@ -238,9 +258,9 @@ export function AutopilotView() {
               onDismiss={() => act(experiment, "dismiss-cleanup")}
             />
           ))}
-        </Section>
+            </Section>
 
-        <Section title="Running" count={live.length} empty="No experiments running.">
+            <Section title="Running" count={live.length} empty="No experiments running.">
           {live.map((experiment) => (
             <ExperimentCard
               key={experiment.id}
@@ -248,9 +268,9 @@ export function AutopilotView() {
               signal={state.signals.find((s) => s.id === experiment.signalId)}
             />
           ))}
-        </Section>
+            </Section>
 
-        <Section
+            <Section
           title="What's not working"
           count={problems.length}
           empty={state.lastRunAt ? "No problems found yet." : "Press Run now to start collecting evidence."}
@@ -258,9 +278,9 @@ export function AutopilotView() {
           {problems.map((signal) => (
             <SignalCard key={signal.id} signal={signal} />
           ))}
-        </Section>
+            </Section>
 
-        {history.length > 0 && (
+            {history.length > 0 && (
           <Section title="History" count={history.length}>
             {history.map((experiment) => (
               <ExperimentCard
@@ -270,6 +290,8 @@ export function AutopilotView() {
               />
             ))}
           </Section>
+            )}
+          </>
         )}
 
         {state.activity.length > 0 && (

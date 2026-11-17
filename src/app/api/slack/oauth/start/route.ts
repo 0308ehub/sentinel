@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
 import { currentUserId } from "@/lib/connections/current";
+import { validOAuthReturnPath } from "@/lib/slack/oauth-return";
 
 const SCOPES = [
   "channels:read",
@@ -15,6 +16,7 @@ export async function GET(request: Request) {
   if (!(await currentUserId())) return Response.json({ error: "Sign in required." }, { status: 401 });
 
   const requestUrl = new URL(request.url);
+  const returnPath = requestUrl.searchParams.get("return");
   if (!process.env.SLACK_CLIENT_ID?.trim() || !process.env.SLACK_CLIENT_SECRET?.trim()) {
     return NextResponse.redirect(new URL("/settings/connectors/slack?error=not_configured", requestUrl.origin));
   }
@@ -33,5 +35,13 @@ export async function GET(request: Request) {
     "Set-Cookie",
     `kismet_slack_state=${encodeURIComponent(state)}; HttpOnly; Path=/; Max-Age=600; SameSite=Lax${requestUrl.protocol === "https:" ? "; Secure" : ""}`,
   );
+  if (validOAuthReturnPath(returnPath)) {
+    response.headers.append(
+      "Set-Cookie",
+      `kismet_slack_return=${encodeURIComponent(returnPath)}; HttpOnly; Path=/; Max-Age=600; SameSite=Lax${requestUrl.protocol === "https:" ? "; Secure" : ""}`,
+    );
+  } else {
+    response.headers.append("Set-Cookie", "kismet_slack_return=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax");
+  }
   return response;
 }

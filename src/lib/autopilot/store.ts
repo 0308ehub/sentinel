@@ -111,7 +111,7 @@ export async function addEvidence(items: NewEvidence[]): Promise<number> {
     source: item.source,
     synthetic: item.synthetic,
     title: item.title.slice(0, 300),
-    body: item.body.slice(0, 4000),
+    body: item.body.slice(0, 8000),
     author: item.author.slice(0, 120),
     url: item.url ?? null,
     occurred_at: item.occurredAt ?? new Date().toISOString(),

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { currentUserId } from "@/lib/connections/current";
 import { saveConnection } from "@/lib/connections/store";
+import { validOAuthReturnPath } from "@/lib/slack/oauth-return";
 
 interface SlackOAuthResponse {
   ok: boolean;
@@ -12,12 +13,19 @@ interface SlackOAuthResponse {
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const destination = new URL("/settings/connectors/slack", url.origin);
+  const returnPath = readCookie(request.headers.get("cookie"), "kismet_slack_return");
+  const destination = new URL(validOAuthReturnPath(returnPath) ? returnPath : "/settings/connectors/slack", url.origin);
   const finish = (error?: string, connected = false) => {
-    if (error) destination.searchParams.set("error", error);
-    if (connected) destination.searchParams.set("connected", "1");
+    if (validOAuthReturnPath(returnPath)) {
+      if (error) destination.searchParams.set("slack_error", error);
+      if (connected) destination.searchParams.set("slack", "connected");
+    } else {
+      if (error) destination.searchParams.set("error", error);
+      if (connected) destination.searchParams.set("connected", "1");
+    }
     const response = NextResponse.redirect(destination);
     response.headers.append("Set-Cookie", "kismet_slack_state=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax");
+    response.headers.append("Set-Cookie", "kismet_slack_return=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax");
     return response;
   };
 
