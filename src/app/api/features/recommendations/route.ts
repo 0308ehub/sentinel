@@ -1,3 +1,4 @@
+import { errorStatus } from "@/lib/ai/orchestrate";
 import { askForJson, readJson, sourceBrief } from "@/lib/ai/respond";
 
 export const maxDuration = 120;
@@ -78,7 +79,7 @@ export async function GET() {
     return Response.json({ recommendations });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not propose features.";
-    return Response.json({ recommendations: [], error: message }, { status: 502 });
+    return Response.json({ recommendations: [], error: message }, { status: errorStatus(error) });
   }
 }
 

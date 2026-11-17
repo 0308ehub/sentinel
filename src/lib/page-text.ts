@@ -1,3 +1,6 @@
+import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
+
 const URL_PATTERN = /https?:\/\/[^\s<>"')\]]+/gi;
 
 export function findReadableUrl(parts: string[]): string | null {
@@ -13,7 +16,7 @@ export function findReadableUrl(parts: string[]): string | null {
 
 export async function readPublicPage(raw: string): Promise<{ url: string; title: string; text: string } | null> {
   const url = publicUrl(raw);
-  if (!url) return null;
+  if (!url || !(await resolvesToPublicAddress(url.hostname))) return null;
   if (url.pathname.toLowerCase().endsWith(".pdf")) return null;
 
   try {
@@ -53,6 +56,25 @@ function publicUrl(raw: string): URL | null {
     url.protocol = "https:";
   }
   return url;
+}
+
+async function resolvesToPublicAddress(hostname: string): Promise<boolean> {
+  if (isIP(hostname)) return !blockedAddress(hostname);
+  try {
+    const records = await lookup(hostname, { all: true, verbatim: true });
+    return records.length > 0 && records.every((record) => !blockedAddress(record.address));
+  } catch {
+    return false;
+  }
+}
+
+function blockedAddress(address: string): boolean {
+  const lower = address.trim().toLowerCase();
+  if (lower.startsWith("::ffff:")) {
+    const mapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(lower);
+    return mapped ? blockedHost(mapped[1]) : true;
+  }
+  return blockedHost(lower);
 }
 
 function blockedHost(hostname: string): boolean {

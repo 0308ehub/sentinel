@@ -72,9 +72,6 @@ export function GraphExperimentsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-lg font-semibold">Experiments</h1>
-            <p className="text-xs text-muted-foreground">
-              Describe a change. Kismet writes the hypothesis, the metric, and the two variants. Ship puts it on the active Jira sprint.
-            </p>
           </div>
           <Button size="sm" onClick={() => setOpen(true)} aria-label="Create experiment">
             <Plus className="h-4 w-4" />
@@ -84,8 +81,7 @@ export function GraphExperimentsPage() {
         <div className="mt-6 max-w-2xl">
           {experiments.length === 0 ? (
             <EmptyState
-              title="No experiments yet"
-              description="Write the change you want to try. Kismet drafts the experiment and files it on the graph."
+              title="No experiments"
               action={{ label: "Create experiment", onClick: () => setOpen(true) }}
             />
           ) : (
@@ -101,9 +97,6 @@ export function GraphExperimentsPage() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <h2 className="text-sm font-semibold">New experiment</h2>
-          <p className="text-xs text-muted-foreground">
-            Say the change and who it is for. Kismet fills in the hypothesis, primary metric, control, treatment, and guardrail.
-          </p>
           <Textarea
             value={prompt}
             onChange={(event) => setPrompt(event.target.value)}

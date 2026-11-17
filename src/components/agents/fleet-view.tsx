@@ -69,7 +69,6 @@ export function FleetView({ showLoop }: { showLoop: boolean }) {
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <h1 className="text-lg font-semibold tracking-tight">Agents</h1>
-              <p className="text-sm text-muted-foreground">Several agents can work at once. Each one keeps its own context.</p>
             </div>
             <Button type="button" variant="outline" onClick={() => assignKismetAgents()}>
               Have Kismet assign

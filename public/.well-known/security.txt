@@ -1,0 +1,4 @@
+Contact: https://app.sentinelai.one/contact
+Preferred-Languages: en
+Canonical: https://app.sentinelai.one/.well-known/security.txt
+Policy: https://app.sentinelai.one/terms

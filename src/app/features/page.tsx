@@ -108,8 +108,7 @@ export default function FeaturesPage() {
                 onClick={() => addSuggestion(suggestion)}
                 className="w-full rounded-lg border border-border bg-card px-3 py-2.5 text-left hover:border-foreground/20"
               >
-                <span className="flex items-center justify-between text-[11px] text-muted-foreground">
-                  Suggestion
+                <span className="flex justify-end text-muted-foreground">
                   <Plus className="h-3 w-3" />
                 </span>
                 <p className="mt-1 line-clamp-3 text-[13px] font-medium leading-snug">{suggestion.title}</p>
@@ -137,7 +136,6 @@ export default function FeaturesPage() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <h2 className="text-sm font-semibold">New feature</h2>
-          <p className="text-xs text-muted-foreground">Write it the way you would say it. Kismet turns it into a feature, a problem, a PRD, a goal, and a metric.</p>
           <Textarea
             value={prompt}
             onChange={(event) => setPrompt(event.target.value)}

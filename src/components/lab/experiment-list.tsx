@@ -42,10 +42,6 @@ export function ExperimentList() {
           <header className="flex flex-wrap items-start justify-between gap-4">
             <div className="max-w-2xl">
               <h1 className="text-lg font-semibold">Experiments</h1>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Kismet reads Pantry&apos;s goals, users, and code, decides what to test, runs it, and asks you before
-                anything ships.
-              </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <ClockControl />
@@ -70,7 +66,6 @@ export function ExperimentList() {
                 experiments={active}
                 all={state.experiments}
                 day={state.clock.day}
-                hasFinished={decided.length > 0}
               />
               <ProposalList experiments={proposals} discovery={state.discovery} customError={state.customError} />
               <DecidedList experiments={decided} />

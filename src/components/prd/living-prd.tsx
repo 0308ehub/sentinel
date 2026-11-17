@@ -5,7 +5,6 @@ import { graphStore, useGraphHydrated, useGraphStore } from "@/lib/graph/graph-s
 import { useAgents } from "@/lib/agents/fleet";
 import {
   domainOf,
-  encodeShare,
   isEvidenceType,
   readLiving,
   type LivingDoc,
@@ -13,6 +12,7 @@ import {
   type PrdShare,
 } from "@/lib/prd/document";
 import { PrdStory, type StoryAgent, type StoryEvidence, type StoryLink } from "@/components/prd/prd-story";
+import { aiContext, readWorkspace, useWorkspaceSettings } from "@/lib/settings/workspace";
 import type { GraphNode } from "@/types/graph";
 
 const PENDING_KEY = "kismet-pending-prd";
@@ -101,6 +101,23 @@ export function LivingPrd({ featureId }: { featureId: string }) {
 
   async function writeFromSources() {
     if (!doc || writing) return;
+    if (!readWorkspace().aiGraph) {
+      commit({
+        ...doc,
+        comments: [
+          ...doc.comments,
+          {
+            id: crypto.randomUUID(),
+            author: "Kismet",
+            color: "#0571d3",
+            section: "document",
+            body: "Graph context is off in AI settings, so this draft was left as written.",
+            at: new Date().toISOString(),
+          },
+        ],
+      });
+      return;
+    }
     setWriting(true);
     const packet = evidence.map((item) => `${item.type}: ${item.title}\n${item.detail}`).filter(Boolean).join("\n\n");
     try {
@@ -108,6 +125,7 @@ export function LivingPrd({ featureId }: { featureId: string }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          context: aiContext(),
           messages: [
             {
               role: "user",
@@ -152,15 +170,17 @@ export function LivingPrd({ featureId }: { featureId: string }) {
   async function ask() {
     if (!doc || asking) return;
     setAsking(true);
+    const sources = readWorkspace().aiGraph ? evidence.map((item) => item.title).join("; ") || "none" : "none";
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          context: aiContext(),
           messages: [
             {
               role: "user",
-              content: `Comment on this product requirements document in two or three sentences. Use only what is written. Say what is missing. Title: ${title}. Introduction: ${doc.introduction || "empty"}. Goals: ${doc.goals || "empty"}. Sources: ${evidence.map((item) => item.title).join("; ") || "none"}.`,
+              content: `Comment on this product requirements document in two or three sentences. Use only what is written. Say what is missing. Title: ${title}. Introduction: ${doc.introduction || "empty"}. Goals: ${doc.goals || "empty"}. Sources: ${sources}.`,
             },
           ],
         }),
@@ -237,10 +257,11 @@ function ShareBox({
   links: StoryLink[];
   onCommit: (doc: LivingDoc) => void;
 }) {
+  const settings = useWorkspaceSettings();
   const [copied, setCopied] = useState(false);
   const [link, setLink] = useState("");
   const [note, setNote] = useState("");
-  const [domain, setDomain] = useState(doc.domain);
+  const [domain, setDomain] = useState(doc.domain || settings.allowedDomain);
   const [invited, setInvited] = useState(doc.invited.join(", "));
 
   async function copy() {
@@ -260,6 +281,10 @@ function ShareBox({
       setNote("Add at least one email.");
       return;
     }
+    if (!settings.allowPublicLinks && next.audience === "anyone") {
+      setNote("Public links are off for this organization. Choose a domain or specific emails.");
+      return;
+    }
     setNote("");
     onCommit(next);
     const share: PrdShare = {
@@ -268,8 +293,19 @@ function ShareBox({
       ...next,
       evidence: evidence.map((item) => ({ type: item.type, title: item.title, detail: item.detail })),
       links: links.map((item) => ({ type: item.type, title: item.title })),
+      expiresAt: settings.requireExpiry ? new Date(Date.now() + settings.shareMaxDays * 24 * 60 * 60 * 1000).toISOString() : undefined,
     };
-    const url = `${window.location.origin}/p/${encodeShare(share)}`;
+    const response = await fetch("/api/prd/share", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(share),
+    });
+    const payload = (await response.json().catch(() => null)) as { token?: string; error?: string } | null;
+    if (!response.ok || !payload?.token) {
+      setNote(payload?.error || "Could not create the link.");
+      return;
+    }
+    const url = `${window.location.origin}/p/${payload.token}`;
     setLink(url);
     try {
       await navigator.clipboard.writeText(url);
@@ -291,7 +327,9 @@ function ShareBox({
             Anyone who can open the link can view it. Editing asks them to create a Kismet account.
           </p>
           <div className="mt-3 space-y-2 text-sm">
-            <Audience value="anyone" current={doc.audience} onChange={(audience) => onCommit({ ...doc, audience })} label="Anyone with the link" />
+            {settings.allowPublicLinks && (
+              <Audience value="anyone" current={doc.audience} onChange={(audience) => onCommit({ ...doc, audience })} label="Anyone with the link" />
+            )}
             <Audience value="domain" current={doc.audience} onChange={(audience) => onCommit({ ...doc, audience })} label="Anyone at a company domain" />
             {doc.audience === "domain" && (
               <input
@@ -314,6 +352,9 @@ function ShareBox({
               />
             )}
           </div>
+          {settings.requireExpiry && (
+            <p className="mt-3 text-xs text-muted-foreground">New links expire after {settings.shareMaxDays} days.</p>
+          )}
           <button type="button" onClick={() => void copy()} className="mt-3 h-8 w-full rounded-md border border-border text-xs">
             {copied ? "Link copied" : "Copy link"}
           </button>

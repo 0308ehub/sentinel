@@ -1,21 +1,13 @@
 import { AppShell } from "@/components/layout/app-shell";
-import { FleetPage } from "@/components/agents/fleet-page";
-import { LabClock } from "@/components/lab/lab-clock";
-import { labDemoEnabled } from "@/lib/lab/demo-mode";
+import { InboxView } from "@/components/inbox/inbox-view";
+import { privatePage } from "@/lib/page-meta";
+
+export const metadata = privatePage("Agents", "Messages from the agents in this workspace.");
 
 export default function AgentsPage() {
-  if (!labDemoEnabled()) {
-    return (
-      <AppShell>
-        <FleetPage showLoop={false} />
-      </AppShell>
-    );
-  }
   return (
-    <AppShell>
-      <LabClock>
-        <FleetPage showLoop />
-      </LabClock>
+    <AppShell header={false}>
+      <InboxView />
     </AppShell>
   );
 }

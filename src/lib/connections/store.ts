@@ -4,7 +4,7 @@ import type postgres from "postgres";
 import { db } from "@/lib/autopilot/db";
 import { decrypt, encrypt } from "@/lib/connections/crypto";
 
-export type Provider = "slack" | "jira" | "databricks" | "github" | "google";
+export type Provider = "slack" | "jira" | "databricks" | "github" | "google" | "figma";
 
 export async function getConnection<T>(
   userId: string,

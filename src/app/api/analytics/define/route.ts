@@ -1,6 +1,7 @@
 import { loadAudience } from "@/lib/analytics/audience";
 import { loadExploreOptions } from "@/lib/analytics/explore";
 import type { ExploreKind, ExploreMeasure, SegmentFilter } from "@/lib/analytics/explore-types";
+import { ModelError } from "@/lib/ai/orchestrate";
 import { askForJson, readJson } from "@/lib/ai/respond";
 import { databricksErrorResponse } from "@/lib/databricks/client";
 
@@ -59,7 +60,8 @@ export async function POST(request: Request) {
         "feature-draft"
       );
       parsed = readJson<DraftBody>(text);
-    } catch {
+    } catch (error) {
+      if (error instanceof ModelError) throw error;
       parsed = heuristic(note, products, payments, cities, states);
     }
     const name = parsed.name?.trim().slice(0, 80);
@@ -82,6 +84,7 @@ export async function POST(request: Request) {
       chart: chart === "funnel" ? "line" : chart,
     });
   } catch (error) {
+    if (error instanceof ModelError) return Response.json({ error: error.message }, { status: error.status });
     return databricksErrorResponse(error);
   }
 }

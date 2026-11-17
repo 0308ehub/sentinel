@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { Audience, AudienceCustomer } from "@/lib/analytics/library";
-import { databricksConnectionKey, runDatabricksQuery } from "@/lib/databricks/client";
+import { databricksConnectionKey, runAppDatabricksQuery as runDatabricksQuery } from "@/lib/databricks/client";
 
 const CUSTOMERS = "samples.bakehouse.sales_customers";
 const TRANSACTIONS = "samples.bakehouse.sales_transactions";

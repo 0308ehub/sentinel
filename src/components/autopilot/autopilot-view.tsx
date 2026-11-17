@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Bot,
   ChevronDown,
   ChevronRight,
   ExternalLink,
@@ -116,13 +115,7 @@ export function AutopilotView() {
         <header className="space-y-3">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h1 className="flex items-center gap-2 text-lg font-semibold">
-                <Bot className="h-5 w-5" /> Autopilot
-              </h1>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Kismet watches customer evidence, runs experiments on {state.repo}, and asks you only before
-                anything ships.
-              </p>
+              <h1 className="text-lg font-semibold">Autopilot</h1>
             </div>
             <Button onClick={runNow} disabled={running || !state.configured}>
               {running ? <Loader2 className="animate-spin" /> : <Play />}

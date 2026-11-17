@@ -30,6 +30,7 @@ export async function POST(request: Request) {
   let pages: PageSight[] = [];
   let memory: WorkMemory[] = [];
   let prefer: ProviderId | undefined;
+  let allowConnectors = true;
   try {
     const body = (await request.json()) as {
       messages?: ChatMessage[];
@@ -37,8 +38,12 @@ export async function POST(request: Request) {
       pages?: PageSight[];
       memory?: WorkMemory[];
       model?: string;
+      context?: { graph?: boolean; connectors?: boolean; chat?: boolean };
     };
     if (body.model === "claude" || body.model === "openai") prefer = body.model;
+    const allowGraph = body.context?.graph !== false;
+    allowConnectors = body.context?.connectors !== false;
+    const allowChat = body.context?.chat !== false;
     modes = (body.modes ?? []).filter((mode) => typeof mode === "string").slice(0, 8);
     pages = (body.pages ?? [])
       .filter((page) => page && typeof page.path === "string" && typeof page.text === "string")
@@ -66,6 +71,12 @@ export async function POST(request: Request) {
       )
       .slice(-20)
       .map((message) => ({ role: message.role, content: message.content.trim().slice(0, 8000) }));
+    if (!allowChat) {
+      pages = [];
+      memory = [];
+    } else if (!allowGraph) {
+      pages = pages.filter((page) => !isGraphPath(page.path));
+    }
   } catch {
     return Response.json({ error: "Send a JSON body with messages." }, { status: 400 });
   }
@@ -76,33 +87,48 @@ export async function POST(request: Request) {
 
   let slackText = "";
   let channels: string[] = [];
-  let slackNote = "Slack is connected, but no channel messages were available.";
-  try {
-    const slack = await getSlackContext();
-    slackText = slack.text;
-    channels = slack.channels;
-    slackNote = slackText
-      ? `Recent messages from ${channels.map((name) => `#${name}`).join(", ")} are below. Use them when they answer the question. Name the channel and the person. Do not invent messages that are not in the excerpts.`
-      : "The Slack bot is connected, but it is not in any channels yet, or those channels are empty. Say that plainly if the user asks about Slack.";
-  } catch (error) {
-    const hint = error instanceof SlackApiError ? error.hint ?? error.code : "Slack could not be read.";
-    slackNote = `Slack could not be read (${hint}). Say so if the user asks about Slack, and answer from general knowledge otherwise.`;
-  }
-
+  let slackNote = "";
   let jiraText = "";
   let issues: string[] = [];
   let jiraNote = "";
-  try {
-    const jira = await getJiraContext();
-    if (jira.configured) {
-      jiraText = jira.text;
-      issues = jira.keys;
-      jiraNote = jiraText
-        ? `Recent Jira issues from ${jira.site} are below. Use them when they answer the question. Name the issue key. Do not invent issues that are not in the excerpts.`
-        : "Jira is connected, but no issues were updated in the last 90 days. Say that plainly if the user asks about Jira.";
+  let warehouseNote = "";
+
+  if (allowConnectors) {
+    slackNote = "Slack is connected, but no channel messages were available.";
+    try {
+      const slack = await getSlackContext();
+      slackText = slack.text;
+      channels = slack.channels;
+      slackNote = slackText
+        ? `Recent messages from ${channels.map((name) => `#${name}`).join(", ")} are below. Use them when they answer the question. Name the channel and the person. Do not invent messages that are not in the excerpts.`
+        : "The Slack bot is connected, but it is not in any channels yet, or those channels are empty. Say that plainly if the user asks about Slack.";
+    } catch (error) {
+      const hint = error instanceof SlackApiError ? error.hint ?? error.code : "Slack could not be read.";
+      slackNote = `Slack could not be read (${hint}). Say so if the user asks about Slack, and answer from general knowledge otherwise.`;
     }
-  } catch (error) {
-    jiraNote = `Jira could not be read (${jiraContextError(error)}). Say so if the user asks about Jira.`;
+
+    try {
+      const jira = await getJiraContext();
+      if (jira.configured) {
+        jiraText = jira.text;
+        issues = jira.keys;
+        jiraNote = jiraText
+          ? `Recent Jira issues from ${jira.site} are below. Use them when they answer the question. Name the issue key. Do not invent issues that are not in the excerpts.`
+          : "Jira is connected, but no issues were updated in the last 90 days. Say that plainly if the user asks about Jira.";
+      }
+    } catch (error) {
+      jiraNote = `Jira could not be read (${jiraContextError(error)}). Say so if the user asks about Jira.`;
+    }
+
+    try {
+      const warehouse = await getDatabricksPrompt();
+      warehouseNote = warehouse
+        ? `${warehouse}\nWhen a question needs these tables, call query_databricks. Use one read-only statement. If the tool returns an error, fix the SQL and call it again. Then answer from the rows. Name the table. Do not invent a number that was not returned.`
+        : "";
+    } catch (error) {
+      const hint = error instanceof DatabricksApiError ? error.hint ?? error.code : "Databricks could not be read.";
+      warehouseNote = `Databricks could not be read (${hint}). Say so if the user asks for warehouse numbers.`;
+    }
   }
 
   const latestQuestion = [...messages].reverse().find((message) => message.role === "user")?.content ?? "";
@@ -112,23 +138,15 @@ export async function POST(request: Request) {
     .map((page) => `At ${page.at || "unknown time"}, on ${page.title} (${page.path}):\n${page.text}`)
     .join("\n\n");
   const workLog = memory.map((item) => `- ${item.at}: ${item.summary}`).join("\n");
-  let warehouseNote = "";
-  try {
-    const warehouse = await getDatabricksPrompt();
-    warehouseNote = warehouse
-      ? `${warehouse}\nWhen a question needs these tables, call query_databricks. Use one read-only statement. If the tool returns an error, fix the SQL and call it again. Then answer from the rows. Name the table. Do not invent a number that was not returned.`
-      : "";
-  } catch (error) {
-    const hint = error instanceof DatabricksApiError ? error.hint ?? error.code : "Databricks could not be read.";
-    warehouseNote = `Databricks could not be read (${hint}). Say so if the user asks for warehouse numbers.`;
-  }
 
   const deep = hasDeepDive(modes);
   const instructions = [
     "You are Kismet, a product manager's assistant.",
     deep ? "Write in plain sentences." : "Be direct and short. Write in plain sentences.",
     "You can see the Kismet pages this person has opened, and a log of what they have been doing here. Use that. Do not ask them to paste it. When they ask what you have been working on, or ask you to reflect, answer from the log in time order.",
-    "You can search the web. Use it for facts that are not in the workspace, the linked page, Slack, Jira, or Databricks. Prefer Slack for what this company said, Jira for the state of the work, and Databricks for numbers. When you use a web page, name it in the sentence as a markdown link.",
+    allowConnectors
+      ? "You can search the web. Use it for facts that are not in the workspace, the linked page, Slack, Jira, or Databricks. Prefer Slack for what this company said, Jira for the state of the work, and Databricks for numbers. When you use a web page, name it in the sentence as a markdown link."
+      : "You can search the web. Connected apps are turned off for drafts, so answer without Slack, Jira, or Databricks. When you use a web page, name it in the sentence as a markdown link.",
     ...promptForChips(modes),
     screen ? `Pages open in Kismet:\n${screen}` : "No Kismet page text was sent with this question.",
     workLog ? `Recent work:\n${workLog}` : "",
@@ -175,4 +193,10 @@ export async function POST(request: Request) {
     const status = error instanceof ModelError ? error.status : 502;
     return Response.json({ error: message }, { status });
   }
+}
+
+const GRAPH_PREFIXES = ["/graph", "/features", "/explorer", "/board", "/timeline", "/experiments", "/decisions", "/analytics", "/dashboard"];
+
+function isGraphPath(path: string): boolean {
+  return GRAPH_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
 }

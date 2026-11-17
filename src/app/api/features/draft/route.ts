@@ -1,3 +1,4 @@
+import { errorStatus } from "@/lib/ai/orchestrate";
 import { askForJson, readJson, sourceBrief } from "@/lib/ai/respond";
 
 export const maxDuration = 120;
@@ -59,6 +60,6 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not draft the feature.";
-    return Response.json({ error: message }, { status: 502 });
+    return Response.json({ error: message }, { status: errorStatus(error) });
   }
 }

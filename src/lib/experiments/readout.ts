@@ -1,7 +1,7 @@
 import "server-only";
 
 import { whereForSegment } from "@/lib/analytics/explore";
-import { runDatabricksQuery } from "@/lib/databricks/client";
+import { runAppDatabricksQuery as runDatabricksQuery } from "@/lib/databricks/client";
 import {
   bucketRanges,
   shares,

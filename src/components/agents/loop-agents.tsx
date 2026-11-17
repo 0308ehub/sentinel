@@ -11,6 +11,7 @@ import type { LabExperiment } from "@/lib/lab/advance";
 import { runDiscovery, useLabStore, type LabState } from "@/lib/lab/store";
 import type { Update } from "@/lib/lab/types";
 import { cn } from "@/lib/utils";
+import { aiContext } from "@/lib/settings/workspace";
 
 export type LoopAgentId = keyof typeof AGENT_LABELS;
 type LoopStatus = "Working" | "Waiting on you" | "Idle";
@@ -55,9 +56,6 @@ export function LoopAgents({ onOpen }: { onOpen: (id: LoopAgentId) => void }) {
           >
             Experiment loop
           </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Four specialists carry each test from evidence to a reviewed change.
-          </p>
         </div>
         <Link href="/experiments" className="text-xs font-medium text-primary hover:underline">
           Open experiments <ArrowRight className="ml-1 inline h-3 w-3" />
@@ -154,6 +152,7 @@ export function LoopAgentRoom({ id, onClose }: { id: LoopAgentId; onClose: () =>
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          context: aiContext(),
           messages: [
             {
               role: "user",

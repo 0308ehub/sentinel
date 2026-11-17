@@ -29,7 +29,7 @@ export async function getDatabricksPrompt(): Promise<string> {
       })
       .join("\n");
   } catch {
-    body = "Catalog list could not be loaded. Use SHOW CATALOGS and SHOW TABLES to find a table.";
+    body = "Catalog list could not be loaded. Ask the user to pick a catalog and schema in Settings.";
   }
 
   const text = [

@@ -2,6 +2,9 @@ import { AppShell } from "@/components/layout/app-shell";
 import { ExperimentRouter } from "@/components/lab/experiment-router";
 import { ExperimentDetail } from "@/components/work/experiment-detail";
 import { labDemoEnabled } from "@/lib/lab/demo-mode";
+import { privatePage } from "@/lib/page-meta";
+
+export const metadata = privatePage("Experiment", "One experiment in this workspace.");
 
 export default async function ExperimentPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

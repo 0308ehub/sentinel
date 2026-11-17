@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { PersonAvatar } from "@/components/shared/person-avatar";
 import { formatDate } from "@/lib/utils";
-import { Scale, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -20,13 +20,7 @@ export function DecisionsView() {
     <div className="flex h-full">
       <div className="w-80 border-r border-border flex flex-col">
         <div className="p-4 border-b border-border">
-          <h1 className="text-sm font-semibold flex items-center gap-2">
-            <Scale className="h-4 w-4" />
-            Decision Explorer
-          </h1>
-          <p className="text-xs text-muted-foreground mt-1">
-            {decisions.length} decisions tracked
-          </p>
+          <h1 className="text-sm font-semibold">Decisions</h1>
         </div>
         <ScrollArea className="flex-1">
           <div className="p-2 space-y-1">

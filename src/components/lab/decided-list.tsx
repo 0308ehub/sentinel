@@ -44,7 +44,7 @@ export function DecidedList({ experiments }: { experiments: LabExperiment[] }) {
           );
         })
       ) : (
-        <EmptyState>Decisions appear here after a test stops.</EmptyState>
+        <EmptyState>None yet</EmptyState>
       )}
     </LabSection>
   );

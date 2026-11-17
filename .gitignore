@@ -50,3 +50,6 @@ next-env.d.ts
 
 # local claude settings
 /.claude/
+
+# local inbox when Postgres is not configured
+/data/

@@ -14,7 +14,9 @@ async function isCronRequest(): Promise<boolean> {
 }
 
 export async function currentUserId(): Promise<string | null> {
-  if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) return "local";
+  if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
+    return process.env.NODE_ENV === "production" ? null : "local";
+  }
   try {
     const userId = (await auth()).userId;
     if (userId) return userId;

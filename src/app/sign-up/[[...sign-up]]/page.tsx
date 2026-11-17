@@ -1,4 +1,7 @@
 import { SignUp } from "@clerk/nextjs";
+import { privatePage } from "@/lib/page-meta";
+
+export const metadata = privatePage("Sign up", "Create a Kismet account.");
 import { AuthFrame, KeylessAuth, authAppearance } from "@/components/auth/auth-frame";
 
 export default function SignUpPage() {

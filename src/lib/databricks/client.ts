@@ -264,9 +264,85 @@ export async function listDatabricksCatalogs(): Promise<DatabricksCatalog[]> {
   return catalogs;
 }
 
-const READ_ONLY = /^(select|with|show|describe|desc|explain)\b/i;
+const READ_START = /^(select|with|show|describe|desc|explain)\b/i;
+const WRITE_WORD = /\b(insert|update|delete|merge|drop|alter|create|grant|revoke|truncate|optimize|vacuum|undrop|msck|copy\s+into|select\s+into|into)\b/i;
 
+function withoutComments(statement: string): string {
+  return statement.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/--.*$/gm, " ").trim().replace(/;+\s*$/, "");
+}
+
+function withoutStrings(statement: string): string {
+  return statement.replace(/'(?:''|[^'])*'/g, "''");
+}
+
+function identChains(sql: string): string[][] {
+  const chains: string[][] = [];
+  const pattern = /`?[A-Za-z_][\w$]*`?(?:\s*\.\s*`?[A-Za-z_][\w$]*`?)+/g;
+  for (const match of sql.matchAll(pattern)) {
+    chains.push(match[0].split(/\s*\.\s*/).map((part) => part.replace(/`/g, "")));
+  }
+  return chains;
+}
+
+function readableStatement(statement: string, config: DatabricksConfig, scope: "connected" | "app"): string {
+  const stripped = withoutComments(statement);
+  const scanned = withoutStrings(stripped);
+  if (!stripped || !READ_START.test(scanned) || /;\s*\S/.test(stripped) || WRITE_WORD.test(scanned)) {
+    throw new DatabricksApiError(
+      "read_only",
+      "Kismet only runs one read query: SELECT, WITH … SELECT, DESCRIBE, or EXPLAIN.",
+      400,
+    );
+  }
+  if (scope === "app") return stripped;
+
+  const catalog = config.catalog?.trim();
+  const schema = config.schema?.trim();
+  if (!catalog || !schema) {
+    throw new DatabricksApiError(
+      "missing_scope",
+      "Choose a catalog and schema in Settings before running a query. Kismet will only read that schema.",
+      400,
+    );
+  }
+  if (/^show\b/i.test(scanned)) {
+    throw new DatabricksApiError(
+      "out_of_scope",
+      `SHOW can list other catalogs. Query tables in ${catalog}.${schema} directly.`,
+      400,
+    );
+  }
+  const catalogName = catalog.toLowerCase();
+  const schemaName = schema.toLowerCase();
+  for (const parts of identChains(scanned)) {
+    if (parts.length > 3) {
+      throw new DatabricksApiError("out_of_scope", `Queries can only read ${catalog}.${schema}.`, 400);
+    }
+    if (parts.length === 3 && (parts[0].toLowerCase() !== catalogName || parts[1].toLowerCase() !== schemaName)) {
+      throw new DatabricksApiError("out_of_scope", `Queries can only read ${catalog}.${schema}.`, 400);
+    }
+    if (parts.length === 2 && parts[0].toLowerCase() !== schemaName) {
+      throw new DatabricksApiError(
+        "out_of_scope",
+        `Use ${catalog}.${schema}.table, or an unqualified column. Other schemas stay closed.`,
+        400,
+      );
+    }
+  }
+  return stripped;
+}
+
+/** A query from chat or the editor. It may only read the catalog and schema on the connection. */
 export async function runDatabricksQuery(statement: string): Promise<DatabricksQueryResult> {
+  return executeDatabricksQuery(statement, "connected");
+}
+
+/** Queries Kismet itself writes, such as the sample warehouse charts. Still one read statement. */
+export async function runAppDatabricksQuery(statement: string): Promise<DatabricksQueryResult> {
+  return executeDatabricksQuery(statement, "app");
+}
+
+async function executeDatabricksQuery(statement: string, scope: "connected" | "app"): Promise<DatabricksQueryResult> {
   const config = await readConfig();
   if (!config) {
     throw new DatabricksApiError(
@@ -276,14 +352,7 @@ export async function runDatabricksQuery(statement: string): Promise<DatabricksQ
     );
   }
 
-  const stripped = statement.replace(/\/\*[\s\S]*?\*\//g, "").replace(/--.*$/gm, "").trim().replace(/;+\s*$/, "");
-  if (!READ_ONLY.test(stripped) || /;\s*\S/.test(stripped)) {
-    throw new DatabricksApiError(
-      "read_only",
-      "Kismet only runs one read query at a time: SELECT, WITH, SHOW, DESCRIBE, or EXPLAIN.",
-      400
-    );
-  }
+  const stripped = readableStatement(statement, config, scope);
 
   const started = Date.now();
   const initial = await callDatabricks<StatementResponse>(config, "/api/2.0/sql/statements", {

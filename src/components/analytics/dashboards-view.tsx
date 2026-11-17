@@ -66,10 +66,7 @@ export function DashboardsView({ onExplore }: { onExplore: () => void }) {
       <div className="min-w-0 flex-1 overflow-y-auto px-6 py-5">
         {!board ? (
           <div className="mx-auto max-w-md pt-16 text-center">
-            <h2 className="text-lg font-semibold">Share a board of charts</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Pin charts from Explore. A copied link opens the same board in another browser. The numbers still come from the warehouse.
-            </p>
+            <h2 className="text-lg font-semibold">No boards</h2>
             <div className="mt-5 flex justify-center gap-2">
               <Button type="button" onClick={() => createDashboard()}>
                 New board

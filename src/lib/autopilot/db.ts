@@ -136,6 +136,140 @@ create table if not exists kismet.slack_mentions (
   state jsonb not null,
   updated_at timestamptz default now()
 );
+
+create table if not exists kismet.inbox_agents (
+  id text primary key,
+  user_id text not null,
+  slug text not null,
+  name text not null,
+  icon text not null default '',
+  color text not null default '#0571d3',
+  instructions text not null default '',
+  pinned boolean not null default false,
+  muted boolean not null default false,
+  ignored_streak integer not null default 0,
+  spec text not null default '',
+  boost real not null default 1,
+  created_at timestamptz not null default now()
+);
+create unique index if not exists inbox_agents_user_slug on kismet.inbox_agents (user_id, slug);
+
+create table if not exists kismet.inbox_threads (
+  id text primary key,
+  user_id text not null,
+  key text not null,
+  kind text not null default 'direct',
+  title text not null default '',
+  pinned boolean not null default false,
+  pin_order integer not null default 0,
+  updated_at timestamptz not null default now()
+);
+create unique index if not exists inbox_threads_user_key on kismet.inbox_threads (user_id, key);
+
+create table if not exists kismet.inbox_removed (
+  user_id text not null,
+  slug text not null,
+  primary key (user_id, slug)
+);
+
+create table if not exists kismet.inbox_members (
+  thread_id text not null,
+  agent_id text not null,
+  primary key (thread_id, agent_id)
+);
+
+create table if not exists kismet.inbox_messages (
+  id text primary key,
+  thread_id text not null,
+  user_id text not null,
+  agent_id text,
+  sender text not null,
+  type text not null,
+  body text not null default '',
+  signal_id text,
+  reply_to text,
+  payload jsonb,
+  read_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists inbox_messages_thread_idx on kismet.inbox_messages (thread_id, created_at);
+
+create table if not exists kismet.inbox_findings (
+  id text primary key,
+  user_id text not null,
+  agent_id text not null,
+  type text not null,
+  semantic_key text not null,
+  title text not null,
+  summary text not null default '',
+  hypothesis text not null default '',
+  proposed_action text not null default '',
+  intro text not null default '',
+  activity text not null default '',
+  confidence double precision not null,
+  impact double precision not null,
+  urgency double precision not null,
+  evidence jsonb not null default '[]'::jsonb,
+  status text not null default 'open',
+  tier text,
+  score double precision,
+  explanation text not null default '',
+  snooze_until timestamptz,
+  source_run_id text,
+  created_at timestamptz not null default now()
+);
+create unique index if not exists inbox_findings_user_key on kismet.inbox_findings (user_id, semantic_key);
+
+create table if not exists kismet.inbox_finding_events (
+  id bigserial primary key,
+  finding_id text not null,
+  user_id text not null,
+  kind text not null,
+  detail text not null default '',
+  at timestamptz not null default now()
+);
+
+create table if not exists kismet.inbox_status (
+  user_id text not null,
+  agent_id text not null,
+  activity text not null default '',
+  run_id text,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, agent_id)
+);
+
+create table if not exists kismet.inbox_prefs (
+  user_id text primary key,
+  mode text not null default 'session',
+  work_start integer not null default 9,
+  work_end integer not null default 18,
+  tz_offset integer not null default 0,
+  idle_hours double precision not null default 2,
+  session_cap integer not null default 4,
+  daily_interrupt_budget integer not null default 3,
+  slack_interrupts boolean not null default false,
+  slack_channel text not null default '',
+  last_meaningful_at timestamptz,
+  session_open_until timestamptz,
+  interrupts_today integer not null default 0,
+  interrupts_day text not null default ''
+);
+
+create table if not exists kismet.ai_spend (
+  bucket text not null,
+  subject text not null,
+  cents integer not null default 0,
+  hits integer not null default 0,
+  primary key (bucket, subject)
+);
+
+create table if not exists kismet.inbox_weights (
+  user_id text not null,
+  signal_type text not null,
+  weight double precision not null default 1,
+  autonomy text not null default 'NOTIFY_ONLY',
+  primary key (user_id, signal_type)
+);
 `;
 
 export async function db(): Promise<Sql> {

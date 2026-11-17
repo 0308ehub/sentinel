@@ -106,8 +106,7 @@ export function ProposalList({
       {discovery.status === "idle" ? (
         <div className="rounded-md border border-dashed p-10 text-center">
           <FlaskConical className="mx-auto h-5 w-5 text-muted-foreground" />
-          <p className="mt-3 text-sm font-medium">Start with the evidence</p>
-          <p className="mt-1 text-xs text-muted-foreground">Kismet reads Pantry before it proposes a change.</p>
+          <p className="mt-3 text-sm font-medium">No proposals</p>
           <Button className="mt-4" size="sm" onClick={runDiscovery}>
             Run discovery
           </Button>
@@ -141,7 +140,7 @@ export function ProposalList({
         <input
           value={idea}
           onChange={(event) => setIdea(event.target.value)}
-          placeholder="Have an idea? Kismet will check it against the evidence"
+          placeholder="An idea"
           className="h-9 min-w-0 flex-1 rounded-md border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-ring"
         />
         <Button

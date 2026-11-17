@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     status: 302,
     headers: {
       Location: target,
-      "Set-Cookie": `kismet_google_state=${state}; HttpOnly; Path=/; Max-Age=600; SameSite=Lax`,
+      "Set-Cookie": `kismet_google_state=${state}; HttpOnly; Path=/; Max-Age=600; SameSite=Lax${new URL(request.url).protocol === "https:" ? "; Secure" : ""}`,
     },
   });
 }

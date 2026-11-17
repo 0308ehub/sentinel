@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Switch } from "@/components/ui/switch";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SettingsShell } from "@/components/settings/settings-shell";
 import {
   NOTIFICATION_PREFS,
@@ -28,15 +28,13 @@ export function NotificationsSettingsView() {
     >
       <Card>
         <CardHeader>
-          <CardTitle>Alert preferences</CardTitle>
-          <CardDescription>Applies to in-app notifications; email is optional below</CardDescription>
+          <CardTitle>Alerts</CardTitle>
         </CardHeader>
         <CardContent className="space-y-0 divide-y divide-border p-0">
           {NOTIFICATION_PREFS.map((pref) => (
             <div key={pref.key} className="flex items-center justify-between gap-4 px-4 py-3">
               <div className="min-w-0">
                 <p className="text-sm font-medium">{pref.label}</p>
-                <p className="text-xs text-muted-foreground">{pref.description}</p>
               </div>
               <Switch
                 checked={prefs[pref.key]}

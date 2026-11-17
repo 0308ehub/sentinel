@@ -1,4 +1,7 @@
 import { SignIn } from "@clerk/nextjs";
+import { privatePage } from "@/lib/page-meta";
+
+export const metadata = privatePage("Sign in", "Sign in to Kismet.");
 import { AuthFrame, KeylessAuth, authAppearance } from "@/components/auth/auth-frame";
 
 export default function SignInPage() {

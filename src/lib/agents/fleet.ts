@@ -3,6 +3,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { modelTitle, type ProviderId } from "@/lib/ai/policy";
 import { getGraphEdges, getGraphNode, getGraphNodes } from "@/lib/graph/graph-store";
+import { aiContext } from "@/lib/settings/workspace";
 
 export type AgentModel = "auto" | ProviderId;
 export type AgentStatus = "working" | "thinking" | "done" | "paused";
@@ -204,6 +205,7 @@ async function deliver(id: string, controller: AbortController) {
       signal: controller.signal,
       body: JSON.stringify({
         model: agent.model === "auto" ? undefined : agent.model,
+        context: aiContext(),
         messages: agent.messages.slice(-12).map((message) => ({ role: message.role, content: message.content })),
       }),
     });

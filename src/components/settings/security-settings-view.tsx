@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SettingsShell } from "@/components/settings/settings-shell";
 
 export function SecuritySettingsView() {
@@ -42,7 +42,6 @@ export function SecuritySettingsView() {
         <Card>
           <CardHeader>
             <CardTitle>Change password</CardTitle>
-            <CardDescription>Use a strong password you don’t reuse elsewhere</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handlePassword} className="space-y-3">
@@ -93,24 +92,17 @@ export function SecuritySettingsView() {
         <Card>
           <CardHeader>
             <CardTitle>Two-factor authentication</CardTitle>
-            <CardDescription>Add an extra layer of protection to your account</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-sm font-medium">Authenticator app</p>
-                <p className="text-xs text-muted-foreground">
-                  Require a code from an authenticator when signing in
-                </p>
               </div>
               <Switch checked={twoFactor} onCheckedChange={setTwoFactor} />
             </div>
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-sm font-medium">New login alerts</p>
-                <p className="text-xs text-muted-foreground">
-                  Email me when a new device signs into my account
-                </p>
               </div>
               <Switch checked={sessionAlerts} onCheckedChange={setSessionAlerts} />
             </div>
@@ -120,7 +112,6 @@ export function SecuritySettingsView() {
         <Card>
           <CardHeader>
             <CardTitle>Active sessions</CardTitle>
-            <CardDescription>Devices currently signed in to Kismet</CardDescription>
           </CardHeader>
           <CardContent className="space-y-0 divide-y divide-border p-0">
             {[

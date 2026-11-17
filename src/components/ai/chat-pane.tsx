@@ -530,7 +530,7 @@ function FolderPanel() {
         <input
           value={name}
           onChange={(event) => setName(event.target.value)}
-          placeholder="Folder for a product or feature"
+          placeholder="Name"
           className="h-8 flex-1 rounded-md border border-border bg-background px-2 text-sm outline-none"
         />
         <button type="submit" className="rounded-md bg-foreground px-2 text-xs text-background">Add</button>
@@ -553,7 +553,6 @@ function FolderPanel() {
             </button>
           </div>
         ))}
-        {state.folders.length === 0 && <p className="text-xs text-muted-foreground">Folders keep chats for one product or feature together.</p>}
       </div>
     </div>
   );

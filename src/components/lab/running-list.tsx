@@ -138,12 +138,10 @@ export function RunningList({
   experiments,
   all,
   day,
-  hasFinished,
 }: {
   experiments: LabExperiment[];
   all: LabExperiment[];
   day: number;
-  hasFinished: boolean;
 }) {
   return (
     <LabSection id="running" title="Running">
@@ -151,7 +149,7 @@ export function RunningList({
         experiments.map((experiment) => <RunningRow key={experiment.id} experiment={experiment} day={day} all={all} />)
       ) : (
         <EmptyState>
-          {hasFinished ? "Nothing running. Design a proposal to start the next test." : "No tests are live yet."}
+          Nothing running
         </EmptyState>
       )}
     </LabSection>

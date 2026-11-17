@@ -39,7 +39,6 @@ export function BoardView() {
       <div className="flex items-center justify-between gap-3 px-6 py-4">
         <div>
           <h1 className="text-lg font-semibold tracking-tight">Board</h1>
-          <p className="text-sm text-muted-foreground">Backlog through done. Drag a card, or press 1–4 while it is focused.</p>
         </div>
         <button
           type="button"

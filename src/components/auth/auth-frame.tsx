@@ -7,7 +7,7 @@ export const authAppearance = {
   variables: {
     colorPrimary: "#111",
     borderRadius: "0.5rem",
-    fontFamily: "var(--font-plex)",
+    fontFamily: "var(--font-satoshi)",
   },
   elements: {
     card: "border border-border shadow-[0_1px_2px_rgba(0,0,0,0.04)]",

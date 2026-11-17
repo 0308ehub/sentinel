@@ -1,0 +1,377 @@
+.ks-bento {
+  container-type: inline-size;
+  font-family: inherit;
+}
+
+.ks-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.ks-tile {
+  position: relative;
+  overflow: hidden;
+  min-height: 340px;
+  border-radius: 22px;
+  background:
+    radial-gradient(42% 58% at 8% 92%, rgba(5, 113, 211, 0.32), transparent 70%),
+    radial-gradient(40% 52% at 96% 8%, rgba(142, 224, 176, 0.62), transparent 68%),
+    linear-gradient(155deg, #d5eafb 0%, #eef8f4 48%, #d7f3e4 100%);
+}
+
+.ks-tile .topo-field {
+  z-index: 0;
+}
+
+.ks-copy {
+  position: relative;
+  z-index: 1;
+  max-width: 34em;
+  margin: 0;
+  padding: 24px 28px 0;
+  font-size: 17px;
+  line-height: 1.4;
+  letter-spacing: -0.015em;
+  color: #5c6570;
+  text-wrap: pretty;
+}
+
+.ks-copy b {
+  font-weight: 500;
+  color: #141414;
+}
+
+.ks-picture {
+  position: absolute;
+  z-index: 1;
+}
+
+.ks-picture--ask {
+  left: 28px;
+  right: 28px;
+  bottom: 32px;
+  height: 64px;
+}
+
+.ks-picture--plan,
+.ks-picture--ship {
+  left: 28px;
+  right: 28px;
+  bottom: 24px;
+}
+
+.ks-picture--plan {
+  height: 228px;
+}
+
+.ks-picture--ship {
+  height: 292px;
+  overflow: hidden;
+}
+
+.ks-picture--agents {
+  left: 28px;
+  right: 28px;
+  bottom: 24px;
+  height: auto;
+}
+
+.ks-tile--ship,
+.ks-tile--tools,
+.ks-tile--agents {
+  min-height: 440px;
+}
+
+.ks-stage {
+  background: transparent;
+}
+
+.ks-plan-card,
+.ks-ship-card {
+  width: 100%;
+  max-width: 100%;
+}
+
+.ks-ship-card {
+  overflow: hidden;
+}
+
+.ks-ship-card > * {
+  min-width: 0;
+}
+
+.ks-ship-card .ss-code {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 17px;
+}
+
+.ks-ship-card .ss-code__line,
+.ks-ship-card .ss-code__text,
+.ks-gh,
+.ks-gh-file {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.ks-ship-card .ss-code__line {
+  overflow: hidden;
+}
+
+.ks-gh-file > .ss-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ks-plan-head,
+.ks-ship-head,
+.ks-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ks-plan-head,
+.ks-ship-head {
+  justify-content: space-between;
+}
+
+.ks-plan-name,
+.ks-ship-title {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 500;
+  color: #141414;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ks-step-label {
+  flex-shrink: 0;
+  width: 78px;
+  font-size: 13px;
+  color: #5c6570;
+}
+
+.ks-step-value {
+  min-width: 0;
+  overflow: hidden;
+  color: #141414;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ks-gh {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 13px;
+  color: #141414;
+}
+
+.ks-gh img {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+}
+
+.ks-gh-num {
+  color: #5c6570;
+}
+
+.ks-gh-file {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 11px;
+  color: #5c6570;
+}
+
+.ks-diff-stat {
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ks-diff-add { color: #1a7f37; }
+.ks-diff-del { color: #cf222e; }
+
+.ks-plan-count,
+.ks-kicker {
+  font-size: 13px;
+  color: #5c6570;
+}
+
+.ks-ship-title {
+  font-size: 15px;
+}
+
+.ks-marks {
+  position: absolute;
+  z-index: 1;
+  left: 16px;
+  right: 16px;
+  top: 108px;
+  bottom: 16px;
+  overflow: hidden;
+}
+
+.ks-mark {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.66);
+  box-shadow: 0 8px 18px rgba(17, 40, 48, 0.06);
+  backdrop-filter: blur(8px);
+  pointer-events: none;
+}
+
+.ks-mark img {
+  width: 15px;
+  height: 15px;
+  object-fit: contain;
+}
+
+.ks-agent-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.8),
+    0 12px 32px rgba(17, 40, 48, 0.08);
+  backdrop-filter: blur(10px);
+}
+
+.ks-agent-switch {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+}
+
+.ks-agent-tab {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px 4px 4px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #5c6570;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.ks-agent-tab[aria-selected="true"] {
+  background: rgba(5, 113, 211, 0.1);
+  color: #141414;
+}
+
+.ks-agent-body {
+  min-height: 0;
+}
+
+.ks-agent-doing {
+  margin: 0;
+  font-size: 12px;
+  color: #5c6570;
+}
+
+.ks-agent-title {
+  margin: 2px 0 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: #141414;
+}
+
+.ks-agent-copy {
+  margin: 6px 0 0;
+  font-size: 14px;
+  line-height: 1.4;
+  color: #141414;
+}
+
+.ks-agent-action {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.4;
+  color: #141414;
+}
+
+.ks-agent-action span {
+  display: block;
+  font-size: 12px;
+  color: #5c6570;
+}
+
+.ks-agent-approve {
+  align-self: flex-start;
+  height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: #0571d3;
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.ks-agent-approve[data-on] {
+  background: rgba(5, 113, 211, 0.12);
+  color: #0460b5;
+  cursor: default;
+}
+
+@container (min-width: 760px) {
+  .ks-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.12fr);
+    grid-template-rows: 360px 460px 400px;
+    grid-template-areas:
+      "ask plan"
+      "ship tools"
+      "agents agents";
+  }
+
+  .ks-tile--ask { grid-area: ask; }
+  .ks-tile--plan { grid-area: plan; }
+  .ks-tile--ship { grid-area: ship; }
+  .ks-tile--tools { grid-area: tools; }
+  .ks-tile--agents { grid-area: agents; }
+
+  .ks-tile {
+    min-height: 0;
+    height: 100%;
+  }
+}
+
+@container (max-width: 759px) {
+  .ks-copy {
+    padding-left: 22px;
+    padding-right: 22px;
+  }
+
+  .ks-picture--ask,
+  .ks-picture--plan,
+  .ks-picture--ship,
+  .ks-picture--agents {
+    left: 22px;
+    right: 22px;
+  }
+}

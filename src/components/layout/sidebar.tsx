@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   FolderTree,
   Layers,
+  Frame,
   Columns3,
   Clock,
   GitBranch,
@@ -40,6 +41,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { initialsFor, readOnboarding } from "@/lib/onboarding";
 import { CURRENT_USER } from "@/lib/settings";
+import { useWorkspaceSettings } from "@/lib/settings/workspace";
 import { startNewChat } from "@/lib/chat/session";
 import { BrandLogo } from "@/components/marketing/brand-logo";
 import { useAccount } from "@/lib/auth/use-account";
@@ -48,23 +50,24 @@ const GROUPS = [
   {
     label: "Workspace",
     items: [
-      { label: "Chat", href: "/ai", icon: MessageSquare },
-      { label: "Agents", href: "/agents", icon: Boxes },
-      { label: "Autopilot", href: "/autopilot", icon: Bot },
-      { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-      { label: "Explorer", href: "/explorer", icon: FolderTree },
-      { label: "Features", href: "/features", icon: Layers },
-      { label: "Board", href: "/board", icon: Columns3 },
-      { label: "Timeline", href: "/timeline", icon: Clock },
-      { label: "Graph", href: "/graph", icon: GitBranch },
+      { id: "chat", label: "Chat", href: "/ai", icon: MessageSquare },
+      { id: "agents", label: "Agents", href: "/agents", icon: Boxes },
+      { id: "autopilot", label: "Autopilot", href: "/autopilot", icon: Bot },
+      { id: "dashboard", label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+      { id: "explorer", label: "Explorer", href: "/explorer", icon: FolderTree },
+      { id: "features", label: "Features", href: "/features", icon: Layers },
+      { id: "design", label: "Design", href: "/design", icon: Frame },
+      { id: "board", label: "Board", href: "/board", icon: Columns3 },
+      { id: "timeline", label: "Timeline", href: "/timeline", icon: Clock },
+      { id: "graph", label: "Graph", href: "/graph", icon: GitBranch },
     ],
   },
   {
     label: "Measure",
     items: [
-      { label: "Analytics", href: "/analytics", icon: BarChart3 },
-      { label: "Experiments", href: "/experiments", icon: FlaskConical },
-      { label: "Decisions", href: "/decisions", icon: Scale },
+      { id: "analytics", label: "Analytics", href: "/analytics", icon: BarChart3 },
+      { id: "experiments", label: "Experiments", href: "/experiments", icon: FlaskConical },
+      { id: "decisions", label: "Decisions", href: "/decisions", icon: Scale },
     ],
   },
 ];
@@ -79,6 +82,7 @@ export function Sidebar() {
     email: CURRENT_USER.email,
     initials: CURRENT_USER.initials,
   });
+  const [attention, setAttention] = useState(0);
 
   useEffect(() => {
     if (account) return;
@@ -91,6 +95,24 @@ export function Sidebar() {
     });
   }, [account]);
 
+  useEffect(() => {
+    let stop = false;
+    async function load() {
+      const res = await fetch("/api/inbox/attention");
+      if (!res.ok) return;
+      const body = (await res.json()) as { count?: number };
+      if (!stop) setAttention(body.count ?? 0);
+    }
+    void load();
+    const timer = window.setInterval(() => void load(), 15000);
+    return () => {
+      stop = true;
+      window.clearInterval(timer);
+    };
+  }, [pathname]);
+
+  const workspace = useWorkspaceSettings();
+  const hiddenNav = new Set(workspace.hiddenNav);
   const shownProfile = account
     ? {
         name: account.name || CURRENT_USER.name,
@@ -150,31 +172,48 @@ export function Sidebar() {
             <Plus className="h-4 w-4 shrink-0" />
             {!sidebarCollapsed && <span>New</span>}
           </Link>
-          {GROUPS.map((group) => (
+          {GROUPS.map((group) => {
+            const items = group.items.filter((item) => !hiddenNav.has(item.id));
+            if (!items.length) return null;
+            return (
             <div key={group.label} className="mb-1">
               {!sidebarCollapsed && (
                 <p className="px-2 pb-1 pt-3 text-[11px] text-muted-foreground">{group.label}</p>
               )}
-              {group.items.map((item) => {
+              {items.map((item) => {
                 const active = item.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(item.href);
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
-                    title={sidebarCollapsed ? item.label : undefined}
+                    title={sidebarCollapsed ? (item.id === "design" ? "Design, alpha" : item.label) : undefined}
                     className={cn(
-                      "flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm",
+                      "relative flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm",
                       active ? "bg-accent font-medium text-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent",
                       sidebarCollapsed && "justify-center px-0",
                     )}
                   >
                     <item.icon className="h-4 w-4 shrink-0" />
-                    {!sidebarCollapsed && <span>{item.label}</span>}
+                    {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
+                    {item.id === "design" && !sidebarCollapsed && (
+                      <span className="ml-auto rounded border border-border px-1 py-px text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                        Alpha
+                      </span>
+                    )}
+                    {item.id === "agents" && attention > 0 && (
+                      <span className={cn(
+                        "grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-medium text-primary-foreground",
+                        sidebarCollapsed ? "absolute right-1 top-1 h-2 min-w-2 px-0" : "ml-auto",
+                      )}>
+                        {sidebarCollapsed ? "" : attention}
+                      </span>
+                    )}
                   </Link>
                 );
               })}
             </div>
-          ))}
+            );
+          })}
           <Link
             href="/settings"
             title={sidebarCollapsed ? "Settings" : undefined}

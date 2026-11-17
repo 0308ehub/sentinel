@@ -40,10 +40,7 @@ export function TimelineView() {
   return (
     <ScrollArea className="h-full">
       <div className="p-6 max-w-3xl mx-auto">
-        <h1 className="text-lg font-semibold mb-1">Timeline</h1>
-        <p className="text-sm text-muted-foreground mb-8">
-          Automatic timeline built from graph events — no manual curation required
-        </p>
+        <h1 className="mb-8 text-lg font-semibold">Timeline</h1>
 
         {Object.entries(grouped).map(([title, { nodeId, events }]) => (
           <div key={nodeId} className="mb-10">

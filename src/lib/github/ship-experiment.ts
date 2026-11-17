@@ -1,7 +1,7 @@
 import "server-only";
 
 import { askForJson, readJson } from "@/lib/ai/respond";
-import { GitHubApiError, listUiFiles, openPullRequest, readFile, repoDefaultBranch } from "@/lib/github/client";
+import { GitHubApiError, isUiPath, listUiFiles, openPullRequest, readFile, repoDefaultBranch } from "@/lib/github/client";
 
 export interface ExperimentBrief {
   title: string;
@@ -10,6 +10,8 @@ export interface ExperimentBrief {
   control: string;
   treatment: string;
   guardrail: string;
+  path?: string;
+  design?: string;
 }
 
 interface DraftFile {
@@ -22,8 +24,13 @@ export async function shipExperimentPullRequest(fullName: string, brief: Experim
   const base = await repoDefaultBranch(fullName);
   const paths = await listUiFiles(fullName, base);
   const files = [];
+  if (brief.path && isUiPath(brief.path)) {
+    const hinted = await readFile(fullName, brief.path, base).catch(() => null);
+    if (hinted) files.push(hinted);
+  }
   for (const path of paths) {
     if (files.length >= 4) break;
+    if (files.some((file) => file.path === path)) continue;
     const file = await readFile(fullName, path, base).catch(() => null);
     if (file) files.push(file);
   }
@@ -44,14 +51,18 @@ export async function shipExperimentPullRequest(fullName: string, brief: Experim
       "The treatment is visible only when process.env.NEXT_PUBLIC_KISMET_EXPERIMENT equals the flag.",
       "Add data-kismet-experiment on the changed element, set to the flag.",
       "Keep the rest of the file. Match its existing components and style.",
+      "When the treatment lists moved, resized, added, or removed pieces, change the file so the screen matches that layout.",
+      brief.path ? `Prefer editing ${brief.path}.` : "",
       "Do not add a measured result, a percentage, or a claim that the experiment won.",
       `Flag: ${flag}`,
-    ].join(" "),
+    ]
+      .filter(Boolean)
+      .join(" "),
     [
       `Title: ${brief.title}`,
       `Hypothesis: ${brief.hypothesis}`,
       `Control: ${brief.control}`,
-      `Treatment: ${brief.treatment}`,
+      `Treatment: ${brief.design || brief.treatment}`,
       `Metric: ${brief.metric}`,
       `Guardrail: ${brief.guardrail}`,
       "",

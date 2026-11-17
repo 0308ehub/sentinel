@@ -3,6 +3,7 @@
 import { useSyncExternalStore } from "react";
 import type { ProviderId } from "@/lib/ai/policy";
 import { readMemory, readPages, remember } from "@/lib/work-context";
+import { aiContext } from "@/lib/settings/workspace";
 
 export type ModelChoice = "auto" | ProviderId;
 
@@ -377,6 +378,7 @@ async function deliver(text: string) {
       body: JSON.stringify({
         modes: chips,
         model: state.model,
+        context: aiContext(),
         pages: readPages(),
         memory: readMemory().map(({ at, summary }) => ({ at, summary })),
         messages: thread.messages.map((message) => ({

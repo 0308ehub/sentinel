@@ -1,4 +1,7 @@
 import { AppShell } from "@/components/layout/app-shell";
+import { privatePage } from "@/lib/page-meta";
+
+export const metadata = privatePage("Slack", "Slack connected to this workspace.");
 import { SlackChannelView } from "@/components/settings/slack-channel-view";
 
 export default async function SlackSettingsPage({

@@ -9,6 +9,7 @@ import { ChatDock } from "@/components/ai/chat-dock";
 import { AgentRunner } from "@/components/agents/agent-runner";
 import { PendingPrd } from "@/components/prd/pending-prd";
 import { MentionWatcher } from "@/components/slack/mention-watcher";
+import { InboxPresence } from "@/components/inbox/inbox-presence";
 
 export function AppShell({
   children,
@@ -29,6 +30,7 @@ export function AppShell({
       <ProposeFeatureDialog />
       <WorkWatcher />
       <MentionWatcher />
+      <InboxPresence />
       <ChatDock />
       <AgentRunner />
     </div>

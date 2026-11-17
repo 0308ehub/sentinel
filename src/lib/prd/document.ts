@@ -79,6 +79,7 @@ export interface PrdShare extends LivingDoc {
   title: string;
   evidence: PrdEvidence[];
   links: { type: string; title: string }[];
+  expiresAt?: string;
 }
 
 const EVIDENCE_TYPES = new Set<NodeType>([
@@ -189,37 +190,58 @@ export function livingFromShare(share: PrdShare): LivingDoc {
   return readLiving({ living: share });
 }
 
-export function encodeShare(share: PrdShare): string {
-  const json = JSON.stringify(share);
-  const bytes = new TextEncoder().encode(json);
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+export function normalizeShare(input: unknown): PrdShare | null {
+  if (!input || typeof input !== "object") return null;
+  const parsed = input as Partial<PrdShare>;
+  if (parsed.v !== 1 || typeof parsed.title !== "string") return null;
+  const doc = readLiving({ living: parsed });
+  return {
+    v: 1,
+    title: text(parsed.title, 140) || "Untitled PRD",
+    ...doc,
+    evidence: Array.isArray(parsed.evidence) ? parsed.evidence.filter(isEvidence).slice(0, 12) : [],
+    links: Array.isArray(parsed.links)
+      ? parsed.links
+          .filter((item): item is { type: string; title: string } => Boolean(item) && typeof item === "object" && typeof (item as { title?: string }).title === "string")
+          .slice(0, 12)
+          .map((item) => ({ type: text(item.type, 40), title: text(item.title, 140) }))
+      : [],
+    expiresAt: shareExpiry(parsed.expiresAt),
+  };
 }
 
 export function decodeShare(token: string): PrdShare | null {
   try {
-    const padded = token.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((token.length + 3) % 4);
-    const binary = atob(padded);
-    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
-    const parsed = JSON.parse(new TextDecoder().decode(bytes)) as Partial<PrdShare>;
-    if (parsed?.v !== 1 || typeof parsed.title !== "string") return null;
-    const doc = readLiving({ living: parsed });
-    return {
-      v: 1,
-      title: text(parsed.title, 140) || "Untitled PRD",
-      ...doc,
-      evidence: Array.isArray(parsed.evidence) ? parsed.evidence.filter(isEvidence).slice(0, 12) : [],
-      links: Array.isArray(parsed.links)
-        ? parsed.links
-            .filter((item): item is { type: string; title: string } => Boolean(item) && typeof item === "object" && typeof (item as { title?: string }).title === "string")
-            .slice(0, 12)
-            .map((item) => ({ type: text(item.type, 40), title: text(item.title, 140) }))
-        : [],
-    };
+    const dot = token.lastIndexOf(".");
+    const body = dot > 0 ? token.slice(0, dot) : token;
+    const json = dot > 0 ? new TextDecoder().decode(base64UrlBytes(body)) : decodeBase64(body);
+    return normalizeShare(JSON.parse(json));
   } catch {
     return null;
   }
+}
+
+function base64UrlBytes(value: string): Uint8Array {
+  const padded = value.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((value.length + 3) % 4);
+  const binary = atob(padded);
+  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+}
+
+function decodeBase64(value: string): string {
+  return new TextDecoder().decode(base64UrlBytes(value));
+}
+
+export function shareExpired(expiresAt?: string, now = Date.now()): boolean {
+  if (!expiresAt) return false;
+  const time = new Date(expiresAt).getTime();
+  return Number.isNaN(time) || time <= now;
+}
+
+function shareExpiry(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const time = new Date(value).getTime();
+  if (Number.isNaN(time)) return undefined;
+  return new Date(time).toISOString();
 }
 
 export function emailAllowed(share: Pick<PrdShare, "audience" | "domain" | "invited">, email: string): boolean {

@@ -98,10 +98,7 @@ export function ExplorerView() {
       <div className="flex-1 overflow-hidden">
         <ScrollArea className="h-full">
           <div className="p-6">
-            <h1 className="text-lg font-semibold mb-1">Explorer</h1>
-            <p className="text-sm text-muted-foreground mb-6">
-              {nodes.length} nodes across the product graph
-            </p>
+            <h1 className="mb-6 text-lg font-semibold">Explorer</h1>
             <div className="border border-border rounded-lg overflow-hidden">
               <table className="w-full text-xs">
                 <thead>

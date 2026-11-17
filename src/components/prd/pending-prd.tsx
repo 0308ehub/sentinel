@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { decodeShare } from "@/lib/prd/document";
+import type { PrdShare } from "@/lib/prd/document";
 import { graphStore } from "@/lib/graph/graph-store";
 import { useUIStore } from "@/stores/ui-store";
 import { clearSharedPrd, takeSharedPrd } from "@/components/prd/living-prd";
@@ -11,10 +11,32 @@ export function PendingPrd() {
   const router = useRouter();
   const productId = useUIStore((state) => state.activeProductId);
   const [token, setToken] = useState<string | null>(null);
-  const share = token ? decodeShare(token) : null;
+  const [share, setShare] = useState<PrdShare | null>(null);
 
   useEffect(() => {
-    setToken(takeSharedPrd());
+    const pending = takeSharedPrd();
+    setToken(pending);
+    if (!pending) return;
+    let cancel = false;
+    void fetch("/api/prd/share", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: pending }),
+    })
+      .then(async (response) => {
+        if (!response.ok) return null;
+        const body = (await response.json()) as { share?: PrdShare };
+        return body.share ?? null;
+      })
+      .then((next) => {
+        if (!cancel) setShare(next);
+      })
+      .catch(() => {
+        if (!cancel) setShare(null);
+      });
+    return () => {
+      cancel = true;
+    };
   }, []);
 
   if (!share || !token) return null;

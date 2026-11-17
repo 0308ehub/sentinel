@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { SettingsShell } from "@/components/settings/settings-shell";
+import { ToggleRow } from "@/components/settings/settings-form";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { updateWorkspace, useWorkspaceSettings } from "@/lib/settings/workspace";
 
 interface RouteRow {
   label: string;
@@ -20,6 +22,7 @@ interface ModelStatus {
 }
 
 export function ModelsView() {
+  const settings = useWorkspaceSettings();
   const [status, setStatus] = useState<ModelStatus | null>(null);
 
   useEffect(() => {
@@ -30,14 +33,15 @@ export function ModelsView() {
   }, []);
 
   return (
-    <SettingsShell title="Models" description="Kismet picks Claude or OpenAI for each kind of work">
+    <SettingsShell title="AI" description="Which model answers, and what a draft is allowed to read">
+      <div className="space-y-4">
       {!status ? (
-        <div className="flex items-center gap-2 py-10 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
           Checking models…
         </div>
       ) : (
-        <div className="space-y-4">
+        <>
           <div className="grid gap-3 sm:grid-cols-2">
             <ProviderCard name="Claude" model={status.claude.model} configured={status.claude.configured} env="ANTHROPIC_API_KEY" />
             <ProviderCard name="OpenAI" model={status.openai.model} configured={status.openai.configured} env="OPENAI_API_KEY" />
@@ -64,8 +68,37 @@ export function ModelsView() {
               )}
             </CardContent>
           </Card>
-        </div>
+        </>
       )}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Context</CardTitle>
+              <CardDescription className="text-xs leading-relaxed">
+                Chat, agents, and PRD drafts leave out a source when it is off.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-0 divide-y divide-border p-0">
+              <ToggleRow
+                title="Product graph"
+                description="Pages on the graph, features, experiments, and linked PRD evidence."
+                checked={settings.aiGraph}
+                onCheckedChange={(aiGraph) => updateWorkspace({ aiGraph })}
+              />
+              <ToggleRow
+                title="Connected apps"
+                description="Slack, Jira, and Databricks excerpts in a draft."
+                checked={settings.aiConnectors}
+                onCheckedChange={(aiConnectors) => updateWorkspace({ aiConnectors })}
+              />
+              <ToggleRow
+                title="Open pages and work log"
+                description="The pages you have had open, and the short log of what you have been doing."
+                checked={settings.aiChat}
+                onCheckedChange={(aiChat) => updateWorkspace({ aiChat })}
+              />
+            </CardContent>
+          </Card>
+      </div>
     </SettingsShell>
   );
 }

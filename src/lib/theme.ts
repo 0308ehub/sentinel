@@ -1,22 +1,33 @@
 export const THEME_KEY = "kismet-theme";
-export type ThemeName = "light" | "dark";
+export type ThemeName = "light" | "dark" | "system";
 
 export function readTheme(): ThemeName {
   if (typeof window === "undefined") return "light";
-  return localStorage.getItem(THEME_KEY) === "dark" ? "dark" : "light";
+  const stored = localStorage.getItem(THEME_KEY);
+  if (stored === "dark" || stored === "light" || stored === "system") return stored;
+  return "light";
+}
+
+function systemDark(): boolean {
+  return window.matchMedia("(prefers-color-scheme: dark)").matches;
 }
 
 export function applyTheme(theme: ThemeName) {
-  document.documentElement.classList.toggle("dark", theme === "dark");
+  const dark = theme === "dark" || (theme === "system" && systemDark());
+  document.documentElement.classList.toggle("dark", dark);
   localStorage.setItem(THEME_KEY, theme);
   document.cookie = `${THEME_KEY}=${theme};path=/;max-age=31536000;SameSite=Lax`;
 }
 
+let media: MediaQueryList | null = null;
+
+function onSystemChange() {
+  if (readTheme() === "system") applyTheme("system");
+}
+
 export function syncTheme() {
-  const stored = localStorage.getItem(THEME_KEY);
-  if (stored === "dark" || stored === "light") {
-    applyTheme(stored);
-    return;
-  }
-  applyTheme(document.documentElement.classList.contains("dark") ? "dark" : "light");
+  applyTheme(readTheme());
+  media?.removeEventListener("change", onSystemChange);
+  media = window.matchMedia("(prefers-color-scheme: dark)");
+  media.addEventListener("change", onSystemChange);
 }

@@ -6,7 +6,7 @@ export function UpdateFeed({ feed }: { feed: Update[] }) {
   return (
     <aside className="xl:sticky xl:top-5 xl:self-start">
       <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[.08em] text-muted-foreground">
-        Kismet&apos;s updates
+        Updates
       </h2>
       <div className="max-h-[720px] overflow-auto rounded-md border bg-card">
         <div className="divide-y">
@@ -29,7 +29,7 @@ export function UpdateFeed({ feed }: { feed: Update[] }) {
               </div>
             ))
           ) : (
-            <EmptyState>Updates from the four agents appear here.</EmptyState>
+            <EmptyState>No updates</EmptyState>
           )}
         </div>
       </div>

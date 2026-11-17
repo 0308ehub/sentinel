@@ -1,24 +1,33 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import { Monitor, Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { SettingsShell } from "@/components/settings/settings-shell";
 import { readOnboarding } from "@/lib/onboarding";
 import { CURRENT_USER } from "@/lib/settings";
 import { useAccount } from "@/lib/auth/use-account";
+import { applyTheme, readTheme, type ThemeName } from "@/lib/theme";
+import { useWorkspaceSettings } from "@/lib/settings/workspace";
 
 export function ProfileSettingsView() {
   const account = useAccount();
+  const workspace = useWorkspaceSettings();
   const [name, setName] = useState(CURRENT_USER.name);
   const [title, setTitle] = useState(CURRENT_USER.title);
   const [email, setEmail] = useState(CURRENT_USER.email);
   const [bio, setBio] = useState("");
   const [saved, setSaved] = useState(false);
+  const [theme, setTheme] = useState<ThemeName>("light");
+
+  useEffect(() => {
+    setTheme(readTheme());
+  }, []);
 
   useEffect(() => {
     if (account) {
@@ -39,12 +48,17 @@ export function ProfileSettingsView() {
     setTimeout(() => setSaved(false), 2000);
   }
 
+  function chooseTheme(next: ThemeName) {
+    setTheme(next);
+    applyTheme(next);
+  }
+
   return (
-    <SettingsShell title="Profile" description="Your personal details shown across Kismet">
+    <SettingsShell title="Profile" description="Your name, role, and how Kismet looks">
+      <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>Your profile</CardTitle>
-          <CardDescription>This is how teammates see you in the graph and activity feed</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSave} className="space-y-4">
@@ -70,6 +84,14 @@ export function ProfileSettingsView() {
               <div className="space-y-1.5">
                 <Label htmlFor="title">Job title</Label>
                 <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} className="h-9" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="org">Organization</Label>
+                <Input id="org" value={workspace.orgName} readOnly className="h-9" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="role">Role</Label>
+                <Input id="role" value="Admin" readOnly className="h-9" />
               </div>
             </div>
 
@@ -104,6 +126,26 @@ export function ProfileSettingsView() {
           </form>
         </CardContent>
       </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Appearance</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          <Button type="button" size="sm" variant={theme === "light" ? "default" : "outline"} onClick={() => chooseTheme("light")}>
+            <Sun className="h-3.5 w-3.5" />
+            Light
+          </Button>
+          <Button type="button" size="sm" variant={theme === "dark" ? "default" : "outline"} onClick={() => chooseTheme("dark")}>
+            <Moon className="h-3.5 w-3.5" />
+            Dark
+          </Button>
+          <Button type="button" size="sm" variant={theme === "system" ? "default" : "outline"} onClick={() => chooseTheme("system")}>
+            <Monitor className="h-3.5 w-3.5" />
+            System
+          </Button>
+        </CardContent>
+      </Card>
+      </div>
     </SettingsShell>
   );
 }

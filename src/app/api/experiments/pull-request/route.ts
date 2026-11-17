@@ -1,4 +1,5 @@
-import { repoName, githubErrorResponse } from "@/lib/github/client";
+import { errorStatus, ModelError } from "@/lib/ai/orchestrate";
+import { githubErrorResponse, isUiPath, repoName } from "@/lib/github/client";
 import { shipExperimentPullRequest } from "@/lib/github/ship-experiment";
 
 export const maxDuration = 120;
@@ -11,6 +12,8 @@ export async function POST(request: Request) {
   let control = "";
   let treatment = "";
   let guardrail = "";
+  let path = "";
+  let design = "";
   try {
     const body = (await request.json()) as Record<string, unknown>;
     repo = typeof body.repo === "string" ? body.repo.trim() : "";
@@ -20,6 +23,8 @@ export async function POST(request: Request) {
     control = typeof body.control === "string" ? body.control.trim().slice(0, 800) : "";
     treatment = typeof body.treatment === "string" ? body.treatment.trim().slice(0, 800) : "";
     guardrail = typeof body.guardrail === "string" ? body.guardrail.trim().slice(0, 400) : "";
+    path = typeof body.path === "string" && isUiPath(body.path) ? body.path : "";
+    design = typeof body.design === "string" ? body.design.trim().slice(0, 4000) : "";
   } catch {
     return Response.json({ error: "Send the experiment and a repository." }, { status: 400 });
   }
@@ -27,9 +32,10 @@ export async function POST(request: Request) {
   if (!title) return Response.json({ error: "The experiment needs a title." }, { status: 400 });
 
   try {
-    const pull = await shipExperimentPullRequest(repo, { title, hypothesis, metric, control, treatment, guardrail });
+    const pull = await shipExperimentPullRequest(repo, { title, hypothesis, metric, control, treatment, guardrail, path, design });
     return Response.json(pull);
   } catch (error) {
+    if (error instanceof ModelError) return Response.json({ error: error.message }, { status: errorStatus(error) });
     return githubErrorResponse(error);
   }
 }

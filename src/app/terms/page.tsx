@@ -11,6 +11,7 @@ export default function TermsPage() {
     <MarketingFrame>
       <main className="max-w-2xl px-6 pb-16 pt-16 text-[15px] leading-relaxed text-[#3c4250] md:px-16 md:pt-20">
         <h1 className="text-3xl font-semibold tracking-[-0.03em] text-[#111]">Terms of service</h1>
+        <p className="mt-3 text-sm text-[#6a717c]">Updated November 7, 2026.</p>
         <div className="mt-8 space-y-4">
           <p>
             Kismet is a workspace for your product team. You keep ownership of your company’s data. You are responsible
@@ -18,7 +19,12 @@ export default function TermsPage() {
           </p>
           <p>
             Experiments that Kismet ships run only inside the permissions you grant. A change that needs a person still
-            waits for that person.
+            waits for that person. Model output can be wrong. It is not legal, financial, or medical advice, and it is
+            not a promise that an experiment will win.
+          </p>
+          <p>
+            Don’t use Kismet to break the law, to get into an account you don’t have, or to hammer the model endpoints.
+            Kismet can slow or stop an account that is doing that.
           </p>
           <p>
             This is a plain summary for the product, not a negotiated enterprise agreement. Talk to a human if you need

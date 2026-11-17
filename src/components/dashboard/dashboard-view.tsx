@@ -41,9 +41,6 @@ export function DashboardView() {
     <div className="h-full overflow-y-auto">
       <div className="mx-auto max-w-6xl px-8 py-8">
         <h1 className="text-2xl font-medium">Dashboard</h1>
-        <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-          Tickets on you, experiments that are running, and the analytics saved in this workspace.
-        </p>
 
         <div className="mt-8 grid items-start gap-x-12 gap-y-10 md:grid-cols-[minmax(0,1.45fr)_minmax(240px,0.75fr)]">
           <div className="space-y-10">
@@ -93,7 +90,7 @@ export function DashboardView() {
 
             <Section title="Team activity" meta={graphReady ? `${activities.length}` : ""}>
               {!graphReady ? null : activities.length === 0 ? (
-                <Empty>No activity yet. It shows up when someone files work or drafts an experiment.</Empty>
+                <Empty>No activity yet.</Empty>
               ) : (
                 activities.slice(0, 8).map((item) => {
                   const person = getPerson(item.actorId);
@@ -114,14 +111,9 @@ export function DashboardView() {
 
           <div className="space-y-10">
             <Section title="Analytics library" href="/analytics" hrefLabel="Open">
-              {!libraryReady || !notebooksReady ? null : (
-                <>
-                  <p className="px-1 pt-3 text-xs text-muted-foreground">
-                    Boards you saved, and boards opened from a shared link.
-                  </p>
-                  {dashboards.length === 0 && metrics.length === 0 && notebooks.length === 0 ? (
-                    <Empty>The library is empty.</Empty>
-                  ) : (
+              {!libraryReady || !notebooksReady ? null : dashboards.length === 0 && metrics.length === 0 && notebooks.length === 0 ? (
+                <Empty>The library is empty.</Empty>
+              ) : (
                     <>
                       {dashboards.map((board) => (
                         <Row
@@ -149,13 +141,11 @@ export function DashboardView() {
                         />
                       ))}
                     </>
-                  )}
-                </>
               )}
             </Section>
 
             <Section
-              title="From Kismet"
+              title="Notifications"
               meta={notesReady ? `${unread.length} unread` : ""}
             >
               {!notesReady ? null : notifications.length === 0 ? (

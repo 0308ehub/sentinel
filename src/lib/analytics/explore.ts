@@ -1,6 +1,6 @@
 import "server-only";
 
-import { runDatabricksQuery } from "@/lib/databricks/client";
+import { runAppDatabricksQuery as runDatabricksQuery } from "@/lib/databricks/client";
 import { customerColumns } from "@/lib/analytics/audience";
 import type {
   ExploreBar,

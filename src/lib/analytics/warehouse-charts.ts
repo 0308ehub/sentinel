@@ -1,6 +1,6 @@
 import "server-only";
 
-import { runDatabricksQuery } from "@/lib/databricks/client";
+import { runAppDatabricksQuery as runDatabricksQuery } from "@/lib/databricks/client";
 import type { BarPoint, ChartPoint, FunnelStep, WarehouseCharts } from "@/lib/analytics/chart-types";
 
 const TRANSACTIONS = "samples.bakehouse.sales_transactions";
