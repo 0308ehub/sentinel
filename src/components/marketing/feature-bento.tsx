@@ -382,7 +382,7 @@ function Ship() {
                     <div className="ks-gh">
                       <img src="/connectors/github.svg" alt="" width={14} height={14} />
                       <Text>{pull.repo}</Text>
-                      <Text className="ks-gh-num">#{pull.number}</Text>
+                      <Text className="ks-gh-num">{`#${pull.number}`}</Text>
                     </div>
                   </div>
                   <Text className="ks-ship-title">{pull.title}</Text>
