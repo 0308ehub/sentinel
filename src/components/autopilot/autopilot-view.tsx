@@ -101,6 +101,25 @@ export function AutopilotView() {
     }
   }
 
+  async function dismissSignal(signal: Signal) {
+    setBusy(signal.id);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/autopilot/signals/${signal.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "dismiss" }),
+      });
+      const body = (await res.json()) as { message?: string; error?: string };
+      setMessage(body.message ?? body.error ?? null);
+      await load();
+    } catch {
+      setMessage("Could not dismiss this problem. Try again.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function act(
     experiment: Experiment,
     action: "approve" | "reject" | "rollout" | "stop" | "approve-cleanup" | "dismiss-cleanup"
@@ -276,7 +295,7 @@ export function AutopilotView() {
           empty={state.lastRunAt ? "No problems found yet." : "Press Run now to start collecting evidence."}
         >
           {problems.map((signal) => (
-            <SignalCard key={signal.id} signal={signal} />
+            <SignalCard key={signal.id} signal={signal} onDismiss={() => dismissSignal(signal)} busy={busy === signal.id} />
           ))}
             </Section>
 
@@ -335,7 +354,7 @@ function Section({
   );
 }
 
-function SignalCard({ signal }: { signal: Signal }) {
+function SignalCard({ signal, onDismiss, busy }: { signal: Signal; onDismiss: () => void; busy: boolean }) {
   const [open, setOpen] = useState(false);
   const synthetic = signal.evidence.filter((e) => e.synthetic).length;
   return (
@@ -351,7 +370,7 @@ function SignalCard({ signal }: { signal: Signal }) {
               <Badge variant="warning">Enough evidence</Badge>
             ) : (
               <Badge variant="muted">
-                {signal.evidence.length}/{READY_MIN_EVIDENCE} evidence
+                {signal.distinctEvidence}/{READY_MIN_EVIDENCE} evidence
               </Badge>
             )}
           </div>
@@ -364,11 +383,21 @@ function SignalCard({ signal }: { signal: Signal }) {
         </div>
       </button>
       {open && (
-        <ul className="divide-y divide-border border-t border-border">
-          {signal.evidence.map((item) => (
-            <EvidenceRow key={item.id} item={item} />
-          ))}
-        </ul>
+        <>
+          <ul className="divide-y divide-border border-t border-border">
+            {signal.evidence.map((item) => (
+              <EvidenceRow key={item.id} item={item} />
+            ))}
+          </ul>
+          {signal.status !== "experimenting" && (
+            <div className="flex justify-end border-t border-border p-2">
+              <Button size="sm" variant="ghost" onClick={onDismiss} disabled={busy}>
+                {busy && <Loader2 className="animate-spin" />}
+                Dismiss problem
+              </Button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

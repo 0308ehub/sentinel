@@ -25,6 +25,8 @@ export interface Signal {
   createdAt: string;
   updatedAt: string;
   evidence: Evidence[];
+  /** Distinct observations: the same finding measured again counts once. */
+  distinctEvidence: number;
   sources: EvidenceSource[];
   ready: boolean;
 }

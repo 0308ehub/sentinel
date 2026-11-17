@@ -169,6 +169,7 @@ export async function listSignals(): Promise<Signal[]> {
     .map((row) => {
       const items = bySignal.get(String(row.id)) ?? [];
       const sources = [...new Set(items.map((item) => item.source))];
+      const distinctEvidence = new Set(items.map((item) => item.title)).size;
       return {
         id: String(row.id),
         title: String(row.title),
@@ -178,8 +179,9 @@ export async function listSignals(): Promise<Signal[]> {
         createdAt: iso(row.created_at),
         updatedAt: iso(row.updated_at),
         evidence: items,
+        distinctEvidence,
         sources,
-        ready: items.length >= READY_MIN_EVIDENCE && sources.length >= READY_MIN_SOURCES,
+        ready: distinctEvidence >= READY_MIN_EVIDENCE && sources.length >= READY_MIN_SOURCES,
       };
     })
     .sort((a, b) => b.evidence.length - a.evidence.length);
@@ -529,10 +531,16 @@ export async function knownEvidenceUrls(urls: string[]): Promise<Set<string>> {
   return new Set(rows.map((row) => row.url).filter((url): url is string => typeof url === "string"));
 }
 
-export async function hasEvidenceTitled(title: string, sinceDays: number): Promise<boolean> {
+/** Updates the latest evidence with this title to the newest numbers. False when there is none yet. */
+export async function refreshEvidenceTitled(title: string, body: string): Promise<boolean> {
   const sql = await db();
+  const userId = scopeUser();
   const rows = await sql`
-    select 1 from kismet.evidence where user_id = ${scopeUser()} and title = ${title} and occurred_at > now() - make_interval(days => ${sinceDays}) limit 1
+    update kismet.evidence set body = ${body.slice(0, 4000)}, occurred_at = now()
+    where id = (
+      select id from kismet.evidence where user_id = ${userId} and title = ${title} order by occurred_at desc limit 1
+    )
+    returning id
   `;
   return rows.length > 0;
 }
