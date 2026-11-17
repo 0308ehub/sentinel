@@ -45,6 +45,8 @@ export interface ChatThread {
   createdAt: string;
   updatedAt: string;
   messages: ChatMessage[];
+  mode?: "chat" | "code";
+  coderSessionId?: string;
 }
 
 export interface ChatFolder {
@@ -90,6 +92,7 @@ const EMPTY_DRAFT: ComposerDraft = { text: "", chips: [], files: [] };
 const pendingIds = new Set<string>();
 const listeners = new Set<() => void>();
 let draft: ComposerDraft = EMPTY_DRAFT;
+let newChatMode: "chat" | "code" = "chat";
 let snapshot = EMPTY;
 
 function emit() {
@@ -164,7 +167,9 @@ function write(next: ChatState) {
 function isThread(value: unknown): value is ChatThread {
   if (!value || typeof value !== "object") return false;
   const thread = value as ChatThread;
-  return typeof thread.id === "string" && typeof thread.title === "string" && Array.isArray(thread.messages);
+  return typeof thread.id === "string" && typeof thread.title === "string" && Array.isArray(thread.messages) &&
+    (thread.mode === undefined || thread.mode === "chat" || thread.mode === "code") &&
+    (thread.coderSessionId === undefined || typeof thread.coderSessionId === "string");
 }
 
 function isFolder(value: unknown): value is ChatFolder {
@@ -207,6 +212,15 @@ export function useComposerDraft(): ComposerDraft {
   );
 }
 
+export function useNewChatMode(): "chat" | "code" {
+  return useSyncExternalStore(subscribe, () => newChatMode, () => "chat");
+}
+
+export function setNewChatMode(mode: "chat" | "code") {
+  newChatMode = mode;
+  emit();
+}
+
 export function activeThread(state: ChatState): ChatThread | undefined {
   return state.threads.find((thread) => thread.id === state.activeId);
 }
@@ -229,6 +243,7 @@ export function startNewChat() {
   const state = readStored();
   write({ ...state, activeId: null });
   setDraft({ text: "", chips: draft.chips, files: [] });
+  setNewChatMode("chat");
 }
 
 export function openThread(id: string) {
@@ -356,6 +371,55 @@ export function sendChat(text: string) {
     () => undefined,
   );
   return run;
+}
+
+export async function sendCode(text: string): Promise<void> {
+  const content = text.trim();
+  if (!content) return;
+  const state = readStored();
+  const now = new Date().toISOString();
+  let thread = state.threads.find((item) => item.id === state.activeId);
+  if (!thread) {
+    thread = {
+      id: crypto.randomUUID(),
+      title: content.replace(/\s+/g, " ").slice(0, 64),
+      folderId: state.folderId,
+      createdAt: now,
+      updatedAt: now,
+      messages: [],
+      mode: "code",
+    };
+    state.threads.unshift(thread);
+    state.activeId = thread.id;
+  }
+  if (thread.mode !== "code") return;
+  thread.messages.push({ id: crypto.randomUUID(), role: "user", content, at: now });
+  thread.updatedAt = now;
+  pendingIds.add(thread.id);
+  setDraft({ text: "", chips: draft.chips, files: [] });
+  write(state);
+  try {
+    const path = thread.coderSessionId ? `/api/coder/sessions/${thread.coderSessionId}/messages` : "/api/coder/sessions";
+    const response = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: content }),
+    });
+    const body = (await response.json()) as { sessionId?: string; error?: string };
+    if (!response.ok) throw new Error(body.error || "Code mode request failed.");
+    if (body.sessionId) updateCoderSession(thread.id, body.sessionId);
+  } finally {
+    pendingIds.delete(thread.id);
+    emit();
+  }
+}
+
+function updateCoderSession(threadId: string, coderSessionId: string) {
+  const state = readStored();
+  const thread = state.threads.find((item) => item.id === threadId);
+  if (!thread) return;
+  thread.coderSessionId = coderSessionId;
+  write(state);
 }
 
 async function deliver(text: string) {

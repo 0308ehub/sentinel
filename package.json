@@ -20,6 +20,7 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "1.8.0",
     "@clerk/nextjs": "^6.39.5",
     "@prisma/client": "^5.22.0",
     "@radix-ui/react-avatar": "^1.2.1",

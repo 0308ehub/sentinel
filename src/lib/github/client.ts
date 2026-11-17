@@ -40,6 +40,37 @@ export interface GitHubPull {
   branch: string;
 }
 
+export async function createPullFromBranch(
+  fullName: string,
+  head: string,
+  base: string,
+  title: string,
+  body: string,
+): Promise<{ number: number; url: string }> {
+  const parsed = repoName(fullName);
+  if (!parsed) throw new GitHubApiError("bad_repo", "Use a repository like owner/name.", 400);
+  try {
+    const pull = await github<{ number?: number; html_url?: string }>(`/repos/${parsed.owner}/${parsed.repo}/pulls`, {
+      method: "POST",
+      body: JSON.stringify({ head, base, title: title.slice(0, 120), body: body.slice(0, 6000) }),
+    });
+    return pullResult(pull);
+  } catch (error) {
+    if (!(error instanceof GitHubApiError) || error.status !== 422) throw error;
+    const pulls = await github<{ number?: number; html_url?: string }[]>(
+      `/repos/${parsed.owner}/${parsed.repo}/pulls?head=${encodeURIComponent(`${parsed.owner}:${head}`)}&state=open`,
+    );
+    return pullResult(pulls[0]);
+  }
+}
+
+function pullResult(pull: { number?: number; html_url?: string } | undefined): { number: number; url: string } {
+  if (!pull?.number || !pull.html_url) {
+    throw new GitHubApiError("github_error", "GitHub did not return the pull request.", 502);
+  }
+  return { number: pull.number, url: pull.html_url };
+}
+
 interface RepoPayload {
   full_name?: string;
   private?: boolean;

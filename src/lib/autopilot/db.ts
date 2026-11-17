@@ -352,6 +352,15 @@ create table if not exists kismet.workspace_state (
   updated_at timestamptz not null default now(),
   primary key (user_id, key)
 );
+
+create table if not exists kismet.coder_sessions (
+  session_id text primary key,
+  user_id text not null,
+  repo text not null,
+  title text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists coder_sessions_user_created_idx on kismet.coder_sessions (user_id, created_at desc);
 `;
 
 export async function db(): Promise<Sql> {

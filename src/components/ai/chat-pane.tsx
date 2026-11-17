@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   ArrowUp,
   Calendar,
+  Code2,
   Folder,
   Hash,
   Loader2,
@@ -32,13 +33,16 @@ import {
   runScheduled,
   schedulePrompt,
   sendChat,
+  sendCode,
   setDraft,
   setFolderFilter,
   setModel,
+  setNewChatMode,
   startNewChat,
   threadPending,
   useChatState,
   useComposerDraft,
+  useNewChatMode,
   type ChatMessage,
   type ModelChoice,
 } from "@/lib/chat/session";
@@ -50,6 +54,7 @@ import { useUIStore } from "@/stores/ui-store";
 import { cn } from "@/lib/utils";
 import { useAccount } from "@/lib/auth/use-account";
 import { GettingStarted } from "@/components/onboarding/getting-started";
+import { CodeThread } from "@/components/ai/code-thread";
 
 const noSubscribe = () => () => {};
 
@@ -64,9 +69,18 @@ export function ChatPane({ variant, onClose }: { variant: "page" | "dock"; onClo
   const draftName = useSyncExternalStore(noSubscribe, () => readOnboarding().name, () => "");
   const bottomRef = useRef<HTMLDivElement>(null);
   const empty = !thread || thread.messages.length === 0;
+  const [codeRepo, setCodeRepo] = useState<string | null>(null);
   const fullName = account?.name || draftName || (CURRENT_USER.name === "You" ? "" : CURRENT_USER.name);
   const firstName = fullName.trim().split(/\s+/)[0] ?? "";
   const greeting = greetingFor(firstName && firstName !== "You" ? firstName : "");
+
+  useEffect(() => {
+    if (thread?.mode !== "code") return;
+    void fetch("/api/coder/status", { cache: "no-store" })
+      .then((res) => res.json() as Promise<{ repo?: string | null }>)
+      .then((body) => setCodeRepo(body.repo ?? null))
+      .catch(() => undefined);
+  }, [thread?.mode]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -75,7 +89,9 @@ export function ChatPane({ variant, onClose }: { variant: "page" | "dock"; onClo
   const transcript = (
     <div className="flex-1 overflow-y-auto">
       <div className={cn("mx-auto flex min-h-full w-full flex-col", variant === "page" ? "max-w-2xl px-4 py-8" : "px-3 py-4")}>
-        {empty ? (
+        {thread?.mode === "code" ? (
+          <CodeThread sessionId={thread.coderSessionId} repo={codeRepo} justSent={pending} />
+        ) : empty ? (
           <EmptyState greeting={greeting} dock={variant === "dock"} />
         ) : (
           <div className="space-y-7">
@@ -197,6 +213,9 @@ function Composer({ utilities = false }: { utilities?: boolean }) {
   const [modelOpen, setModelOpen] = useState(false);
   const [panel, setPanel] = useState<"folders" | "schedule" | null>(null);
   const [models, setModels] = useState({ claude: "Claude", openai: "OpenAI" });
+  const codeMode = useNewChatMode();
+  const [codeStatus, setCodeStatus] = useState<{ configured: boolean; github: boolean; repo: string | null } | null>(null);
+  const [codeError, setCodeError] = useState("");
   const query = chipQuery(draft.text);
   const menu = modeOpen ? matchingChips("") : query === null ? [] : matchingChips(query);
   const thread = activeThread(state);
@@ -213,6 +232,13 @@ function Composer({ utilities = false }: { utilities?: boolean }) {
         });
       })
       .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    void fetch("/api/coder/status", { cache: "no-store" })
+      .then((res) => res.json() as Promise<{ configured?: boolean; github?: boolean; repo?: string | null }>)
+      .then((body) => setCodeStatus({ configured: Boolean(body.configured), github: Boolean(body.github), repo: body.repo ?? null }))
+      .catch(() => setCodeStatus(null));
   }, []);
 
   async function sendWithBug(text: string, chips: string[]) {
@@ -234,6 +260,17 @@ function Composer({ utilities = false }: { utilities?: boolean }) {
     }
     const pulled = pullChipsForSend(draft.text, draft.chips);
     setDraft({ text: pulled.text, chips: pulled.chips, files: draft.files });
+    if (thread?.mode === "code" || (!thread && codeMode === "code")) {
+      if (!codeStatus?.github || !codeStatus.repo) {
+        setCodeError("Connect GitHub and choose a repository first.");
+        return;
+      }
+      setCodeError("");
+      void sendCode(pulled.text).catch((error: unknown) => {
+        setCodeError(error instanceof Error ? error.message : "Code mode request failed.");
+      });
+      return;
+    }
     void sendWithBug(pulled.text, pulled.chips);
   }
 
@@ -351,6 +388,21 @@ function Composer({ utilities = false }: { utilities?: boolean }) {
           <IconButton label="Choose a mode" onClick={() => { setModeOpen((open) => !open); setModelOpen(false); }}>
             <Hash className="h-4 w-4" />
           </IconButton>
+          {codeStatus?.configured && (!thread || thread.mode === "code") && (
+            <button
+              type="button"
+              aria-label="Code mode"
+              aria-pressed={thread?.mode === "code" || codeMode === "code"}
+              disabled={Boolean(thread)}
+              onClick={() => setNewChatMode(codeMode === "code" ? "chat" : "code")}
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs text-muted-foreground hover:bg-muted",
+                (thread?.mode === "code" || codeMode === "code") && "bg-muted text-foreground",
+              )}
+            >
+              <Code2 className="h-3.5 w-3.5" /> Code
+            </button>
+          )}
           <div className="relative">
             <button
               type="button"
@@ -385,6 +437,11 @@ function Composer({ utilities = false }: { utilities?: boolean }) {
           </button>
         </div>
       </div>
+      {codeError && (
+        <p className="mt-2 text-xs text-destructive">
+          {codeError} <Link href="/settings/connectors/github" className="underline">Open GitHub settings</Link>
+        </p>
+      )}
       {utilities && (
         <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
           <UtilityButton active={panel === "folders"} onClick={() => setPanel(panel === "folders" ? null : "folders")}>
@@ -689,7 +746,7 @@ function Citations({ message }: { message: ChatMessage }) {
   );
 }
 
-function AnswerText({ text }: { text: string }) {
+export function AnswerText({ text }: { text: string }) {
   const parts = text.split(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g);
   return (
     <>
