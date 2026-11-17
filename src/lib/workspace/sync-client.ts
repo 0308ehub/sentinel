@@ -2,24 +2,38 @@
 
 import { useSyncExternalStore } from "react";
 import { graphStore } from "@/lib/graph/graph-store";
+import { useAnalyticsLibrary } from "@/stores/analytics-store";
+import { useNotificationStore } from "@/stores/notification-store";
+import { useQueryEditorStore } from "@/stores/query-editor-store";
 import { workspaceAdapters, type SyncAdapter } from "@/lib/workspace/adapters";
-import { initialAction, trimForUpload } from "@/lib/workspace/sync-plan";
+import { STATE_KEYS, type StateKey } from "@/lib/workspace/keys";
+import { initialAction, shouldUpload, trimForUpload } from "@/lib/workspace/sync-plan";
 
 export type WorkspaceSyncStatus = "idle" | "saving" | "saved" | "error" | "local-only";
 
-type StateKey = "graph" | "chats";
 type ServerState = { data: unknown; version: number };
 type StateResponse = { userId: string; states: Partial<Record<StateKey, ServerState>> };
+type PersistStore = {
+  persist: {
+    hasHydrated: () => boolean;
+    onFinishHydration: (fn: () => void) => () => void;
+  };
+};
 
 const API = "/api/workspace/state";
 const OWNER_KEY = "kismet-sync-owner";
 const MAX_UPLOAD_BYTES = 3_000_000;
 const RETRY_DELAYS = [2_000, 5_000, 15_000, 30_000];
 const adapters: SyncAdapter<unknown>[] = workspaceAdapters;
-const versions: Record<StateKey, number> = { graph: 0, chats: 0 };
-const dirty: Record<StateKey, boolean> = { graph: false, chats: false };
-const inFlight: Record<StateKey, boolean> = { graph: false, chats: false };
-const retries: Record<StateKey, number> = { graph: 0, chats: 0 };
+
+function recordOf<T>(value: T): Record<StateKey, T> {
+  return Object.fromEntries(STATE_KEYS.map((key) => [key, value])) as Record<StateKey, T>;
+}
+
+const versions = recordOf(0);
+const dirty = recordOf(false);
+const inFlight = recordOf(false);
+const retries = recordOf(0);
 const timers: Partial<Record<StateKey, ReturnType<typeof setTimeout>>> = {};
 const listeners = new Set<() => void>();
 
@@ -68,6 +82,8 @@ function scheduleUpload(key: StateKey, delay = 700): void {
 
 function markDirty(key: StateKey): void {
   if (suppressChanges || stopped) return;
+  const adapter = adapterFor(key);
+  if (!shouldUpload(versions[key], adapter.isEmpty(adapter.read()))) return;
   dirty[key] = true;
   setStatus("saving");
   scheduleUpload(key);
@@ -190,20 +206,33 @@ async function bootstrap(): Promise<void> {
   }
 }
 
-function waitForGraphHydration(): Promise<void> {
-  if (graphStore.persist.hasHydrated()) return Promise.resolve();
+function whenHydrated(store: PersistStore): Promise<void> {
+  if (store.persist.hasHydrated()) return Promise.resolve();
   return new Promise((resolve) => {
-    const unsubscribe = graphStore.persist.onFinishHydration(() => {
+    const unsubscribe = store.persist.onFinishHydration(() => {
       unsubscribe();
       resolve();
     });
+    if (store.persist.hasHydrated()) {
+      unsubscribe();
+      resolve();
+    }
   });
+}
+
+function waitForStores(): Promise<void> {
+  return Promise.all([
+    whenHydrated(graphStore),
+    whenHydrated(useNotificationStore),
+    whenHydrated(useAnalyticsLibrary),
+    whenHydrated(useQueryEditorStore),
+  ]).then(() => undefined);
 }
 
 export function startWorkspaceSync(): void {
   if (started) return;
   started = true;
-  void waitForGraphHydration().then(bootstrap);
+  void waitForStores().then(bootstrap);
 }
 
 async function refreshFromServer(): Promise<void> {
@@ -251,8 +280,7 @@ function flushOnPageHide(): void {
 
 export function retryWorkspaceSync(): void {
   stopped = false;
-  retries.graph = 0;
-  retries.chats = 0;
+  for (const key of STATE_KEYS) retries[key] = 0;
   if (bootstrapTimer) clearTimeout(bootstrapTimer);
   bootstrapTimer = undefined;
   for (const adapter of adapters) {

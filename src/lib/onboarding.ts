@@ -53,41 +53,75 @@ export function isOnboardingStep(value: string): value is OnboardingStep {
   return (ONBOARDING_STEPS as readonly string[]).includes(value);
 }
 
+const listeners = new Set<() => void>();
+
+function text(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+export function normalizeOnboarding(value: unknown): OnboardingDraft {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return EMPTY_ONBOARDING;
+  const parsed = value as Partial<OnboardingDraft>;
+  const step = typeof parsed.step === "string" && isOnboardingStep(parsed.step) ? parsed.step : "you";
+  return {
+    started: parsed.started === true,
+    completed: parsed.completed === true,
+    step,
+    name: text(parsed.name),
+    email: text(parsed.email),
+    role: text(parsed.role),
+    company: text(parsed.company),
+    website: text(parsed.website),
+    size: text(parsed.size),
+    goals: Array.isArray(parsed.goals) ? parsed.goals.filter((goal) => typeof goal === "string") : [],
+  };
+}
+
+function publish(next: OnboardingDraft): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(KEY, JSON.stringify(next));
+  window.dispatchEvent(new Event("kismet-onboarding"));
+  listeners.forEach((listener) => listener());
+}
+
 export function readOnboarding(): OnboardingDraft {
   if (typeof window === "undefined") return EMPTY_ONBOARDING;
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return EMPTY_ONBOARDING;
-    const parsed = JSON.parse(raw) as Partial<OnboardingDraft>;
-    return {
-      ...EMPTY_ONBOARDING,
-      ...parsed,
-      goals: Array.isArray(parsed.goals) ? parsed.goals.filter((g) => typeof g === "string") : [],
-      step: parsed.step && isOnboardingStep(parsed.step) ? parsed.step : "you",
-    };
+    return normalizeOnboarding(raw ? JSON.parse(raw) : null);
   } catch {
     return EMPTY_ONBOARDING;
   }
 }
 
 export function writeOnboarding(patch: Partial<OnboardingDraft>): OnboardingDraft {
-  const next = { ...readOnboarding(), ...patch };
-  localStorage.setItem(KEY, JSON.stringify(next));
-  window.dispatchEvent(new Event("kismet-onboarding"));
+  const next = normalizeOnboarding({ ...readOnboarding(), ...patch });
+  publish(next);
   return next;
 }
 
 export function beginSignup(name: string, email: string) {
-  const next: OnboardingDraft = {
+  publish({
     ...EMPTY_ONBOARDING,
     started: true,
     completed: false,
     step: "you",
     name: name.trim(),
     email: email.trim(),
-  };
-  localStorage.setItem(KEY, JSON.stringify(next));
-  window.dispatchEvent(new Event("kismet-onboarding"));
+  });
+}
+
+export function replaceOnboarding(data: unknown): void {
+  publish(normalizeOnboarding(data));
+}
+
+export function resetOnboarding(): void {
+  publish(EMPTY_ONBOARDING);
+}
+
+export function subscribeOnboarding(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
 }
 
 export function destinationAfterSignIn(): string {

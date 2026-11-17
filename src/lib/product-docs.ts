@@ -332,9 +332,9 @@ export const PRODUCT_DOCS: ProductDoc[] = [
       },
       {
         id: "stored-here",
-        heading: "What is stored in this browser",
+        heading: "Where settings live",
         paragraphs: [
-          "Org policy is stored in this browser, under the localStorage key kismet-org-settings. It is not a server-side org policy yet.",
+          "Workspace settings are saved with the signed-in account and cached in this browser. Until people can be invited into a shared organization, those settings belong to the signed-in user.",
           "Share links can expire. The public-link and domain checks run in the client. They are not a cryptographic lock on the link.",
         ],
       },

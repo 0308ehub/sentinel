@@ -373,3 +373,24 @@ export const useQueryEditorStore = create<NotebookEditorState>()(
     }
   )
 );
+
+function notebooksFrom(data: unknown): SavedNotebook[] | null {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+  const raw = (data as { savedNotebooks?: unknown }).savedNotebooks;
+  if (!Array.isArray(raw)) return null;
+  return normalizePersistedNotebooks(raw.filter((item) => item && typeof item === "object"));
+}
+
+export function readNotebookSync(): { savedNotebooks: SavedNotebook[] } {
+  return { savedNotebooks: useQueryEditorStore.getState().savedNotebooks };
+}
+
+export function replaceNotebooks(data: unknown): void {
+  const savedNotebooks = notebooksFrom(data);
+  if (!savedNotebooks) return;
+  useQueryEditorStore.setState({ savedNotebooks });
+}
+
+export function resetNotebooks(): void {
+  useQueryEditorStore.setState(buildInitialState());
+}

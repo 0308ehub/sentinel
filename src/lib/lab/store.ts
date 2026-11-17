@@ -26,6 +26,7 @@ let hydrated = false;
 let interval: ReturnType<typeof setInterval> | null = null;
 let discoveryTimer: ReturnType<typeof setInterval> | null = null;
 const listeners = new Set<() => void>();
+const syncListeners = new Set<() => void>();
 const subscribe = (fn: () => void) => {
   listeners.add(fn);
   return () => listeners.delete(fn);
@@ -34,9 +35,9 @@ const emit = (next: LabState) => {
   snapshot = next;
   listeners.forEach((fn) => fn());
 };
-const update = (fn: (state: LabState) => LabState) => {
+const update = (fn: (state: LabState) => LabState, notify = true) => {
   hydrate();
-  write(fn(snapshot));
+  write(fn(snapshot), notify);
 };
 
 function scenarioKey(id: string): string | null {
@@ -63,7 +64,7 @@ function hydrate() {
     syncClock();
   }
 }
-function write(next: LabState) {
+function write(next: LabState, notify = true) {
   snapshot = next;
   try {
     localStorage.setItem(
@@ -76,6 +77,7 @@ function write(next: LabState) {
     /* session state remains usable */
   }
   listeners.forEach((fn) => fn());
+  if (notify) syncListeners.forEach((fn) => fn());
   syncClock();
 }
 function syncClock() {
@@ -272,9 +274,81 @@ export function requestChanges(id: string, note: string) {
     ),
   }));
 }
-export function resetDemo() {
+function labClock(value: unknown): LabState["clock"] {
+  const clock = value && typeof value === "object" ? (value as Partial<LabState["clock"]>) : {};
+  const speed = clock.speed === 1 || clock.speed === 4 || clock.speed === 16 ? clock.speed : 4;
+  const day = typeof clock.day === "number" && clock.day >= 1 ? Math.round(clock.day) : 1;
+  return { day, playing: false, speed };
+}
+
+function labStateFrom(data: unknown): LabState | null {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+  const record = data as Partial<LabState>;
+  if (!Array.isArray(record.experiments) || !Array.isArray(record.feed)) return null;
+  const discovery = record.discovery;
+  const status = discovery?.status === "reading" || discovery?.status === "done" ? discovery.status : "idle";
+  return {
+    clock: labClock(record.clock),
+    discovery: { status, step: typeof discovery?.step === "number" ? discovery.step : 0 },
+    experiments: record.experiments,
+    autonomy: record.autonomy === "auto" ? "auto" : "ask",
+    feed: record.feed,
+    customError: typeof record.customError === "string" ? record.customError : null,
+  };
+}
+
+export function readLabSync(): LabState {
+  if (typeof window === "undefined") return EMPTY;
+  try {
+    const parsed = JSON.parse(localStorage.getItem(KEY) ?? "null") as { version?: number; state?: unknown } | null;
+    return parsed?.version === VERSION ? labStateFrom(parsed.state) ?? EMPTY : EMPTY;
+  } catch {
+    return EMPTY;
+  }
+}
+
+export function replaceLab(data: unknown): void {
+  const next = labStateFrom(data);
+  if (!next) return;
   if (discoveryTimer) clearInterval(discoveryTimer);
+  discoveryTimer = null;
+  try {
+    const experiments = next.experiments.map((experiment) => ({
+      ...experiment,
+      run: materializeRun({ ...experiment, run: null }),
+    }));
+    hydrated = true;
+    write({ ...next, experiments });
+  } catch {
+    // A damaged lab snapshot stays local until the next valid copy.
+  }
+}
+
+export function resetLab(): void {
+  if (discoveryTimer) clearInterval(discoveryTimer);
+  discoveryTimer = null;
+  hydrated = true;
   write(EMPTY);
+}
+
+export function subscribeLab(listener: () => void): () => void {
+  syncListeners.add(listener);
+  return () => syncListeners.delete(listener);
+}
+
+export function labIsEmpty(state: LabState): boolean {
+  return (
+    state.experiments.length === 0 &&
+    state.feed.length === 0 &&
+    state.discovery.status === "idle" &&
+    state.clock.day === 1 &&
+    state.autonomy === "ask" &&
+    !state.customError
+  );
+}
+
+export function resetDemo() {
+  resetLab();
 }
 
 function fallbackIdea(text: string): Proposal {

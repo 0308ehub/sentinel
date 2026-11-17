@@ -43,6 +43,7 @@ const COLORS = ["#0f9d8a", "#e07a2f", "#7c5cdb", "#3b82f6", "#db4d6d", "#b45309"
 const VERBS = ["Reading", "Checking what connects to", "Comparing", "Drafting a note on"];
 
 const listeners = new Set<() => void>();
+const contentListeners = new Set<() => void>();
 let snapshot: FleetState = EMPTY;
 let hydrated = false;
 let motion: number | undefined;
@@ -77,7 +78,7 @@ function hydrate() {
   emit(readStored());
 }
 
-function write(next: FleetState) {
+function write(next: FleetState, notify = true) {
   const stored = { agents: next.agents.slice(0, 24).map((agent) => ({ ...agent, messages: agent.messages.slice(-40) })) };
   try {
     localStorage.setItem(KEY, JSON.stringify(stored));
@@ -85,11 +86,38 @@ function write(next: FleetState) {
     // The fleet still works for this session if storage is full.
   }
   emit(stored);
+  if (notify) contentListeners.forEach((listener) => listener());
 }
 
-function update(change: (state: FleetState) => FleetState) {
+function update(change: (state: FleetState) => FleetState, notify = true) {
   hydrate();
-  write(change(snapshot));
+  write(change(snapshot), notify);
+}
+
+export function readFleetSync(): FleetState {
+  return readStored();
+}
+
+export function replaceFleet(data: unknown): void {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return;
+  const agents = (data as Partial<FleetState>).agents;
+  if (!Array.isArray(agents)) return;
+  for (const controller of inflight.values()) controller.abort();
+  inflight.clear();
+  hydrated = true;
+  write({ agents: agents.filter(isAgent).slice(0, 24) });
+}
+
+export function resetFleet(): void {
+  hydrated = true;
+  for (const controller of inflight.values()) controller.abort();
+  inflight.clear();
+  write(EMPTY);
+}
+
+export function subscribeFleet(listener: () => void): () => void {
+  contentListeners.add(listener);
+  return () => contentListeners.delete(listener);
 }
 
 function isAgent(value: unknown): value is FleetAgent {
@@ -263,7 +291,7 @@ export function startAgentMotion() {
           updatedAt: new Date().toISOString(),
         };
       }),
-    }));
+    }), false);
   }, 2200);
   return () => {
     if (motion) window.clearInterval(motion);

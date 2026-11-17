@@ -2,14 +2,9 @@ import "server-only";
 
 import type postgres from "postgres";
 import { db } from "@/lib/autopilot/db";
+import { STATE_KEYS, type StateKey } from "@/lib/workspace/keys";
 
-export type StateKey = "graph" | "chats";
-
-export const STATE_KEYS: StateKey[] = ["graph", "chats"];
-
-export function isStateKey(value: unknown): value is StateKey {
-  return typeof value === "string" && STATE_KEYS.includes(value as StateKey);
-}
+export { isStateKey, STATE_KEYS, type StateKey } from "@/lib/workspace/keys";
 
 interface StateRow {
   key: StateKey;
@@ -23,7 +18,7 @@ export async function loadStates(
   const sql = await db();
   const rows = await sql<StateRow[]>`
     select key, data, version from kismet.workspace_state
-    where user_id = ${userId} and key in ${sql(STATE_KEYS)}
+    where user_id = ${userId} and key in ${sql([...STATE_KEYS])}
   `;
   return Object.fromEntries(rows.map((row) => [row.key, { data: row.data, version: row.version }]));
 }

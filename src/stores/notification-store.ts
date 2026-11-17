@@ -56,3 +56,33 @@ export const useNotificationStore = create<NotificationState>()(
     }
   )
 );
+
+const NOTIFICATION_TYPES = new Set<Notification["type"]>(["info", "warning", "success", "error"]);
+
+function isNotification(value: unknown): value is Notification {
+  if (!value || typeof value !== "object") return false;
+  const item = value as Notification;
+  return (
+    typeof item.id === "string" &&
+    typeof item.title === "string" &&
+    typeof item.description === "string" &&
+    NOTIFICATION_TYPES.has(item.type) &&
+    typeof item.read === "boolean" &&
+    typeof item.timestamp === "string"
+  );
+}
+
+export function readNotificationSync(): { items: Notification[] } {
+  return { items: useNotificationStore.getState().items };
+}
+
+export function replaceNotifications(data: unknown): void {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return;
+  const items = (data as { items?: unknown }).items;
+  if (!Array.isArray(items)) return;
+  useNotificationStore.setState({ items: items.filter(isNotification).slice(0, 100) });
+}
+
+export function resetNotifications(): void {
+  useNotificationStore.setState({ items: [] });
+}

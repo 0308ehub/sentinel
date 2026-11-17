@@ -252,14 +252,30 @@ export function aiContext(): AiContext {
   return { graph: settings.aiGraph, connectors: settings.aiConnectors, chat: settings.aiChat };
 }
 
-export function updateWorkspace(patch: Partial<WorkspaceSettings>) {
-  const next = normalizeWorkspace({ ...readWorkspace(), ...patch });
+export function workspaceIsDefault(value: unknown): boolean {
+  return JSON.stringify(normalizeWorkspace(value)) === JSON.stringify(fresh());
+}
+
+export function replaceWorkspace(data: unknown): void {
+  const next = normalizeWorkspace(data);
   try {
     localStorage.setItem(KEY, JSON.stringify(next));
   } catch {
     // The settings still apply for this session if storage is full.
   }
   emit(next);
+}
+
+export function resetWorkspace(): void {
+  replaceWorkspace(fresh());
+}
+
+export function subscribeWorkspace(listener: () => void): () => void {
+  return subscribe(listener);
+}
+
+export function updateWorkspace(patch: Partial<WorkspaceSettings>) {
+  replaceWorkspace({ ...readWorkspace(), ...patch });
 }
 
 export function useWorkspaceSettings(): WorkspaceSettings {

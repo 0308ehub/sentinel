@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { initialAction, trimForUpload } from "../src/lib/workspace/sync-plan.ts";
+import { initialAction, shouldUpload, trimForUpload } from "../src/lib/workspace/sync-plan.ts";
 
 test("server state is adopted when it exists", () => {
   assert.equal(
@@ -28,6 +28,12 @@ test("empty local and server state needs no action", () => {
     initialAction({ serverHasData: false, localEmpty: true, localOwner: null, userId: "user-a" }),
     "none",
   );
+});
+
+test("an empty cache does not upload until the account has a row", () => {
+  assert.equal(shouldUpload(0, true), false);
+  assert.equal(shouldUpload(0, false), true);
+  assert.equal(shouldUpload(2, true), true);
 });
 
 test("trimForUpload keeps values under the byte limit", () => {

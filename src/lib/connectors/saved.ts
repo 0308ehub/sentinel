@@ -1,5 +1,7 @@
 import { connectorById } from "@/lib/connectors/catalog";
 
+// Form values include tokens and passwords. They stay in this browser.
+// workspace_state is plaintext JSON, so syncing them would store secrets in the account row.
 const KEY = "kismet-connectors";
 
 export interface SavedConnector {

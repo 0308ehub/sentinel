@@ -12,6 +12,11 @@ export function initialAction(input: {
   return "reset-local";
 }
 
+/** A first-time empty cache must not create an account row that would wipe another browser. */
+export function shouldUpload(version: number, empty: boolean): boolean {
+  return version > 0 || !empty;
+}
+
 export function trimForUpload(
   json: unknown,
   maxBytes: number,

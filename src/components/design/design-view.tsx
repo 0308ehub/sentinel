@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { readDesignDraft, subscribeDesignExternal, writeDesignDraft, type DesignNote } from "@/lib/design/draft";
 import {
   cloneScreen,
   designDiff,
@@ -22,14 +23,6 @@ import { graphStore } from "@/lib/graph/graph-store";
 import { CURRENT_USER } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui-store";
-
-const STORE = "kismet-design";
-
-interface Note {
-  id: string;
-  role: "user" | "assistant";
-  text: string;
-}
 
 interface RepoOption {
   fullName: string;
@@ -48,7 +41,7 @@ export function DesignView() {
   const [original, setOriginal] = useState<Screen | null>(null);
   const [versions, setVersions] = useState<Screen[]>([]);
   const [activeId, setActiveId] = useState("");
-  const [notes, setNotes] = useState<Note[]>([]);
+  const [notes, setNotes] = useState<DesignNote[]>([]);
   const [selected, setSelected] = useState("");
   const [editing, setEditing] = useState("");
   const [draft, setDraft] = useState("");
@@ -91,6 +84,7 @@ export function DesignView() {
   const originalRef = useRef(original);
   const activeRef = useRef<Screen | null>(null);
   const forkRef = useRef<string | null>(null);
+  const draftGeneration = useRef(0);
   panRef.current = pan;
   zoomRef.current = zoom;
   originalRef.current = original;
@@ -137,31 +131,24 @@ export function DesignView() {
   }, []);
 
   useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(STORE) || "null") as {
-        original?: unknown;
-        versions?: unknown[];
-        activeId?: unknown;
-        notes?: Note[];
-      } | null;
-      const base = screenFromClient(saved?.original);
-      const list = (saved?.versions ?? []).map(screenFromClient).filter((screen): screen is Screen => Boolean(screen));
-      if (base) {
-        setOriginal(base);
-        setVersions(list);
-        const id = typeof saved?.activeId === "string" ? saved.activeId : list[0]?.id || base.id;
-        setActiveId(id);
-        setNotes(Array.isArray(saved?.notes) ? saved.notes.filter(isNote).slice(-40) : []);
-      }
-    } catch {
-      // A broken local draft should not block the blank canvas.
-    }
-    setReady(true);
+    const apply = () => {
+      const saved = readDesignDraft();
+      const known = saved.versions.some((screen) => screen.id === saved.activeId) || saved.original?.id === saved.activeId;
+      draftGeneration.current += 1;
+      forkRef.current = null;
+      setOriginal(saved.original);
+      setVersions(saved.versions);
+      setActiveId(known ? saved.activeId : saved.versions[0]?.id || saved.original?.id || "");
+      setNotes(saved.notes);
+      setReady(true);
+    };
+    apply();
+    return subscribeDesignExternal(apply);
   }, []);
 
   useEffect(() => {
     if (!ready) return;
-    localStorage.setItem(STORE, JSON.stringify({ original, versions, activeId, notes: notes.slice(-40) }));
+    writeDesignDraft({ original, versions, activeId, notes });
   }, [ready, original, versions, activeId, notes]);
 
   useEffect(() => {
@@ -365,6 +352,7 @@ export function DesignView() {
     const ask = draft.trim();
     const base = activeRef.current;
     const origin = originalRef.current;
+    const seen = draftGeneration.current;
     if (!ask || !base || !origin || working) return;
     setDraft("");
     setNotes((list) => [...list, { id: newId("note"), role: "user", text: ask }]);
@@ -378,7 +366,7 @@ export function DesignView() {
       const body = (await res.json()) as { message?: string; makeVariant?: boolean; layout?: unknown; error?: string };
       if (!res.ok) throw new Error(body.error || "Could not change the screen.");
       const layout = layoutFromUnknown(body.layout);
-      if (!layout) throw new Error("The edit did not return a screen.");
+      if (!layout || draftGeneration.current !== seen) return;
       const makeVariant = body.makeVariant === true;
       const id = !makeVariant && base.id !== origin.id ? base.id : newId("screen");
       const next = screenWith(layout, {
@@ -521,7 +509,9 @@ export function DesignView() {
     const startY = event.clientY;
     const originX = piece.x;
     const originY = piece.y;
+    const seen = draftGeneration.current;
     function place(ev: PointerEvent) {
+      if (draftGeneration.current !== seen) return;
       const scale = zoomRef.current || 1;
       const x = originX + (ev.clientX - startX) / scale;
       const y = originY + (ev.clientY - startY) / scale;
@@ -974,8 +964,3 @@ function pieceClass(kind: PieceKind): string {
   return "flex cursor-move items-start rounded-lg border border-border bg-background p-2 text-xs shadow-sm";
 }
 
-function isNote(value: unknown): value is Note {
-  if (!value || typeof value !== "object") return false;
-  const note = value as Note;
-  return (note.role === "user" || note.role === "assistant") && typeof note.text === "string" && typeof note.id === "string";
-}
