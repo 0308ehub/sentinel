@@ -111,17 +111,22 @@ function readStored(): ChatState {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return EMPTY;
-    const parsed = JSON.parse(raw) as Partial<ChatState>;
-    const threads = Array.isArray(parsed.threads) ? parsed.threads.filter(isThread).slice(0, 40) : [];
-    const folders = Array.isArray(parsed.folders) ? parsed.folders.filter(isFolder).slice(0, 40) : [];
-    const schedules = Array.isArray(parsed.schedules) ? parsed.schedules.filter(isSchedule).slice(0, 40) : [];
-    const model = parsed.model === "claude" || parsed.model === "openai" || parsed.model === "auto" ? parsed.model : "auto";
-    const activeId = threads.some((thread) => thread.id === parsed.activeId) ? parsed.activeId ?? null : null;
-    const folderId = folders.some((folder) => folder.id === parsed.folderId) ? parsed.folderId ?? null : null;
-    return { threads, folders, schedules, activeId, folderId, model };
+    return parseChatState(JSON.parse(raw));
   } catch {
     return EMPTY;
   }
+}
+
+function parseChatState(value: unknown): ChatState {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return EMPTY;
+  const parsed = value as Partial<ChatState>;
+  const threads = Array.isArray(parsed.threads) ? parsed.threads.filter(isThread).slice(0, 40) : [];
+  const folders = Array.isArray(parsed.folders) ? parsed.folders.filter(isFolder).slice(0, 40) : [];
+  const schedules = Array.isArray(parsed.schedules) ? parsed.schedules.filter(isSchedule).slice(0, 40) : [];
+  const model = parsed.model === "claude" || parsed.model === "openai" || parsed.model === "auto" ? parsed.model : "auto";
+  const activeId = threads.some((thread) => thread.id === parsed.activeId) ? parsed.activeId ?? null : null;
+  const folderId = folders.some((folder) => folder.id === parsed.folderId) ? parsed.folderId ?? null : null;
+  return { threads, folders, schedules, activeId, folderId, model };
 }
 
 function write(next: ChatState) {
@@ -172,6 +177,22 @@ function isSchedule(value: unknown): value is ScheduledPrompt {
   if (!value || typeof value !== "object") return false;
   const item = value as ScheduledPrompt;
   return typeof item.id === "string" && typeof item.prompt === "string" && typeof item.at === "string";
+}
+
+export function readChatState(): ChatState {
+  return readStored();
+}
+
+export function replaceChatState(next: unknown): void {
+  write(parseChatState(next));
+}
+
+export function resetChatState(): void {
+  write({ ...EMPTY, threads: [], folders: [], schedules: [] });
+}
+
+export function subscribeChatState(listener: () => void): () => void {
+  return subscribe(listener);
 }
 
 export function useChatState(): ChatState {

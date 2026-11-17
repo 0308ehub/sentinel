@@ -282,6 +282,15 @@ create table if not exists kismet.inbox_weights (
   autonomy text not null default 'NOTIFY_ONLY',
   primary key (user_id, signal_type)
 );
+
+create table if not exists kismet.workspace_state (
+  user_id text not null,
+  key text not null,
+  data jsonb not null,
+  version integer not null default 1,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, key)
+);
 `;
 
 export async function db(): Promise<Sql> {

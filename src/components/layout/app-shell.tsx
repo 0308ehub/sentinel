@@ -10,6 +10,7 @@ import { AgentRunner } from "@/components/agents/agent-runner";
 import { PendingPrd } from "@/components/prd/pending-prd";
 import { MentionWatcher } from "@/components/slack/mention-watcher";
 import { InboxPresence } from "@/components/inbox/inbox-presence";
+import { WorkspaceSync } from "@/components/layout/workspace-sync";
 
 export function AppShell({
   children,
@@ -29,6 +30,7 @@ export function AppShell({
       <CommandPalette />
       <ProposeFeatureDialog />
       <WorkWatcher />
+      <WorkspaceSync />
       <MentionWatcher />
       <InboxPresence />
       <ChatDock />
