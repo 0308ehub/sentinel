@@ -1,8 +1,7 @@
 import "server-only";
 
 import { autopilotConfigured, db } from "@/lib/autopilot/db";
-
-const WORKSPACE_ID = process.env.KISMET_WORKSPACE_ID?.trim() || "kismet";
+import { loadStates } from "@/lib/workspace/state-store";
 
 const STARTER_NOTE = {
   id: "note_kismet",
@@ -18,72 +17,26 @@ export interface WorkspaceNote {
   at: string;
 }
 
-export interface WorkspaceRecord {
-  graph: unknown;
-  graphAt: string | null;
-  chat: unknown;
-  chatAt: string | null;
-  notes: WorkspaceNote[];
-  notesAt: string | null;
-}
-
 let tableReady: Promise<void> | null = null;
 
-export async function readWorkspace(): Promise<WorkspaceRecord | null> {
+export async function readWorkspaceNotes(userId: string): Promise<WorkspaceNote[] | null> {
   if (!autopilotConfigured()) return null;
   const sql = await db();
   await ensureWorkspace(sql);
   await sql`
     insert into kismet.workspace (id, notes, notes_at)
-    values (${WORKSPACE_ID}, ${sql.json([STARTER_NOTE])}, now())
+    values (${userId}, ${sql.json([STARTER_NOTE])}, now())
     on conflict (id) do nothing
   `;
   const rows = await sql<Row[]>`
-    select graph, graph_at, chat, chat_at, notes, notes_at
+    select notes
     from kismet.workspace
-    where id = ${WORKSPACE_ID}
+    where id = ${userId}
   `;
-  const row = rows[0];
-  if (!row) return { graph: null, graphAt: null, chat: null, chatAt: null, notes: [STARTER_NOTE], notesAt: null };
-  return {
-    graph: row.graph ?? null,
-    graphAt: stamp(row.graph_at),
-    chat: row.chat ?? null,
-    chatAt: stamp(row.chat_at),
-    notes: notesOf(row.notes),
-    notesAt: stamp(row.notes_at),
-  };
+  return notesOf(rows[0]?.notes);
 }
 
-export async function saveWorkspacePart(
-  kind: "graph" | "chat",
-  body: unknown,
-  expected: string | null,
-): Promise<{ at: string } | { conflict: true }> {
-  const sql = await db();
-  await ensureWorkspace(sql);
-  const rows =
-    kind === "graph"
-      ? await sql<Stamp[]>`
-          update kismet.workspace
-          set graph = ${sql.json(body as never)}, graph_at = now()
-          where id = ${WORKSPACE_ID}
-            and ((graph_at is null and ${expected}::timestamptz is null) or date_trunc('milliseconds', graph_at) = date_trunc('milliseconds', ${expected}::timestamptz))
-          returning graph_at as at
-        `
-      : await sql<Stamp[]>`
-          update kismet.workspace
-          set chat = ${sql.json(body as never)}, chat_at = now()
-          where id = ${WORKSPACE_ID}
-            and ((chat_at is null and ${expected}::timestamptz is null) or date_trunc('milliseconds', chat_at) = date_trunc('milliseconds', ${expected}::timestamptz))
-          returning chat_at as at
-        `;
-  const at = stamp(rows[0]?.at);
-  if (!at) return { conflict: true };
-  return { at };
-}
-
-export async function addWorkspaceNote(title: string, body: string): Promise<WorkspaceNote[]> {
+export async function addWorkspaceNote(userId: string, title: string, body: string): Promise<WorkspaceNote[]> {
   const sql = await db();
   await ensureWorkspace(sql);
   const note: WorkspaceNote = {
@@ -93,31 +46,41 @@ export async function addWorkspaceNote(title: string, body: string): Promise<Wor
     at: new Date().toISOString(),
   };
   return sql.begin(async (tx) => {
+    await tx`
+      insert into kismet.workspace (id, notes, notes_at)
+      values (${userId}, ${tx.json([STARTER_NOTE])}, now())
+      on conflict (id) do nothing
+    `;
     const rows = await tx<Row[]>`
-      select notes from kismet.workspace where id = ${WORKSPACE_ID} for update
+      select notes from kismet.workspace where id = ${userId} for update
     `;
     const notes = [note, ...notesOf(rows[0]?.notes)].slice(0, 100);
     await tx`
       update kismet.workspace
       set notes = ${tx.json(notes as never)}, notes_at = now()
-      where id = ${WORKSPACE_ID}
+      where id = ${userId}
     `;
     return notes;
   });
 }
 
-export async function removeWorkspaceNote(id: string): Promise<WorkspaceNote[]> {
+export async function removeWorkspaceNote(userId: string, id: string): Promise<WorkspaceNote[]> {
   const sql = await db();
   await ensureWorkspace(sql);
   return sql.begin(async (tx) => {
+    await tx`
+      insert into kismet.workspace (id, notes, notes_at)
+      values (${userId}, ${tx.json([STARTER_NOTE])}, now())
+      on conflict (id) do nothing
+    `;
     const rows = await tx<Row[]>`
-      select notes from kismet.workspace where id = ${WORKSPACE_ID} for update
+      select notes from kismet.workspace where id = ${userId} for update
     `;
     const notes = notesOf(rows[0]?.notes).filter((note) => note.id !== id);
     await tx`
       update kismet.workspace
       set notes = ${tx.json(notes as never)}, notes_at = now()
-      where id = ${WORKSPACE_ID}
+      where id = ${userId}
     `;
     return notes;
   });
@@ -126,21 +89,26 @@ export async function removeWorkspaceNote(id: string): Promise<WorkspaceNote[]> 
 const GRAPH_TYPES = new Set(["PRODUCT", "FEATURE", "DECISION", "CUSTOMER_PROBLEM", "GOAL", "EXPERIMENT"]);
 
 /** Text the model can read when Slack and Jira are still empty. */
-export async function workspaceBrief(): Promise<string> {
-  const record = await readWorkspace().catch(() => null);
-  if (!record) return "";
-  const notes = record.notes
-    .slice(0, 40)
-    .map((note) => `- ${note.title}: ${note.body.replace(/\s+/g, " ").trim()}`)
-    .join("\n");
-  const graph = graphBrief(record.graph);
-  return [
-    notes ? `Notes written in this Kismet workspace:\n${notes}` : "",
-    graph ? `Product graph:\n${graph}` : "",
-  ]
-    .filter(Boolean)
-    .join("\n\n")
-    .slice(0, 8000);
+export async function workspaceBrief(userId: string | null): Promise<string> {
+  if (!userId) return "";
+  try {
+    const [workspaceNotes, states] = await Promise.all([readWorkspaceNotes(userId), loadStates(userId)]);
+    if (!workspaceNotes) return "";
+    const notes = workspaceNotes
+      .slice(0, 40)
+      .map((note) => `- ${note.title}: ${note.body.replace(/\s+/g, " ").trim()}`)
+      .join("\n");
+    const graph = graphBrief(states.graph?.data);
+    return [
+      notes ? `Notes written in this Kismet workspace:\n${notes}` : "",
+      graph ? `Product graph:\n${graph}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n")
+      .slice(0, 8000);
+  } catch {
+    return "";
+  }
 }
 
 function graphBrief(value: unknown): string {
@@ -183,22 +151,6 @@ function notesOf(value: unknown): WorkspaceNote[] {
   });
 }
 
-function stamp(value: unknown): string | null {
-  if (!value) return null;
-  if (value instanceof Date) return value.toISOString();
-  if (typeof value === "string") return value;
-  return null;
-}
-
 interface Row {
-  graph: unknown;
-  graph_at: unknown;
-  chat: unknown;
-  chat_at: unknown;
   notes: unknown;
-  notes_at: unknown;
-}
-
-interface Stamp {
-  at: unknown;
 }

@@ -5,6 +5,7 @@ import { runOrchestrated } from "@/lib/ai/orchestrate";
 import type { OrchestratedTask } from "@/lib/ai/policy";
 import { workspaceBrief } from "@/lib/workspace/cloud";
 import { postgresBrief } from "@/lib/postgres/client";
+import { currentUserId } from "@/lib/connections/current";
 
 export async function sourceBrief(): Promise<string> {
   const parts: string[] = [];
@@ -26,7 +27,7 @@ export async function sourceBrief(): Promise<string> {
   } catch {
     parts.push("Databricks could not be read.");
   }
-  const workspace = await workspaceBrief();
+  const workspace = await workspaceBrief(await currentUserId());
   if (workspace) parts.push(workspace);
   const database = await postgresBrief();
   if (database) parts.push(database);
