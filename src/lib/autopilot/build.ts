@@ -1,43 +1,14 @@
 import "server-only";
 
 import { askForJson, readJson } from "@/lib/ai/respond";
+import { codeRules, pullBody } from "@/lib/autopilot/agent-task";
+import { agentBuildAvailable, startAgentBuild } from "@/lib/autopilot/agent-build";
 import { autopilotDryRun, autopilotRepo, defaultAutopilotRepo } from "@/lib/autopilot/repo";
 import { listExperiments, listSignals, log, setSignalStatus, updateExperiment } from "@/lib/autopilot/store";
 import type { Experiment, Signal } from "@/lib/autopilot/types";
 import { lockedFiles } from "@/lib/autopilot/overlap";
 import { baseBranch, isLocalSource, listSourceFiles, readSourceFile } from "@/lib/autopilot/source";
 import { closePull, commitChecks, getPull, GitHubApiError, openPullRequest, type GitHubFile } from "@/lib/github/client";
-
-const IMPORT_LINE = 'import { useVariant } from "@/lib/autopilot/variant";';
-
-function codeRules(flag: string, external: boolean): string {
-  if (external) {
-    return [
-      "Gate the new version with a small local React hook in the edited file.",
-      'It must default to useState("control") and, after mount, read const kismet = window.kismet; if it is missing, return.',
-      "When it exists, call",
-      `kismet.ready.then(() => setVariant(kismet.variant("${flag}"))).`,
-      "For a TypeScript file, add declare global with an optional Window.kismet whose ready is Promise<void> and whose",
-      'variant(flag: string) returns "control" or "treatment".',
-      "Control must render exactly what it renders today, including during server rendering and hydration.",
-      "The hook must be called at the top level of a client component, never conditionally.",
-      "The change must appear only where the experiment says, never on other pages: no global or fixed-position elements.",
-      "Use only components and imports that already exist in the file or React hooks. Match the existing style.",
-      `Add data-track="${flag}" to the new element.`,
-      "Do not invent data, results or claims.",
-    ].join(" ");
-  }
-  return [
-    `Gate the new version with the hook: ${IMPORT_LINE}`,
-    `const variant = useVariant("${flag}"); render the change only when variant === "treatment".`,
-    "Control must render exactly what it renders today.",
-    "The file must start with \"use client\" and the hook must be called at the top level of a component, never conditionally.",
-    "The change must appear only where the experiment says, never on other pages: no global or fixed-position elements.",
-    "Use only components and imports that already exist in the file or in the files shown. Match the existing style.",
-    `Add data-track="${flag}" to the new element.`,
-    "Do not invent data, results or claims.",
-  ].join(" ");
-}
 
 async function pickFiles(base: string, experiment: Experiment, signal: Signal | undefined): Promise<GitHubFile[]> {
   const paths = await listSourceFiles(base, 600);
@@ -114,39 +85,17 @@ async function writeChange(
   return { file, content, summary: draft.summary?.trim().slice(0, 280) || experiment.treatment };
 }
 
-function pullBody(experiment: Experiment, signal: Signal | undefined, summary: string): string {
-  const evidence = signal?.evidence ?? [];
-  const synthetic = evidence.filter((e) => e.synthetic).length;
-  return [
-    `## ${experiment.title}`,
-    "",
-    summary,
-    "",
-    `**Hypothesis:** ${experiment.hypothesis}`,
-    `**Control:** ${experiment.control || "Today's screen."}`,
-    `**Treatment:** ${experiment.treatment}`,
-    `**Measured by:** ${experiment.metric}`,
-    experiment.guardrail ? `**Guardrail:** ${experiment.guardrail}` : "",
-    "",
-    `### Why (${evidence.length} pieces of evidence${synthetic ? `, ${synthetic} synthetic` : ""})`,
-    ...evidence.slice(0, 8).map((e) => `- ${e.synthetic ? "_(synthetic)_ " : ""}[${e.source}] ${e.title}`),
-    "",
-    `The change is dark until Kismet starts the experiment (flag \`${experiment.flag}\`, 50/50 split).`,
-    "Approve it from Kismet's Experiments page, or merge this PR — merging is the approval.",
-    "",
-    "_Opened by Kismet._",
-  ]
-    .filter((line) => line !== "")
-    .join("\n");
-}
-
 /** Writes the code change for one designed experiment and opens its pull request. */
 export async function buildNext(): Promise<string | null> {
   const experiments = await listExperiments();
-  const experiment = experiments.find((e) => e.status === "building" && !e.prNumber);
+  // An experiment the coding agent is already building is followed by followAgentBuilds, never restarted here.
+  const experiment = experiments.find((e) => e.status === "building" && !e.prNumber && !e.coderSessionId);
   if (!experiment) return null;
   const signal = (await listSignals()).find((s) => s.id === experiment.signalId);
   const repo = await autopilotRepo();
+
+  if (experiment.coderSessionId) return null;
+  if (!experiment.agentFailed && await agentBuildAvailable()) return startAgentBuild(experiment, signal);
 
   try {
     const base = await baseBranch();

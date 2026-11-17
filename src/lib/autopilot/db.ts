@@ -92,6 +92,9 @@ alter table kismet.experiments add column if not exists cleanup_pr_url text;
 alter table kismet.experiments add column if not exists cleanup_pr_number integer;
 alter table kismet.experiments add column if not exists cleanup_draft text;
 alter table kismet.experiments add column if not exists cleanup_note text;
+alter table kismet.experiments add column if not exists coder_session_id text;
+alter table kismet.experiments add column if not exists agent_failed boolean not null default false;
+create index if not exists experiments_coder_session_idx on kismet.experiments (coder_session_id);
 
 create table if not exists kismet.flags (
   key text primary key,
@@ -361,6 +364,11 @@ create table if not exists kismet.coder_sessions (
   created_at timestamptz not null default now()
 );
 create index if not exists coder_sessions_user_created_idx on kismet.coder_sessions (user_id, created_at desc);
+
+create table if not exists kismet.webhook_events (
+  id text primary key,
+  received_at timestamptz not null default now()
+);
 `;
 
 export async function db(): Promise<Sql> {

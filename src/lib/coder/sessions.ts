@@ -26,7 +26,7 @@ export function coderConfigured(): boolean {
   );
 }
 
-function client(): Anthropic {
+export function client(): Anthropic {
   return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 }
 
@@ -54,6 +54,12 @@ async function listEvents(sessionId: string): Promise<BetaManagedAgentsSessionEv
     if (events.length >= 3000) break;
   }
   return events;
+}
+
+export async function managedSessionView(sessionId: string): Promise<CoderView> {
+  const sdk = client();
+  const [session, events] = await Promise.all([sdk.beta.sessions.retrieve(sessionId), listEvents(sessionId)]);
+  return toCoderView(events, session);
 }
 
 export async function startCoderSession(userId: string, text: string): Promise<CoderSessionRow> {
@@ -91,9 +97,7 @@ export async function startCoderSession(userId: string, text: string): Promise<C
 
 export async function coderSessionView(userId: string, sessionId: string): Promise<CoderView> {
   await coderSessionRow(userId, sessionId);
-  const sdk = client();
-  const [session, events] = await Promise.all([sdk.beta.sessions.retrieve(sessionId), listEvents(sessionId)]);
-  return toCoderView(events, session);
+  return managedSessionView(sessionId);
 }
 
 export async function sendCoderMessage(userId: string, sessionId: string, text: string): Promise<void> {

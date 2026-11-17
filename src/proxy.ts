@@ -21,6 +21,7 @@ const isPublicRoute = createRouteMatcher([
   // Landing-page experiments run for signed-out visitors.
   "/api/autopilot/flags",
   "/api/autopilot/events",
+  "/api/coder/webhook",
   "/api/health",
 ]);
 

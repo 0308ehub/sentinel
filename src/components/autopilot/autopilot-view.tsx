@@ -492,7 +492,10 @@ function ExperimentCard({
           )}
         </div>
       )}
-      {experiment.note && <p className="text-xs text-muted-foreground">{experiment.note}</p>}
+      {experiment.note && !experiment.coderSessionId && <p className="text-xs text-muted-foreground">{experiment.note}</p>}
+      {experiment.status === "building" && experiment.coderSessionId && (
+        <p className="text-xs text-muted-foreground">Kismet&apos;s coding agent is building this.</p>
+      )}
       {experiment.overlap && !DONE.has(experiment.status) && (
         <p className="rounded bg-muted/60 p-2 text-xs">{experiment.overlap}</p>
       )}

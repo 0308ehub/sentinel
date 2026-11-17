@@ -64,6 +64,21 @@ export async function createPullFromBranch(
   }
 }
 
+export interface GitHubCompareFile {
+  filename: string;
+  status: string;
+  patch?: string;
+}
+
+export async function compareFiles(fullName: string, base: string, head: string): Promise<GitHubCompareFile[]> {
+  const parsed = repoName(fullName);
+  if (!parsed) throw new GitHubApiError("bad_repo", "Use a repository like owner/name.", 400);
+  const result = await github<{ files?: GitHubCompareFile[] }>(
+    `/repos/${parsed.owner}/${parsed.repo}/compare/${encodeURIComponent(base)}...${encodeURIComponent(head)}`,
+  );
+  return result.files ?? [];
+}
+
 function pullResult(pull: { number?: number; html_url?: string } | undefined): { number: number; url: string } {
   if (!pull?.number || !pull.html_url) {
     throw new GitHubApiError("github_error", "GitHub did not return the pull request.", 502);

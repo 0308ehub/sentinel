@@ -6,6 +6,7 @@ import { withAutopilotUser } from "@/lib/autopilot/scope";
 import { currentUserId } from "@/lib/connections/current";
 import { isLocalSource, sourceLabel } from "@/lib/autopilot/source";
 import { buildNext, followPulls } from "@/lib/autopilot/build";
+import { followAgentBuilds } from "@/lib/autopilot/agent-build";
 import { buildCleanup, followCleanups } from "@/lib/autopilot/cleanup";
 import { clusterEvidence } from "@/lib/autopilot/cluster";
 import { designNext } from "@/lib/autopilot/design";
@@ -90,6 +91,7 @@ async function runScopedTick(): Promise<TickResult> {
 
       // Before the gate: design the next experiment and build its PR.
       await step("design", result, designNext);
+      await step("agent-build", result, followAgentBuilds);
       await step("build", result, buildNext);
     }
 
@@ -118,6 +120,13 @@ export async function autopilotState(): Promise<AutopilotState> {
   try {
     await claimLegacyRows(userId);
     return await withAutopilotUser(userId, async () => {
+      const before = await listExperiments();
+      if (before.some((experiment) => experiment.status === "building" && experiment.coderSessionId)) {
+        await followAgentBuilds().catch(async (error) => {
+          const message = error instanceof Error ? error.message : String(error);
+          await log("error", `agent-build failed: ${message}`).catch(() => {});
+        });
+      }
       const [signals, experiments, activity, last, counts, repo, sampleEvidence] = await Promise.all([
         listSignals(),
         listExperiments(),

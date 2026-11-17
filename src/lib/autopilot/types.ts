@@ -98,6 +98,8 @@ export interface Experiment {
   readout: Readout | null;
   /** The file the change edits. In dry-run mode the change is stored, not pushed. */
   draftPath: string | null;
+  coderSessionId: string | null;
+  agentFailed: boolean;
   cleanup: Cleanup | null;
   createdAt: string;
   startedAt: string | null;

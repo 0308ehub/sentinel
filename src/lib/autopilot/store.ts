@@ -76,6 +76,8 @@ function toExperiment(row: Row): Experiment {
     note: (row.note as string | null) ?? null,
     readout: (row.readout as Readout | null) ?? null,
     draftPath: (row.draft_path as string | null) ?? null,
+    coderSessionId: (row.coder_session_id as string | null) ?? null,
+    agentFailed: Boolean(row.agent_failed),
     cleanup: row.cleanup_status
       ? {
           status: row.cleanup_status as CleanupStatus,
@@ -199,6 +201,14 @@ export async function getExperiment(id: string): Promise<Experiment | null> {
   return rows[0] ? toExperiment(rows[0]) : null;
 }
 
+export async function experimentOwnerBySession(sessionId: string): Promise<string | null> {
+  const sql = await db();
+  const rows = await sql<{ user_id: string }[]>`
+    select user_id from kismet.experiments where coder_session_id = ${sessionId} limit 1
+  `;
+  return rows[0]?.user_id ?? null;
+}
+
 export async function createExperiment(input: {
   signalId: string;
   version: number;
@@ -235,6 +245,8 @@ export async function updateExperiment(
     note: string | null;
     readout: Readout | null;
     draftPath: string | null;
+    coderSessionId: string | null;
+    agentFailed: boolean;
     draft: string | null;
     original: string | null;
     cleanupStatus: CleanupStatus | null;
@@ -256,6 +268,8 @@ export async function updateExperiment(
   if (patch.note !== undefined) columns.note = patch.note;
   if (patch.readout !== undefined) columns.readout = patch.readout === null ? null : sql.json(patch.readout as never);
   if (patch.draftPath !== undefined) columns.draft_path = patch.draftPath;
+  if (patch.coderSessionId !== undefined) columns.coder_session_id = patch.coderSessionId;
+  if (patch.agentFailed !== undefined) columns.agent_failed = patch.agentFailed;
   if (patch.draft !== undefined) columns.draft = patch.draft;
   if (patch.original !== undefined) columns.original = patch.original;
   if (patch.cleanupStatus !== undefined) columns.cleanup_status = patch.cleanupStatus;
