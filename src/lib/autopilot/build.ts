@@ -94,7 +94,6 @@ export async function buildNext(): Promise<string | null> {
   const signal = (await listSignals()).find((s) => s.id === experiment.signalId);
   const repo = await autopilotRepo();
 
-  if (experiment.coderSessionId) return null;
   if (!experiment.agentFailed && await agentBuildAvailable()) return startAgentBuild(experiment, signal);
 
   try {
