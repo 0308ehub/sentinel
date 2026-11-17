@@ -421,6 +421,25 @@ async function deliver(text: string) {
   }
 }
 
+export function chatSnapshot(): ChatState {
+  return readStored();
+}
+
+export function replaceChat(next: ChatState) {
+  if (!isChatState(next)) return;
+  write(next);
+}
+
+export function subscribeChat(listener: () => void) {
+  return subscribe(listener);
+}
+
+function isChatState(value: unknown): value is ChatState {
+  if (!value || typeof value !== "object") return false;
+  const state = value as ChatState;
+  return Array.isArray(state.threads) && Array.isArray(state.folders) && Array.isArray(state.schedules);
+}
+
 function finish(threadId: string, message: ChatMessage) {
   pendingIds.delete(threadId);
   const state = readStored();

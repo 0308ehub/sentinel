@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { syncTheme } from "@/lib/theme";
 import { ExperimentProvider } from "@/components/autopilot/experiment-provider";
+import { CloudSync } from "@/components/workspace/cloud-sync";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   useEffect(() => {
@@ -24,7 +25,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ExperimentProvider>{children}</ExperimentProvider>
+      <ExperimentProvider>
+        <CloudSync />
+        {children}
+      </ExperimentProvider>
     </QueryClientProvider>
   );
 }

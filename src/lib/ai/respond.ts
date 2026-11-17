@@ -3,6 +3,7 @@ import { getJiraContext } from "@/lib/jira/context";
 import { getSlackContext } from "@/lib/slack/context";
 import { runOrchestrated } from "@/lib/ai/orchestrate";
 import type { OrchestratedTask } from "@/lib/ai/policy";
+import { workspaceBrief } from "@/lib/workspace/cloud";
 
 export async function sourceBrief(): Promise<string> {
   const parts: string[] = [];
@@ -24,6 +25,8 @@ export async function sourceBrief(): Promise<string> {
   } catch {
     parts.push("Databricks could not be read.");
   }
+  const workspace = await workspaceBrief();
+  if (workspace) parts.push(workspace);
   return parts.join("\n\n");
 }
 

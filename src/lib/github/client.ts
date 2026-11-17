@@ -279,6 +279,31 @@ export async function commitChecks(fullName: string, sha: string): Promise<"pend
   return "success";
 }
 
+let repoNotesAt = 0;
+let repoNotes = "";
+
+/** Open issues and pull requests, for a workspace that does not have Slack yet. */
+export async function recentRepoNotes(): Promise<string> {
+  if (Date.now() - repoNotesAt < 60_000 && repoNotes) return repoNotes;
+  const named = process.env.KISMET_GITHUB_REPO?.trim() ?? "";
+  let fullName = repoName(named) ? named : "";
+  if (!fullName) {
+    const repos = await listWritableRepos();
+    fullName = repos[0]?.fullName ?? "";
+  }
+  const parsed = repoName(fullName);
+  if (!parsed) return "";
+  const issues = await github<{ number?: number; title?: string; pull_request?: unknown }[]>(
+    `/repos/${parsed.owner}/${parsed.repo}/issues?state=open&per_page=8&sort=updated`,
+  );
+  const lines = issues
+    .filter((issue) => typeof issue.number === "number" && typeof issue.title === "string")
+    .map((issue) => `- #${issue.number} ${issue.pull_request ? "pull request" : "issue"}: ${issue.title}`);
+  repoNotes = lines.length ? `Open work on ${fullName}:\n${lines.join("\n")}` : "";
+  repoNotesAt = Date.now();
+  return repoNotes;
+}
+
 export function githubErrorResponse(error: unknown): Response {
   if (error instanceof GitHubApiError) {
     return Response.json({ error: error.code, hint: error.hint }, { status: error.status });

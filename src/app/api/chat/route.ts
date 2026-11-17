@@ -7,6 +7,8 @@ import { getJiraContext, jiraContextError } from "@/lib/jira/context";
 import { findReadableUrl, readPublicPage } from "@/lib/page-text";
 import { getSlackContext } from "@/lib/slack/context";
 import { SlackApiError } from "@/lib/slack/client";
+import { recentRepoNotes } from "@/lib/github/client";
+import { workspaceBrief } from "@/lib/workspace/cloud";
 
 export const maxDuration = 120;
 
@@ -131,6 +133,11 @@ export async function POST(request: Request) {
     }
   }
 
+  const [company, github] = await Promise.all([
+    workspaceBrief().catch(() => ""),
+    allowConnectors ? recentRepoNotes().catch(() => "") : Promise.resolve(""),
+  ]);
+
   const latestQuestion = [...messages].reverse().find((message) => message.role === "user")?.content ?? "";
   const pageUrl = findReadableUrl([latestQuestion, ...pages.map((page) => page.text).reverse()]);
   const linkedPage = pageUrl ? await readPublicPage(pageUrl) : null;
@@ -144,12 +151,15 @@ export async function POST(request: Request) {
     "You are Kismet, a product manager's assistant.",
     deep ? "Write in plain sentences." : "Be direct and short. Write in plain sentences.",
     "You can see the Kismet pages this person has opened, and a log of what they have been doing here. Use that. Do not ask them to paste it. When they ask what you have been working on, or ask you to reflect, answer from the log in time order.",
+    "Notes written in this workspace, the product graph, and GitHub are the company record when Slack and Jira are empty. Use them. Do not invent customers, metrics, or tickets that are not written there.",
     allowConnectors
       ? "You can search the web. Use it for facts that are not in the workspace, the linked page, Slack, Jira, or Databricks. Prefer Slack for what this company said, Jira for the state of the work, and Databricks for numbers. When you use a web page, name it in the sentence as a markdown link."
       : "You can search the web. Connected apps are turned off for drafts, so answer without Slack, Jira, or Databricks. When you use a web page, name it in the sentence as a markdown link.",
     ...promptForChips(modes),
     screen ? `Pages open in Kismet:\n${screen}` : "No Kismet page text was sent with this question.",
     workLog ? `Recent work:\n${workLog}` : "",
+    company,
+    github,
     linkedPage ? `Text from the link on screen (${linkedPage.title}, ${linkedPage.url}):\n${linkedPage.text}` : "",
     slackNote,
     slackText ? `\nSlack excerpts:\n${slackText}` : "",

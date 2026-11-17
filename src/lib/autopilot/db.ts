@@ -1,19 +1,20 @@
 import "server-only";
 
 import postgres from "postgres";
+import { pooledDatabase, resolveDatabaseUrl } from "@/lib/db/url";
 
 type Sql = postgres.Sql;
 
 const globalForSql = globalThis as unknown as { kismetSql?: Sql; kismetReady?: Promise<void> };
 
 function databaseUrl(): string {
-  const url = process.env.KISMET_DATABASE_URL?.trim() || process.env.DATABASE_URL?.trim();
-  if (!url) throw new Error("Set KISMET_DATABASE_URL (or DATABASE_URL) so Autopilot can store its work.");
+  const url = resolveDatabaseUrl();
+  if (!url) throw new Error("Set DATABASE_URL to the Supabase connection string.");
   return url;
 }
 
 export function autopilotConfigured(): boolean {
-  return Boolean(process.env.KISMET_DATABASE_URL?.trim() || process.env.DATABASE_URL?.trim());
+  return Boolean(resolveDatabaseUrl());
 }
 
 function client(): Sql {
@@ -23,6 +24,7 @@ function client(): Sql {
     globalForSql.kismetSql = postgres(url, {
       max: 5,
       ssl: local ? false : "require",
+      prepare: pooledDatabase(url) ? false : true,
       onnotice: () => {},
       connection: { search_path: "kismet" },
     });
@@ -261,6 +263,16 @@ create table if not exists kismet.ai_spend (
   cents integer not null default 0,
   hits integer not null default 0,
   primary key (bucket, subject)
+);
+
+create table if not exists kismet.workspace (
+  id text primary key,
+  graph jsonb,
+  graph_at timestamptz,
+  chat jsonb,
+  chat_at timestamptz,
+  notes jsonb not null default '[]'::jsonb,
+  notes_at timestamptz
 );
 
 create table if not exists kismet.inbox_weights (

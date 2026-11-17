@@ -9,6 +9,7 @@ import { RelativeTime } from "@/components/shared/relative-time";
 import { useAnalyticsLibrary } from "@/stores/analytics-store";
 import { useNotificationStore } from "@/stores/notification-store";
 import { useQueryEditorStore } from "@/stores/query-editor-store";
+import { WorkspaceNotes } from "@/components/workspace/notes-panel";
 import type { GraphNode, NodeStatus, NodeType, Priority } from "@/types/graph";
 
 const OPEN: NodeStatus[] = ["DRAFT", "ACTIVE", "IN_PROGRESS", "AT_RISK", "STALE"];
@@ -44,6 +45,7 @@ export function DashboardView() {
 
         <div className="mt-8 grid items-start gap-x-12 gap-y-10 md:grid-cols-[minmax(0,1.45fr)_minmax(240px,0.75fr)]">
           <div className="space-y-10">
+            <WorkspaceNotes />
             <Section
               title="Assigned to you"
               meta={graphReady ? `${tickets.length} open` : ""}
