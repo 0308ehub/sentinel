@@ -288,6 +288,14 @@ export async function mergePull(fullName: string, number: number, title: string)
   });
 }
 
+/** Deletes a Kismet branch. Other branches, including the default branch, are left alone. */
+export async function deleteBranch(fullName: string, branch: string): Promise<void> {
+  const parsed = repoName(fullName);
+  if (!parsed || !branch.startsWith("kismet/")) return;
+  const ref = `heads/${branch.replaceAll("/", "%2F")}`;
+  await github(`/repos/${parsed.owner}/${parsed.repo}/git/refs/${ref}`, { method: "DELETE" });
+}
+
 export async function closePull(fullName: string, number: number): Promise<void> {
   const parsed = repoName(fullName);
   if (!parsed) throw new GitHubApiError("bad_repo", "Use a repository like owner/name.", 400);

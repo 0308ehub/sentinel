@@ -5,7 +5,7 @@ import { isLocalSource } from "@/lib/autopilot/source";
 import { place } from "@/lib/autopilot/overlap";
 import { listExperiments, log, setFlag, setSignalStatus, updateExperiment } from "@/lib/autopilot/store";
 import type { Experiment } from "@/lib/autopilot/types";
-import { closePull, mergePull } from "@/lib/github/client";
+import { closePull, deleteBranch, mergePull } from "@/lib/github/client";
 
 /**
  * The code is in: start the 50/50 split, in a slice of traffic that doesn't collide with other
@@ -64,7 +64,9 @@ export async function approve(experiment: Experiment): Promise<string> {
 
 export async function reject(experiment: Experiment): Promise<string> {
   if (experiment.status !== "awaiting_approval") throw new Error("This experiment isn't waiting for approval.");
-  if (experiment.prNumber) await closePull(await autopilotRepo(), experiment.prNumber).catch(() => {});
+  const repo = await autopilotRepo();
+  if (experiment.prNumber) await closePull(repo, experiment.prNumber).catch(() => {});
+  if (experiment.branch) await deleteBranch(repo, experiment.branch).catch(() => {});
   await updateExperiment(experiment.id, { status: "rejected", endedAt: new Date().toISOString(), note: "Rejected by you." });
   await setSignalStatus(experiment.signalId, "open");
   await log("gate", `You rejected “${experiment.title}”. Kismet will try a different idea.`, experiment.id);

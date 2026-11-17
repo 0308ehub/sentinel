@@ -8,7 +8,7 @@ import { isLocalSource } from "@/lib/autopilot/source";
 import type { Experiment, Signal } from "@/lib/autopilot/types";
 import { client, coderConfigured, managedSessionView, SESSION_BUDGET_CENTS } from "@/lib/coder/sessions";
 import { getConnection } from "@/lib/connections/store";
-import { compareFiles, createPullFromBranch, readFile, repoDefaultBranch } from "@/lib/github/client";
+import { closePull, compareFiles, createPullFromBranch, deleteBranch, readFile, repoDefaultBranch } from "@/lib/github/client";
 
 async function githubToken(): Promise<string> {
   const connection = await getConnection<{ token?: unknown }>(autopilotUser(), "github");
@@ -108,6 +108,37 @@ async function followOne(experiment: Experiment, signal: Signal | undefined): Pr
       view.branch ? "the coding session did not finish normally" :
         explanation || "the coding agent did not report a branch";
   return failBuild(experiment, reason);
+}
+
+/** Stops a build the person does not want and removes its unmerged branch. */
+export async function cancelBuild(experiment: Experiment): Promise<string> {
+  if (experiment.status !== "building" && experiment.status !== "awaiting_approval") {
+    throw new Error("This experiment is not being written.");
+  }
+  const sessionId = experiment.coderSessionId;
+  await updateExperiment(experiment.id, {
+    status: "rejected",
+    coderSessionId: null,
+    endedAt: new Date().toISOString(),
+    note: "Stopped by you. The unmerged change was removed.",
+  });
+  await setSignalStatus(experiment.signalId, "open");
+  let branch = experiment.branch;
+  if (sessionId) {
+    await client().beta.sessions.events.send(sessionId, { events: [{ type: "user.interrupt" }] }).catch(() => {});
+    if (!branch) {
+      const view = await managedSessionView(sessionId).catch(() => null);
+      branch = view?.branch ?? null;
+    }
+  }
+  const repo = await autopilotRepo().catch(() => "");
+  if (repo && experiment.prNumber) await closePull(repo, experiment.prNumber).catch(() => {});
+  const branches = new Set([branch, `kismet/exp-${experiment.flag}`].filter((name): name is string => Boolean(name)));
+  if (repo) {
+    for (const name of branches) await deleteBranch(repo, name).catch(() => {});
+  }
+  await log("build", `You stopped “${experiment.title}” and removed the unmerged change.`, experiment.id);
+  return "Stopped. The unmerged change was removed.";
 }
 
 export async function followAgentBuilds(): Promise<string | null> {

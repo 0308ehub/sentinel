@@ -17,6 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { BuildLive } from "@/components/autopilot/build-live";
 import { RelativeTime } from "@/components/shared/relative-time";
 import { cn } from "@/lib/utils";
 import {
@@ -102,8 +103,13 @@ export function AutopilotView() {
   }
 
   async function testSignal(signal: Signal) {
+    if (state?.experiments.some((experiment) => experiment.status === "building")) {
+      setMessage("Kismet is already writing a change. It is listed under Running.");
+      document.getElementById("autopilot-running")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
     setBusy(signal.id);
-    setMessage(null);
+    setMessage("Designing the test. This usually takes under a minute.");
     try {
       const res = await fetch(`/api/autopilot/signals/${signal.id}`, {
         method: "POST",
@@ -111,8 +117,9 @@ export function AutopilotView() {
         body: JSON.stringify({ action: "test" }),
       });
       const body = (await res.json()) as { message?: string; error?: string };
-      setMessage(body.message ?? body.error ?? null);
+      setMessage(body.message ?? body.error ?? "The test did not start.");
       await load();
+      if (res.ok) document.getElementById("autopilot-running")?.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch {
       setMessage("Could not start a test. Try again.");
     } finally {
@@ -141,7 +148,7 @@ export function AutopilotView() {
 
   async function act(
     experiment: Experiment,
-    action: "approve" | "reject" | "rollout" | "stop" | "approve-cleanup" | "dismiss-cleanup"
+    action: "approve" | "reject" | "cancel" | "rollout" | "stop" | "approve-cleanup" | "dismiss-cleanup"
   ) {
     setBusy(experiment.id + action);
     setMessage(null);
@@ -270,7 +277,8 @@ export function AutopilotView() {
                       Approve &amp; ship
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => act(experiment, "reject")} disabled={busy !== null}>
-                      Reject
+                      {busy === experiment.id + "reject" && <Loader2 className="animate-spin" />}
+                      Discard change
                     </Button>
                   </>
                 ) : (
@@ -298,15 +306,23 @@ export function AutopilotView() {
           ))}
             </Section>
 
+            <div id="autopilot-running">
             <Section title="Running" count={live.length} empty="No experiments running.">
           {live.map((experiment) => (
             <ExperimentCard
               key={experiment.id}
               experiment={experiment}
               signal={state.signals.find((s) => s.id === experiment.signalId)}
+              actions={experiment.status === "building" ? (
+                <Button size="sm" variant="outline" onClick={() => act(experiment, "cancel")} disabled={busy !== null}>
+                  {busy === experiment.id + "cancel" && <Loader2 className="animate-spin" />}
+                  Stop and discard
+                </Button>
+              ) : undefined}
             />
           ))}
             </Section>
+            </div>
 
             <Section
           title="What's not working"
@@ -318,10 +334,12 @@ export function AutopilotView() {
               : undefined
           }
         >
+          {message && <p className="rounded-md bg-muted p-3 text-xs text-muted-foreground">{message}</p>}
           {problems.map((signal) => (
             <SignalCard
               key={signal.id}
               signal={signal}
+              experiment={state.experiments.find((item) => item.signalId === signal.id)}
               onDismiss={() => dismissSignal(signal)}
               onTest={() => testSignal(signal)}
               busy={busy === signal.id}
@@ -387,13 +405,17 @@ function Section({
   );
 }
 
+const OPEN_TEST = new Set(["building", "queued", "running", "awaiting_approval", "awaiting_rollout"]);
+
 function SignalCard({
   signal,
+  experiment,
   onDismiss,
   onTest,
   busy,
 }: {
   signal: Signal;
+  experiment?: Experiment;
   onDismiss: () => void;
   onTest: () => void;
   busy: boolean;
@@ -424,13 +446,22 @@ function SignalCard({
             {signal.area && ` · ${signal.area}`}
             {synthetic > 0 && ` · ${synthetic === signal.evidence.length ? "all" : synthetic} synthetic`}
           </p>
+          {experiment?.status === "building" && (
+            <p className="mt-1 text-xs text-muted-foreground">Writing the change. It is listed under Running.</p>
+          )}
+          {experiment?.status === "awaiting_approval" && (
+            <p className="mt-1 text-xs text-muted-foreground">The change is ready under Needs you.</p>
+          )}
+          {experiment?.status === "failed" && experiment.note && (
+            <p className="mt-1 text-xs text-muted-foreground">{experiment.note}</p>
+          )}
         </div>
       </button>
-      {signal.status !== "experimenting" && (
+      {!(experiment && OPEN_TEST.has(experiment.status)) && (
         <div className="shrink-0 p-3 pl-0">
           <Button size="sm" onClick={onTest} disabled={busy}>
             {busy && <Loader2 className="animate-spin" />}
-            Test a fix
+            {busy ? "Designing…" : "Test a fix"}
           </Button>
         </div>
       )}
@@ -546,9 +577,7 @@ function ExperimentCard({
         </div>
       )}
       {experiment.note && !experiment.coderSessionId && <p className="text-xs text-muted-foreground">{experiment.note}</p>}
-      {experiment.status === "building" && experiment.coderSessionId && (
-        <p className="text-xs text-muted-foreground">Kismet&apos;s coding agent is building this.</p>
-      )}
+      {experiment.status === "building" && experiment.coderSessionId && <BuildLive experimentId={experiment.id} />}
       {experiment.overlap && !DONE.has(experiment.status) && (
         <p className="rounded bg-muted/60 p-2 text-xs">{experiment.overlap}</p>
       )}

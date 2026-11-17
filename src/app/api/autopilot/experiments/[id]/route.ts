@@ -1,3 +1,4 @@
+import { cancelBuild } from "@/lib/autopilot/agent-build";
 import { approveCleanup, dismissCleanup } from "@/lib/autopilot/cleanup";
 import { approve, reject, rollout, stop } from "@/lib/autopilot/lifecycle";
 import { withAutopilotUser } from "@/lib/autopilot/scope";
@@ -7,7 +8,7 @@ import { GitHubApiError } from "@/lib/github/client";
 
 export const dynamic = "force-dynamic";
 
-const ACTIONS = ["approve", "reject", "rollout", "stop", "approve-cleanup", "dismiss-cleanup"] as const;
+const ACTIONS = ["approve", "reject", "cancel", "rollout", "stop", "approve-cleanup", "dismiss-cleanup"] as const;
 type Action = (typeof ACTIONS)[number];
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -28,7 +29,7 @@ async function act(id: string, action: Action): Promise<Response> {
   try {
     let message: string;
     if (action === "approve") message = await approve(experiment);
-    else if (action === "reject") message = await reject(experiment);
+    else if (action === "reject" || action === "cancel") message = action === "cancel" ? await cancelBuild(experiment) : await reject(experiment);
     else if (action === "rollout") message = await rollout(experiment);
     else if (action === "approve-cleanup") message = await approveCleanup(experiment);
     else if (action === "dismiss-cleanup") message = await dismissCleanup(experiment);

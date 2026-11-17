@@ -4,6 +4,7 @@ import { withAutopilotUser } from "@/lib/autopilot/scope";
 import { setSignalStatus } from "@/lib/autopilot/store";
 import { currentUserId } from "@/lib/connections/current";
 
+export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
 /** Dismisses a problem the account does not want Kismet to work on. */
