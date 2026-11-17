@@ -21,6 +21,7 @@ const isPublicRoute = createRouteMatcher([
   // Landing-page experiments run for signed-out visitors.
   "/api/autopilot/flags",
   "/api/autopilot/events",
+  "/api/health",
 ]);
 
 // Vercel cron sends the CRON_SECRET bearer; the route checks it again itself.

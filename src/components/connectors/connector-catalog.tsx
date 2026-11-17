@@ -116,7 +116,7 @@ export function ConnectorCatalog({ onConnectionsChange }: { onConnectionsChange?
     };
   }, []);
 
-  const anyConnected = savedIds.some((id) => !isServerCredentialConnector(id)) || Object.values(live).some((item) => item.connected);
+  const anyConnected = Object.values(live).some((item) => item.connected);
   useEffect(() => {
     onConnectionsChange?.(anyConnected);
   }, [anyConnected, onConnectionsChange]);
@@ -145,6 +145,10 @@ export function ConnectorCatalog({ onConnectionsChange }: { onConnectionsChange?
       );
     });
   }, [query]);
+  const liveConnectors = filtered.filter((connector) => connector.live);
+  const comingSoon = filtered.filter((connector) => !connector.live);
+  const liveCount = CONNECTORS.filter((connector) => connector.live).length;
+  const comingSoonCount = CONNECTORS.length - liveCount;
 
   const open = CONNECTORS.find((connector) => connector.id === openId) ?? null;
 
@@ -157,11 +161,11 @@ export function ConnectorCatalog({ onConnectionsChange }: { onConnectionsChange?
         className="h-9"
       />
       <p className="mt-3 text-xs text-muted-foreground">
-        {CONNECTORS.length} tools. Each one asks for the URL or key it needs, then Kismet files what it produces onto the product graph.
+        {liveCount} connectors work today; {comingSoonCount} more are coming soon.
       </p>
       <div className="mt-4 space-y-6">
         {CONNECTOR_CATEGORIES.map((category) => {
-          const items = filtered.filter((connector) => connector.category === category);
+          const items = liveConnectors.filter((connector) => connector.category === category);
           if (items.length === 0) return null;
           return (
             <section key={category}>
@@ -208,6 +212,44 @@ export function ConnectorCatalog({ onConnectionsChange }: { onConnectionsChange?
             </section>
           );
         })}
+        {comingSoon.length > 0 && (
+          <details className="rounded-md border border-border" open={query.trim() ? true : undefined}>
+            <summary className="cursor-pointer px-3 py-2.5 text-sm font-medium">
+              Coming soon ({query.trim() ? comingSoon.length : comingSoonCount})
+            </summary>
+            <div className="divide-y divide-border border-t border-border">
+              {comingSoon.map((connector) => {
+                const saved = savedIds.includes(connector.id);
+                return (
+                  <div key={connector.id} className="flex items-center gap-3 px-3 py-2.5">
+                    <Mark name={connector.name} logo={connector.logo} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium">{connector.name}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {connector.category} · Files {connector.filesAs}.
+                      </p>
+                    </div>
+                    <span className="text-[11px] text-muted-foreground">Coming soon</span>
+                    {saved && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          removeConnector(connector.id);
+                          graphStore.getState().detachSource(connector.id);
+                          refreshSaved();
+                        }}
+                      >
+                        Remove saved key
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </details>
+        )}
       </div>
 
       <Dialog open={Boolean(open)} onOpenChange={(next) => !next && setOpenId(null)}>

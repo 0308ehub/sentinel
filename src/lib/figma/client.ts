@@ -35,7 +35,8 @@ export async function figmaStatus(): Promise<{ connected: boolean; handle: strin
   try {
     const me = await figmaFetch<{ handle?: string }>("/v1/me", token);
     return { connected: true, handle: me.handle?.trim() || "" };
-  } catch {
+  } catch (error) {
+    console.error("[figma] status", error);
     return { connected: false, handle: "" };
   }
 }
@@ -48,7 +49,8 @@ export async function connectFigma(token: string): Promise<{ handle: string; sav
   try {
     await saveConnection(userId, "figma", { token }, { handle });
     return { handle, saved: true };
-  } catch {
+  } catch (error) {
+    console.error("[figma] save connection", error);
     return { handle, saved: false };
   }
 }

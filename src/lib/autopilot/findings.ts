@@ -1,15 +1,15 @@
 import "server-only";
 
 import { addEvidence, elementStats, hasEvidenceTitled, type NewEvidence } from "@/lib/autopilot/store";
+import { minPageVisitors } from "@/lib/autopilot/thresholds";
 
 const WINDOW_DAYS = 7;
-const MIN_PAGE_VISITORS = 50;
 const LOW_CLICK_RATE = 0.03;
 const REPEAT_AFTER_DAYS = 3;
 
 /** Turns usage numbers into evidence: elements on busy pages that almost nobody clicks. */
 export async function analyticsFindings(): Promise<string | null> {
-  const stats = await elementStats(WINDOW_DAYS, MIN_PAGE_VISITORS);
+  const stats = await elementStats(WINDOW_DAYS, minPageVisitors());
   const found: NewEvidence[] = [];
   for (const stat of stats) {
     const rate = stat.clickers / stat.pageVisitors;

@@ -107,6 +107,7 @@ export async function POST(request: Request) {
         ? `Recent messages from ${channels.map((name) => `#${name}`).join(", ")} are below. Use them when they answer the question. Name the channel and the person. Do not invent messages that are not in the excerpts.`
         : "The Slack bot is connected, but it is not in any channels yet, or those channels are empty. Say that plainly if the user asks about Slack.";
     } catch (error) {
+      console.error("[chat] slack context", error);
       const hint = error instanceof SlackApiError ? error.hint ?? error.code : "Slack could not be read.";
       slackNote = `Slack could not be read (${hint}). Say so if the user asks about Slack, and answer from general knowledge otherwise.`;
     }
@@ -121,6 +122,7 @@ export async function POST(request: Request) {
           : "Jira is connected, but no issues were updated in the last 90 days. Say that plainly if the user asks about Jira.";
       }
     } catch (error) {
+      console.error("[chat] jira context", error);
       jiraNote = `Jira could not be read (${jiraContextError(error)}). Say so if the user asks about Jira.`;
     }
 
@@ -130,6 +132,7 @@ export async function POST(request: Request) {
         ? `${warehouse}\nWhen a question needs these tables, call query_databricks. Use one read-only statement. If the tool returns an error, fix the SQL and call it again. Then answer from the rows. Name the table. Do not invent a number that was not returned.`
         : "";
     } catch (error) {
+      console.error("[chat] databricks context", error);
       const hint = error instanceof DatabricksApiError ? error.hint ?? error.code : "Databricks could not be read.";
       warehouseNote = `Databricks could not be read (${hint}). Say so if the user asks for warehouse numbers.`;
     }
@@ -137,8 +140,14 @@ export async function POST(request: Request) {
 
   const [company, github, database] = await Promise.all([
     workspaceBrief(await currentUserId()),
-    allowConnectors ? recentRepoNotes().catch(() => "") : Promise.resolve(""),
-    allowConnectors ? postgresBrief().catch(() => "") : Promise.resolve(""),
+    allowConnectors ? recentRepoNotes().catch((error) => {
+      console.error("[chat] github context", error);
+      return "";
+    }) : Promise.resolve(""),
+    allowConnectors ? postgresBrief().catch((error) => {
+      console.error("[chat] postgres context", error);
+      return "";
+    }) : Promise.resolve(""),
   ]);
 
   const latestQuestion = [...messages].reverse().find((message) => message.role === "user")?.content ?? "";
@@ -203,6 +212,7 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
+    console.error("[chat]", error);
     const message = error instanceof Error ? error.message : "The model request failed.";
     const status = error instanceof ModelError ? error.status : 502;
     return Response.json({ error: message }, { status });

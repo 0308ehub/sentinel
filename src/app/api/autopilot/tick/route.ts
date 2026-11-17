@@ -19,7 +19,10 @@ export async function GET(request: Request) {
   if (secret && !bearerMatches(request.headers.get("authorization"), secret)) {
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }
-  const connected = await listConnectionUsers("github").catch(() => []);
+  const connected = await listConnectionUsers("github").catch((error) => {
+    console.error("[autopilot] connected users", error);
+    return [];
+  });
   const users = tickUsers(connected, await currentUserId());
   const runs = [];
   for (const userId of users) runs.push(await runTick(userId));

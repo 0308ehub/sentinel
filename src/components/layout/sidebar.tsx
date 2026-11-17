@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import * as AvatarPrimitive from "@radix-ui/react-avatar";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
@@ -25,6 +25,8 @@ import {
   Plus,
   Bot,
   Boxes,
+  CircleAlert,
+  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui-store";
@@ -45,55 +47,111 @@ import { useWorkspaceSettings } from "@/lib/settings/workspace";
 import { startNewChat } from "@/lib/chat/session";
 import { BrandLogo } from "@/components/marketing/brand-logo";
 import { useAccount } from "@/lib/auth/use-account";
+import { ReportProblem } from "@/components/feedback/report-problem";
 
-const GROUPS = [
-  {
-    label: "Workspace",
-    items: [
-      { id: "chat", label: "Chat", href: "/ai", icon: MessageSquare },
-      { id: "agents", label: "Agents", href: "/agents", icon: Boxes },
-      { id: "autopilot", label: "Autopilot", href: "/autopilot", icon: Bot },
-      { id: "dashboard", label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-      { id: "explorer", label: "Explorer", href: "/explorer", icon: FolderTree },
-      { id: "features", label: "Features", href: "/features", icon: Layers },
-      { id: "design", label: "Design", href: "/design", icon: Frame },
-      { id: "board", label: "Board", href: "/board", icon: Columns3 },
-      { id: "timeline", label: "Timeline", href: "/timeline", icon: Clock },
-      { id: "graph", label: "Graph", href: "/graph", icon: GitBranch },
-    ],
-  },
-  {
-    label: "Measure",
-    items: [
-      { id: "analytics", label: "Analytics", href: "/analytics", icon: BarChart3 },
-      { id: "experiments", label: "Experiments", href: "/experiments", icon: FlaskConical },
-      { id: "decisions", label: "Decisions", href: "/decisions", icon: Scale },
-    ],
-  },
+type NavItem = { id: string; label: string; href: string; icon: typeof MessageSquare };
+
+// What a new user needs: talk to Kismet and see the experiments it runs.
+const PRIMARY: NavItem[] = [
+  { id: "chat", label: "Chat", href: "/ai", icon: MessageSquare },
+  { id: "autopilot", label: "Experiments", href: "/autopilot", icon: FlaskConical },
+  { id: "features", label: "Features", href: "/features", icon: Layers },
+  { id: "graph", label: "Graph", href: "/graph", icon: GitBranch },
 ];
+
+// Everything else stays one click away, and in the command palette.
+const MORE: NavItem[] = [
+  { id: "dashboard", label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { id: "analytics", label: "Analytics", href: "/analytics", icon: BarChart3 },
+  { id: "decisions", label: "Decisions", href: "/decisions", icon: Scale },
+  { id: "board", label: "Board", href: "/board", icon: Columns3 },
+  { id: "timeline", label: "Timeline", href: "/timeline", icon: Clock },
+  { id: "design", label: "Design", href: "/design", icon: Frame },
+  { id: "explorer", label: "Explorer", href: "/explorer", icon: FolderTree },
+  { id: "agents", label: "Agents", href: "/agents", icon: Boxes },
+  { id: "experiments", label: "Demo lab", href: "/experiments", icon: Bot },
+];
+
+const MORE_KEY = "kismet-nav-more-open";
+const moreListeners = new Set<() => void>();
+
+function readMoreOpen(): boolean {
+  try {
+    return localStorage.getItem(MORE_KEY) === "1";
+  } catch {
+    return false; // Storage blocked: start collapsed.
+  }
+}
+
+function writeMoreOpen(open: boolean) {
+  try {
+    localStorage.setItem(MORE_KEY, open ? "1" : "0");
+  } catch {
+    // Storage blocked: the choice lasts until reload.
+  }
+  moreListeners.forEach((listener) => listener());
+}
+
+function subscribeMore(listener: () => void) {
+  moreListeners.add(listener);
+  return () => {
+    moreListeners.delete(listener);
+  };
+}
+
+const noSubscribe = () => () => {};
+
+function isActive(item: NavItem, pathname: string): boolean {
+  return item.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(item.href);
+}
+
+function NavLink({ item, pathname, collapsed, badge }: { item: NavItem; pathname: string; collapsed: boolean; badge: number }) {
+  return (
+    <Link
+      href={item.href}
+      title={collapsed ? (item.id === "design" ? "Design, alpha" : item.label) : undefined}
+      className={cn(
+        "relative flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm",
+        isActive(item, pathname) ? "bg-accent font-medium text-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent",
+        collapsed && "justify-center px-0",
+      )}
+    >
+      <item.icon className="h-4 w-4 shrink-0" />
+      {!collapsed && <span className="truncate">{item.label}</span>}
+      {item.id === "design" && !collapsed && (
+        <span className="ml-auto rounded border border-border px-1 py-px text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          Alpha
+        </span>
+      )}
+      {badge > 0 && <CountBadge count={badge} collapsed={collapsed} />}
+    </Link>
+  );
+}
+
+function CountBadge({ count, collapsed }: { count: number; collapsed: boolean }) {
+  return (
+    <span className={cn(
+      "grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-medium text-primary-foreground",
+      collapsed ? "absolute right-1 top-1 h-2 min-w-2 px-0" : "ml-auto",
+    )}>
+      {collapsed ? "" : count}
+    </span>
+  );
+}
 
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const account = useAccount();
   const { sidebarCollapsed, toggleSidebar } = useUIStore();
-  const [profile, setProfile] = useState({
-    name: CURRENT_USER.name,
-    email: CURRENT_USER.email,
-    initials: CURRENT_USER.initials,
-  });
+  // Read after hydration so the server and client render the same first frame.
+  const draftName = useSyncExternalStore(noSubscribe, () => readOnboarding().name, () => "");
+  const draftEmail = useSyncExternalStore(noSubscribe, () => readOnboarding().email, () => "");
+  const profile = draftName
+    ? { name: draftName, email: draftEmail, initials: initialsFor(draftName) }
+    : { name: CURRENT_USER.name, email: CURRENT_USER.email, initials: CURRENT_USER.initials };
+  const moreStored = useSyncExternalStore(subscribeMore, readMoreOpen, () => false);
   const [attention, setAttention] = useState(0);
-
-  useEffect(() => {
-    if (account) return;
-    const draft = readOnboarding();
-    if (!draft.name) return;
-    setProfile({
-      name: draft.name,
-      email: draft.email,
-      initials: initialsFor(draft.name),
-    });
-  }, [account]);
 
   useEffect(() => {
     let stop = false;
@@ -113,6 +171,9 @@ export function Sidebar() {
 
   const workspace = useWorkspaceSettings();
   const hiddenNav = new Set(workspace.hiddenNav);
+  const moreItems = MORE.filter((item) => !hiddenNav.has(item.id));
+  // The group opens on its own when you are on one of its pages.
+  const moreOpen = moreStored || moreItems.some((item) => isActive(item, pathname));
   const shownProfile = account
     ? {
         name: account.name || CURRENT_USER.name,
@@ -172,48 +233,32 @@ export function Sidebar() {
             <Plus className="h-4 w-4 shrink-0" />
             {!sidebarCollapsed && <span>New</span>}
           </Link>
-          {GROUPS.map((group) => {
-            const items = group.items.filter((item) => !hiddenNav.has(item.id));
-            if (!items.length) return null;
-            return (
-            <div key={group.label} className="mb-1">
-              {!sidebarCollapsed && (
-                <p className="px-2 pb-1 pt-3 text-[11px] text-muted-foreground">{group.label}</p>
-              )}
-              {items.map((item) => {
-                const active = item.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(item.href);
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    title={sidebarCollapsed ? (item.id === "design" ? "Design, alpha" : item.label) : undefined}
-                    className={cn(
-                      "relative flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm",
-                      active ? "bg-accent font-medium text-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent",
-                      sidebarCollapsed && "justify-center px-0",
-                    )}
-                  >
-                    <item.icon className="h-4 w-4 shrink-0" />
-                    {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
-                    {item.id === "design" && !sidebarCollapsed && (
-                      <span className="ml-auto rounded border border-border px-1 py-px text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                        Alpha
-                      </span>
-                    )}
-                    {item.id === "agents" && attention > 0 && (
-                      <span className={cn(
-                        "grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-medium text-primary-foreground",
-                        sidebarCollapsed ? "absolute right-1 top-1 h-2 min-w-2 px-0" : "ml-auto",
-                      )}>
-                        {sidebarCollapsed ? "" : attention}
-                      </span>
-                    )}
-                  </Link>
-                );
-              })}
-            </div>
-            );
-          })}
+          {PRIMARY.filter((item) => !hiddenNav.has(item.id)).map((item) => (
+            <NavLink key={item.href} item={item} pathname={pathname} collapsed={sidebarCollapsed} badge={0} />
+          ))}
+          <button
+            type="button"
+            onClick={() => writeMoreOpen(!moreOpen)}
+            aria-expanded={moreOpen}
+            title={sidebarCollapsed ? "More" : undefined}
+            className={cn(
+              "relative mt-2 flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
+              sidebarCollapsed && "justify-center px-0",
+            )}
+          >
+            <ChevronRight className={cn("h-4 w-4 shrink-0 transition-transform", moreOpen && "rotate-90")} />
+            {!sidebarCollapsed && <span>More</span>}
+            {!moreOpen && attention > 0 && <CountBadge count={attention} collapsed={sidebarCollapsed} />}
+          </button>
+          {moreOpen && moreItems.map((item) => (
+            <NavLink
+              key={item.href}
+              item={item}
+              pathname={pathname}
+              collapsed={sidebarCollapsed}
+              badge={item.id === "agents" ? attention : 0}
+            />
+          ))}
           <Link
             href="/settings"
             title={sidebarCollapsed ? "Settings" : undefined}
@@ -231,6 +276,19 @@ export function Sidebar() {
 
       <Separator />
       <div className="p-2">
+        <ReportProblem>
+          <button
+            type="button"
+            title={sidebarCollapsed ? "Report a problem" : undefined}
+            className={cn(
+              "mb-1 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
+              sidebarCollapsed && "justify-center px-0",
+            )}
+          >
+            <CircleAlert className="h-4 w-4 shrink-0" />
+            {!sidebarCollapsed && <span>Report a problem</span>}
+          </button>
+        </ReportProblem>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button

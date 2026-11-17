@@ -22,11 +22,15 @@ import {
   Search,
   Plus,
   Boxes,
+  CircleAlert,
 } from "lucide-react";
 import type { NodeType } from "@/types/graph";
+import { ReportProblem } from "@/components/feedback/report-problem";
 
 const NAV_ITEMS = [
   { label: "Chat", href: "/ai", icon: MessageSquare },
+  { label: "Experiments", href: "/autopilot", icon: FlaskConical },
+  { label: "Connections", href: "/settings/connectors", icon: Boxes },
   { label: "Agents", href: "/agents", icon: Boxes },
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Explorer", href: "/explorer", icon: FolderTree },
@@ -36,7 +40,7 @@ const NAV_ITEMS = [
   { label: "Timeline", href: "/timeline", icon: Clock },
   { label: "Graph View", href: "/graph", icon: GitBranch },
   { label: "Analytics", href: "/analytics", icon: BarChart3 },
-  { label: "Experiments", href: "/experiments", icon: FlaskConical },
+  { label: "Demo lab", href: "/experiments", icon: FlaskConical },
   { label: "Decisions", href: "/decisions", icon: Scale },
 ];
 
@@ -51,6 +55,7 @@ export function CommandPalette() {
   const { commandPaletteOpen, setCommandPaletteOpen, setProposeFeatureOpen } = useUIStore();
   const router = useRouter();
   const [query, setQuery] = React.useState("");
+  const [feedbackOpen, setFeedbackOpen] = React.useState(false);
 
   React.useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -63,8 +68,8 @@ export function CommandPalette() {
     return () => document.removeEventListener("keydown", down);
   }, [commandPaletteOpen, setCommandPaletteOpen]);
 
-  const graphVersion = useGraphStore((s) => s.nodes.length);
-  const results = React.useMemo(() => searchGraph(query), [query, graphVersion]);
+  useGraphStore((s) => s.nodes.length);
+  const results = searchGraph(query);
 
   const navigate = (href: string) => {
     setCommandPaletteOpen(false);
@@ -79,15 +84,16 @@ export function CommandPalette() {
   };
 
   return (
-    <Dialog open={commandPaletteOpen} onOpenChange={setCommandPaletteOpen}>
-      <DialogContent className="overflow-hidden p-0 shadow-lg max-w-lg">
-        <Command shouldFilter={false}>
-          <CommandInput
-            placeholder="Search products, features, metrics, decisions..."
-            value={query}
-            onValueChange={setQuery}
-          />
-          <CommandList>
+    <>
+      <Dialog open={commandPaletteOpen} onOpenChange={setCommandPaletteOpen}>
+        <DialogContent className="overflow-hidden p-0 shadow-lg max-w-lg">
+          <Command shouldFilter={false}>
+            <CommandInput
+              placeholder="Search products, features, metrics, decisions..."
+              value={query}
+              onValueChange={setQuery}
+            />
+            <CommandList>
             <CommandEmpty>No results found.</CommandEmpty>
             {!query && (
               <>
@@ -95,6 +101,13 @@ export function CommandPalette() {
                   <CommandItem onSelect={openProposeFeature}>
                     <Plus className="mr-2 h-4 w-4 text-primary" />
                     Propose feature…
+                  </CommandItem>
+                  <CommandItem onSelect={() => {
+                    setCommandPaletteOpen(false);
+                    setFeedbackOpen(true);
+                  }}>
+                    <CircleAlert className="mr-2 h-4 w-4 text-primary" />
+                    Report a problem…
                   </CommandItem>
                 </CommandGroup>
                 <CommandGroup heading="Navigation">
@@ -134,9 +147,11 @@ export function CommandPalette() {
                 })}
               </CommandGroup>
             )}
-          </CommandList>
-        </Command>
-      </DialogContent>
-    </Dialog>
+            </CommandList>
+          </Command>
+        </DialogContent>
+      </Dialog>
+      <ReportProblem open={feedbackOpen} onOpenChange={setFeedbackOpen} />
+    </>
   );
 }

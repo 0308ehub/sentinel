@@ -36,7 +36,8 @@ export async function getSlackContext(): Promise<{ text: string; channels: strin
       if (lines.length > 0) {
         blocks.push(`#${channel.name}\n${lines.join("\n")}`);
       }
-    } catch {
+    } catch (error) {
+      console.error("[slack] channel context", error);
       // One channel the bot cannot read should not drop the rest.
     }
   }

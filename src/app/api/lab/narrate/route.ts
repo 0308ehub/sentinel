@@ -39,7 +39,8 @@ export async function POST(request: Request) {
       : [];
     if (typeof value.headline !== "string" || !paragraphs.length) return Response.json(fallback);
     return Response.json({ headline: value.headline.slice(0, 200), paragraphs, by: "model" });
-  } catch {
+  } catch (error) {
+    console.error("[lab] narration fallback", error);
     return Response.json(fallback);
   }
 }

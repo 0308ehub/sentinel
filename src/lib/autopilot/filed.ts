@@ -11,7 +11,8 @@ async function graphEvidence(userId: string): Promise<FiledEvidence[]> {
   try {
     const states = await loadStates(userId);
     return evidenceFromGraph(states.graph?.data);
-  } catch {
+  } catch (error) {
+    console.error("[autopilot] workspace evidence", error);
     return [];
   }
 }
@@ -27,7 +28,8 @@ async function jiraEvidence(): Promise<FiledEvidence[]> {
       url: issue.url,
       occurredAt: issue.updated || new Date().toISOString(),
     }));
-  } catch {
+  } catch (error) {
+    console.error("[autopilot] jira evidence", error);
     return [];
   }
 }
@@ -57,7 +59,8 @@ async function slackEvidence(): Promise<FiledEvidence[]> {
       }
     }
     return found.slice(0, 12);
-  } catch {
+  } catch (error) {
+    console.error("[autopilot] slack evidence", error);
     return [];
   }
 }

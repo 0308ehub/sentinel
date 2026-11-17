@@ -33,7 +33,10 @@ export async function getPostgresStatus(): Promise<PostgresStatus> {
   const userId = await currentUserId();
   if (!userId) return { configured: true, connected: false, error: "Sign in required." };
   if (cache && cache.userId === userId && Date.now() - cache.at < 60_000) return cache.status;
-  const saved = await getConnection<SavedSecret>(userId, "postgres").catch(() => null);
+  const saved = await getConnection<SavedSecret>(userId, "postgres").catch((error) => {
+    console.error("[postgres] saved connection", error);
+    return null;
+  });
   const url = saved?.secret.url ? postgresUrl(saved.secret.url) : null;
   if (!url) return { configured: true, connected: false };
   const status = await probe(url);
@@ -62,7 +65,10 @@ export async function disconnectPostgres(): Promise<void> {
 }
 
 export async function postgresBrief(): Promise<string> {
-  const status = await getPostgresStatus().catch(() => null);
+  const status = await getPostgresStatus().catch((error) => {
+    console.error("[postgres] status", error);
+    return null;
+  });
   if (!status?.connected || !status.database) return "";
   const tables = (status.tables ?? []).map((table) => `${table.schema}.${table.name}`).join(", ");
   return [
@@ -83,7 +89,9 @@ async function probe(url: string): Promise<PostgresStatus> {
     onnotice: () => {},
   });
   try {
-    await sql`set default_transaction_read_only = on`.catch(() => undefined);
+    await sql`set default_transaction_read_only = on`.catch((error) => {
+      console.error("[postgres] read-only session", error);
+    });
     const info = await sql<{ name: string }[]>`select current_database() as name`;
     const tables = await sql<{ schema: string; name: string }[]>`
       select table_schema as schema, table_name as name
@@ -92,7 +100,10 @@ async function probe(url: string): Promise<PostgresStatus> {
         and table_schema not in ('pg_catalog', 'information_schema', 'kismet')
       order by table_schema, table_name
       limit 12
-    `.catch(() => []);
+    `.catch((error) => {
+      console.error("[postgres] table list", error);
+      return [];
+    });
     return {
       configured: true,
       connected: true,
@@ -101,6 +112,7 @@ async function probe(url: string): Promise<PostgresStatus> {
       tables: tables.map((table) => ({ schema: table.schema, name: table.name })),
     };
   } catch (error) {
+    console.error("[postgres] probe", error);
     return { configured: true, connected: false, error: safeMessage(error) };
   } finally {
     await sql.end({ timeout: 2 }).catch(() => undefined);

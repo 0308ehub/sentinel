@@ -71,7 +71,8 @@ export async function POST(request: Request) {
       new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 12000)),
     ]);
     return Response.json(merge(base, readJson<Record<string, unknown>>(text)));
-  } catch {
+  } catch (error) {
+    console.error("[lab] proposal fallback", error);
     return Response.json(base);
   }
 }

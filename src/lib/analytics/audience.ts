@@ -45,7 +45,8 @@ export async function customerColumns(): Promise<CustomerColumnMap> {
     };
     columnsCache.set(key, columns);
     return columns;
-  } catch {
+  } catch (error) {
+    console.error("[analytics] audience columns", error);
     columnsCache.set(key, EMPTY_COLUMNS);
     return EMPTY_COLUMNS;
   }
@@ -86,7 +87,8 @@ export async function loadAudience(): Promise<Audience> {
         const name = byId.get(customer.id);
         if (name) customer.label = name;
       }
-    } catch {
+    } catch (error) {
+      console.error("[analytics] customer labels", error);
       // The customer id is enough to segment one person when names cannot be read.
     }
   }

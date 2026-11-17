@@ -137,6 +137,15 @@ create index if not exists activity_user_idx on kismet.activity (user_id, id des
 create unique index if not exists flags_user_key on kismet.flags (user_id, key);
 create unique index if not exists experiments_user_flag on kismet.experiments (user_id, flag);
 
+create table if not exists kismet.feedback (
+  id text primary key,
+  user_id text not null,
+  message text not null,
+  page text,
+  created_at timestamptz not null default now()
+);
+create index if not exists feedback_user_created_idx on kismet.feedback (user_id, created_at desc);
+
 -- Flag names used to be unique across the whole product. Each account can now reuse one.
 do $$
 declare row record;
