@@ -151,6 +151,20 @@ async function scan(userId: string): Promise<SlackInboxItem[]> {
   return (await load(userId)).inbox;
 }
 
+/**
+ * Several Kismet accounts can share one Slack bot (one app installed once per workspace). Each mention is
+ * claimed once across all of them, so only one account replies and changes Jira.
+ */
+async function claimMention(botId: string, channelId: string, ts: string, userId: string): Promise<boolean> {
+  const sql = await db();
+  const rows = await sql`
+    insert into kismet.slack_mention_claims (mention_key, user_id) values (${`${botId}:${channelId}:${ts}`}, ${userId})
+    on conflict (mention_key) do nothing
+    returning mention_key
+  `;
+  return rows.length > 0;
+}
+
 async function handleMention(
   userId: string,
   botId: string,
@@ -161,6 +175,7 @@ async function handleMention(
     store.seen = [...store.seen, id].slice(-400);
     await save(userId, store);
   });
+  if (!(await claimMention(botId, mention.channelId, mention.ts, userId))) return;
 
   const people = await mentionedPeople(mention.text, botId);
   const askedBy = await slackUserName(mention.userId).catch(() => "Someone");

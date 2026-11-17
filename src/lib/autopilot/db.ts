@@ -171,6 +171,13 @@ create table if not exists kismet.autopilot_repo (
   updated_at timestamptz not null default now()
 );
 
+-- One row per Slack mention, so accounts sharing a bot never both act on it.
+create table if not exists kismet.slack_mention_claims (
+  mention_key text primary key,
+  user_id text not null,
+  claimed_at timestamptz not null default now()
+);
+
 create table if not exists kismet.autopilot_sites (
   user_id text primary key,
   site_key text not null unique,
