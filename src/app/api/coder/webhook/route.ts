@@ -21,8 +21,10 @@ export async function POST(request: Request): Promise<Response> {
   try {
     event = client().beta.webhooks.unwrap(body, { headers: Object.fromEntries(request.headers), key });
   } catch {
+    console.warn("[coder] webhook rejected: bad signature");
     return new Response(null, { status: 400 });
   }
+  console.info(`[coder] webhook ${event.data.type} ${event.data.id}`);
   try {
     if (!await firstReceipt(event.id)) return new Response(null, { status: 204 });
     if (event.data.type !== "session.status_idled" && event.data.type !== "session.status_terminated") {

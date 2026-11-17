@@ -29,7 +29,8 @@ async function jiraEvidence(): Promise<FiledEvidence[]> {
       occurredAt: issue.updated || new Date().toISOString(),
     }));
   } catch (error) {
-    console.error("[autopilot] jira evidence", error);
+    // An account without Jira connected is normal, not an error worth logging every hour.
+    if (!(error instanceof Error && error.message === "missing_config")) console.error("[autopilot] jira evidence", error);
     return [];
   }
 }
