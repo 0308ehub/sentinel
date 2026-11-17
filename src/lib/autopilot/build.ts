@@ -94,7 +94,16 @@ export async function buildNext(): Promise<string | null> {
   const signal = (await listSignals()).find((s) => s.id === experiment.signalId);
   const repo = await autopilotRepo();
 
-  if (!experiment.agentFailed && await agentBuildAvailable()) return startAgentBuild(experiment, signal);
+  if (experiment.agentFailed) {
+    await updateExperiment(experiment.id, {
+      status: "failed",
+      endedAt: new Date().toISOString(),
+      note: experiment.note ?? "The coding agent did not ship a change.",
+    });
+    await setSignalStatus(experiment.signalId, "open");
+    return `Stopped “${experiment.title}”. The coding agent did not ship a change.`;
+  }
+  if (await agentBuildAvailable()) return startAgentBuild(experiment, signal);
 
   try {
     const base = await baseBranch();

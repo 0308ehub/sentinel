@@ -3,7 +3,7 @@ import "server-only";
 import { experimentTask, gateInPatch, pullBody } from "@/lib/autopilot/agent-task";
 import { autopilotDryRun, autopilotRepo, defaultAutopilotRepo } from "@/lib/autopilot/repo";
 import { autopilotUser } from "@/lib/autopilot/scope";
-import { listExperiments, listSignals, log, updateExperiment } from "@/lib/autopilot/store";
+import { listExperiments, listSignals, log, setSignalStatus, updateExperiment } from "@/lib/autopilot/store";
 import { isLocalSource } from "@/lib/autopilot/source";
 import type { Experiment, Signal } from "@/lib/autopilot/types";
 import { client, coderConfigured, managedSessionView, SESSION_BUDGET_CENTS } from "@/lib/coder/sessions";
@@ -48,8 +48,15 @@ export async function startAgentBuild(experiment: Experiment, signal: Signal | u
 }
 
 async function failBuild(experiment: Experiment, reason: string): Promise<string> {
-  const note = `Could not build yet: ${reason}`;
-  await updateExperiment(experiment.id, { coderSessionId: null, agentFailed: true, note });
+  const note = `Could not build: ${reason}`;
+  await updateExperiment(experiment.id, {
+    status: "failed",
+    coderSessionId: null,
+    agentFailed: true,
+    endedAt: new Date().toISOString(),
+    note,
+  });
+  await setSignalStatus(experiment.signalId, "open");
   await log("build", `${note} (“${experiment.title}”).`, experiment.id);
   return note;
 }
@@ -94,9 +101,12 @@ async function followOne(experiment: Experiment, signal: Signal | undefined): Pr
   if (view.status === "idle" && view.stopReason === "end_turn" && view.branch) {
     return finishBuild(experiment, signal, view.branch);
   }
+  const said = [...view.items].reverse().find((item) => item.kind === "agent" && item.text);
+  const explanation = said && said.kind === "agent" ? said.text.split("\n").map((line) => line.trim()).find(Boolean)?.slice(0, 240) : "";
   const reason = view.status === "terminated" ? "the coding session terminated" :
     view.stopReason === "budget_reached" ? "the coding session reached its budget" :
-      view.branch ? "the coding session did not finish normally" : "the coding agent did not report a branch";
+      view.branch ? "the coding session did not finish normally" :
+        explanation || "the coding agent did not report a branch";
   return failBuild(experiment, reason);
 }
 
