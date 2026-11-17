@@ -56,9 +56,9 @@ export function InstallSite() {
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-6">
       <header>
-        <h1 className="text-lg font-semibold">Install Autopilot</h1>
+        <h1 className="text-lg font-semibold">Install Kismet experiments</h1>
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          Paste this tag into every page of your site, before &lt;/body&gt;. Autopilot then measures experiments it ships
+          Paste this tag into every page of your site, before &lt;/body&gt;. Kismet then measures experiments it ships
           to your repository.
         </p>
       </header>

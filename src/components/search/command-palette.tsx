@@ -29,7 +29,7 @@ import { ReportProblem } from "@/components/feedback/report-problem";
 
 const NAV_ITEMS = [
   { label: "Chat", href: "/ai", icon: MessageSquare },
-  { label: "Experiments", href: "/autopilot", icon: FlaskConical },
+  { label: "Experiments", href: "/experiments", icon: FlaskConical },
   { label: "Connections", href: "/settings/connectors", icon: Boxes },
   { label: "Agents", href: "/agents", icon: Boxes },
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -40,7 +40,6 @@ const NAV_ITEMS = [
   { label: "Timeline", href: "/timeline", icon: Clock },
   { label: "Graph View", href: "/graph", icon: GitBranch },
   { label: "Analytics", href: "/analytics", icon: BarChart3 },
-  { label: "Demo lab", href: "/experiments", icon: FlaskConical },
   { label: "Decisions", href: "/decisions", icon: Scale },
 ];
 

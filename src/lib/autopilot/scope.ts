@@ -5,7 +5,7 @@ const users = new AsyncLocalStorage<string>();
 /** The account whose Autopilot rows the current call may read or write. */
 export function autopilotUser(): string {
   const userId = users.getStore();
-  if (!userId) throw new Error("Autopilot has no user.");
+  if (!userId) throw new Error("Kismet has no user.");
   return userId;
 }
 

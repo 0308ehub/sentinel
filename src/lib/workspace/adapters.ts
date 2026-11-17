@@ -10,7 +10,6 @@ import {
 } from "@/lib/chat/session";
 import { designDraftIsEmpty, readDesignDraft, replaceDesignDraft, resetDesignDraft, subscribeDesignDraft } from "@/lib/design/draft";
 import { graphStore } from "@/lib/graph/graph-store";
-import { labIsEmpty, readLabSync, replaceLab, resetLab, subscribeLab } from "@/lib/lab/store";
 import { readOnboarding, replaceOnboarding, resetOnboarding, subscribeOnboarding, EMPTY_ONBOARDING } from "@/lib/onboarding";
 import { readWorkspace, replaceWorkspace, resetWorkspace, subscribeWorkspace, workspaceIsDefault } from "@/lib/settings/workspace";
 import { readWorkContext, replaceWorkContext, resetWorkContext, subscribeWorkContext } from "@/lib/work-context";
@@ -165,15 +164,6 @@ const agentsSyncAdapter: SyncAdapter<ReturnType<typeof readFleetSync>> = {
   subscribe: (listener) => subscribeWhenChanged(readFleetSync, subscribeFleet, listener),
 };
 
-const labSyncAdapter: SyncAdapter<ReturnType<typeof readLabSync>> = {
-  key: "lab",
-  read: readLabSync,
-  apply: replaceLab,
-  reset: resetLab,
-  isEmpty: labIsEmpty,
-  subscribe: (listener) => subscribeWhenChanged(readLabSync, subscribeLab, listener),
-};
-
 const designSyncAdapter: SyncAdapter<ReturnType<typeof readDesignDraft>> = {
   key: "design",
   read: readDesignDraft,
@@ -217,7 +207,6 @@ const adapterByKey: Record<StateKey, SyncAdapter<unknown>> = {
   onboarding: listed(onboardingSyncAdapter),
   settings: listed(settingsSyncAdapter),
   agents: listed(agentsSyncAdapter),
-  lab: listed(labSyncAdapter),
   design: listed(designSyncAdapter),
   notifications: listed(notificationsSyncAdapter),
   analytics: listed(analyticsSyncAdapter),

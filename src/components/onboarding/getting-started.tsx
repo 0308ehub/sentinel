@@ -17,7 +17,7 @@ const ITEMS = [
   { key: "github", label: "Connect GitHub", href: "/settings/connectors/github" },
   { key: "repo", label: "Choose the repository experiments ship to", href: "/settings/connectors/github" },
   { key: "evidence", label: "Connect Slack or Jira, or tell Kismet what customers say", href: "/settings/connectors" },
-  { key: "autopilot", label: "Run your first experiment loop", href: "/autopilot" },
+  { key: "autopilot", label: "Run your first experiment loop", href: "/experiments" },
 ] as const;
 
 export function GettingStarted() {

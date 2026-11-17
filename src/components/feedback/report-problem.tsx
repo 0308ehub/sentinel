@@ -42,7 +42,7 @@ export function ReportProblem({
         return;
       }
       setMessage("");
-      setStatus("Thanks — this goes straight to the Kismet team's Autopilot.");
+      setStatus("Thanks — this goes straight to the Kismet team.");
     } catch {
       setStatus("Could not send feedback.");
     } finally {

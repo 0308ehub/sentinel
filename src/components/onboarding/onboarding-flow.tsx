@@ -71,7 +71,7 @@ export function OnboardingFlow({ step }: { step: string }) {
       onFinish={() => {
         writeOnboarding({ completed: true, step: "evidence" });
         void fetch("/api/autopilot/tick", { method: "POST", keepalive: true }).catch(() => undefined);
-        router.push("/autopilot");
+        router.push("/experiments");
       }}
     />
   );
@@ -202,7 +202,7 @@ function GitHubStep({ onBack, onNext }: { onBack: () => void; onNext: () => void
     <OnboardingShell
       step="github"
       title="Connect GitHub"
-      description="Autopilot opens pull requests on your repository."
+      description="Kismet opens pull requests on your repository."
       onBack={onBack}
       onNext={onNext}
       nextDisabled={!repo || busy}
@@ -296,7 +296,7 @@ function RepoChoice({
   return (
     <div className="rounded-xl border border-[#e6e8ec] p-4">
       <p className="flex items-center gap-2 text-sm font-medium"><Check className="h-4 w-4 text-[#0571d3]" />Connected{login ? ` as ${login}` : ""}</p>
-      <Field label="Repository Autopilot ships to" className="mt-4">
+      <Field label="Repository Kismet ships to" className="mt-4">
         <select value={repo} onChange={(event) => onChange(event.target.value)} disabled={busy} className={inputClass}>
           <option value="">Choose a repository</option>
           {repos.map((item) => <option key={item.fullName} value={item.fullName}>{item.fullName}</option>)}

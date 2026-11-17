@@ -85,7 +85,7 @@ export function GitHubView() {
     });
     if (!res.ok) {
       setTarget(previous);
-      setHint("Could not save the repository Autopilot ships to.");
+      setHint("Could not save the repository Kismet ships to.");
     }
   }
 
@@ -137,7 +137,7 @@ export function GitHubView() {
           </div>
           {hint && <p className="mt-3 text-xs text-destructive">{hint}</p>}
           <div className="mt-4 max-w-lg space-y-1">
-            <Label htmlFor="autopilot-repo">Repository Autopilot ships to</Label>
+            <Label htmlFor="autopilot-repo">Repository Kismet ships to</Label>
             <select
               id="autopilot-repo"
               className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"

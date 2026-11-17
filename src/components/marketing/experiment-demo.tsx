@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import {
   Area,
@@ -16,7 +16,7 @@ import {
 import { BarChart3, Boxes, FlaskConical, GitPullRequest, MessageSquare, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AgentMark } from "@/components/inbox/agent-mark";
-import { obrienFlemingBoundaries } from "@/lib/lab/stats";
+import { obrienFlemingBoundaries } from "@/lib/experiments/stats";
 import { cn } from "@/lib/utils";
 
 const BOUNDARIES = obrienFlemingBoundaries(5, 0.05);
@@ -143,9 +143,7 @@ export function ExperimentDemo({ surface = "card" }: { surface?: "card" | "windo
   const [scene, setScene] = useState(0);
   const [progress, setProgress] = useState(0);
   const [reduceMotion, setReduceMotion] = useState(false);
-  const sceneRef = useRef(0);
   const current = SCENES[scene]!;
-  sceneRef.current = scene;
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -156,21 +154,14 @@ export function ExperimentDemo({ surface = "card" }: { surface?: "card" | "windo
   }, []);
 
   useEffect(() => {
-    if (!reduceMotion) return;
-    setProgress(1);
-  }, [reduceMotion, scene]);
-
-  useEffect(() => {
     if (reduceMotion) return;
     const id = scene;
     const started = performance.now();
     let frame = 0;
     const step = (now: number) => {
-      if (sceneRef.current !== id) return;
       const next = (now - started) / SCENES[id]!.ms;
       if (next >= 1) {
         const nextId = (id + 1) % SCENES.length;
-        sceneRef.current = nextId;
         setScene(nextId);
         setProgress(0);
         return;
@@ -183,7 +174,6 @@ export function ExperimentDemo({ surface = "card" }: { surface?: "card" | "windo
   }, [reduceMotion, scene]);
 
   function jump(index: number) {
-    sceneRef.current = index;
     setScene(index);
     setProgress(reduceMotion ? 1 : 0);
   }

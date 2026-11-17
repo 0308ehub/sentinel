@@ -116,7 +116,7 @@ export async function buildCleanup(): Promise<string | null> {
         `Keeps ${kept} and removes the \`${experiment.flag}\` switch from \`${file.path}\`.`,
         `Everyone already sees ${kept}, so merging this changes no one's experience.`,
         "",
-        "_Opened by Kismet Autopilot._",
+        "_Opened by Kismet._",
       ].join("\n"),
     });
     await updateExperiment(experiment.id, {
@@ -174,7 +174,7 @@ export async function followCleanups(): Promise<string | null> {
       await closePull(repo, number);
       await updateExperiment(experiment.id, {
         cleanupStatus: "failed",
-        cleanupNote: "The cleanup's preview build failed, so Autopilot closed it. The switch stays in the code.",
+        cleanupNote: "The cleanup's preview build failed, so Kismet closed it. The switch stays in the code.",
       });
       await log("cleanup", `Cleanup build failed for “${experiment.title}”; closed PR #${number}.`, experiment.id);
     }

@@ -1,16 +1,13 @@
 import { AppShell } from "@/components/layout/app-shell";
-import { GraphExperimentsPage } from "@/components/experiments/graph-experiments-page";
-import { ExperimentList } from "@/components/lab/experiment-list";
-import { labDemoEnabled } from "@/lib/lab/demo-mode";
+import { AutopilotView } from "@/components/autopilot/autopilot-view";
 import { privatePage } from "@/lib/page-meta";
 
-export const metadata = privatePage("Experiments", "Experiments in this workspace.");
+export const metadata = privatePage("Experiments", "Work the agents are ready to take on.");
 
-export default function ExperimentsPage() {
-  if (!labDemoEnabled()) return <GraphExperimentsPage />;
+export default function AutopilotPage() {
   return (
     <AppShell>
-      <ExperimentList />
+      <AutopilotView />
     </AppShell>
   );
 }

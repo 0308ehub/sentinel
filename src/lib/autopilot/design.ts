@@ -15,7 +15,7 @@ function productContext(): string {
     process.env.AUTOPILOT_PRODUCT_CONTEXT?.trim() ||
     [
       "Kismet is a Next.js web app for product managers.",
-      "Pages: /ai (chat), /autopilot, /dashboard, /explorer, /features (feature list), /features/[id], /board, /timeline, /graph,",
+      "Pages: /ai (chat), /experiments, /dashboard, /explorer, /features (feature list), /features/[id], /board, /timeline, /graph,",
       "/analytics, /experiments, /decisions, /connectors, /settings, /settings/connectors/*.",
       "Creating a feature today happens through the ⌘K command palette item 'Propose feature…', which opens a dialog",
       "whose submit button is labelled 'Propose & open workspace'.",

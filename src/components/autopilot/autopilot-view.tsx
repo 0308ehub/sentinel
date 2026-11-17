@@ -143,7 +143,7 @@ export function AutopilotView() {
   if (!state) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading Autopilot…
+        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading experiments…
       </div>
     );
   }
@@ -171,7 +171,7 @@ export function AutopilotView() {
                     <a href="/settings/connectors/github" className="underline underline-offset-2">
                       Choose one in Settings → Connectors → GitHub
                     </a>{" "}
-                    so Autopilot can build experiments.
+                    so Kismet can build experiments.
                   </>
                 )}
               </p>
@@ -184,7 +184,7 @@ export function AutopilotView() {
 
           {!state.configured || state.error ? (
             <p className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-              {state.error ?? "Autopilot needs a database. Set KISMET_DATABASE_URL and restart."}
+              {state.error ?? "Kismet needs a database. Set KISMET_DATABASE_URL and restart."}
             </p>
           ) : (
             <p className="text-sm">
@@ -218,7 +218,7 @@ export function AutopilotView() {
           )}
           {state.dryRun && (
             <p className="rounded-md bg-muted p-3 text-xs text-muted-foreground">
-              Dry run: Autopilot writes changes but never pushes, merges or closes anything on GitHub.
+              Dry run: Kismet writes changes but never pushes, merges or closes anything on GitHub.
             </p>
           )}
           {message && <p className="rounded-md bg-muted p-3 text-xs text-muted-foreground">{message}</p>}
@@ -315,7 +315,7 @@ export function AutopilotView() {
 
         {state.activity.length > 0 && (
           <details className="text-xs text-muted-foreground">
-            <summary className="cursor-pointer select-none">What Autopilot did recently</summary>
+            <summary className="cursor-pointer select-none">What Kismet did recently</summary>
             <ul className="mt-2 space-y-1">
               {state.activity
                 .filter((a) => a.kind !== "tick")

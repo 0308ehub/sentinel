@@ -5,7 +5,6 @@ export const STATE_KEYS = [
   "onboarding",
   "settings",
   "agents",
-  "lab",
   "design",
   "notifications",
   "analytics",

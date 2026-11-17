@@ -6,7 +6,7 @@ import {
   obrienFlemingBoundaries,
   samplesPerArm,
   srmPValue,
-} from "../src/lib/lab/stats.ts";
+} from "../src/lib/experiments/stats.ts";
 
 test("normal CDF and inverse agree", () => {
   for (const p of [0.0001, 0.01, 0.1, 0.5, 0.9, 0.99, 0.9999])

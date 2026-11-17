@@ -32,7 +32,7 @@ function labelFor(target: Element): string | null {
   return label ? label.slice(0, 80) : null;
 }
 
-/** Assigns this visitor to running experiments and records page views and clicks for Autopilot. */
+/** Assigns this visitor to running experiments and records page views and clicks for Kismet. */
 export function ExperimentProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [visitor] = useState(() => (typeof document === "undefined" ? "" : readVisitor()));

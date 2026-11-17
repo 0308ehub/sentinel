@@ -13,7 +13,6 @@ test("synced keys stay explicit", () => {
     "onboarding",
     "settings",
     "agents",
-    "lab",
     "design",
     "notifications",
     "analytics",

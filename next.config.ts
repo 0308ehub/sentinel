@@ -16,6 +16,12 @@ if (process.env.VERCEL === "1") {
 }
 
 const nextConfig: NextConfig = {
+  async redirects() {
+    return [
+      { source: "/autopilot", destination: "/experiments", permanent: true },
+      { source: "/autopilot/install", destination: "/experiments/install", permanent: true },
+    ];
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

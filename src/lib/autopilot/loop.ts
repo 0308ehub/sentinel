@@ -147,6 +147,6 @@ export async function autopilotState(): Promise<AutopilotState> {
       };
     });
   } catch (error) {
-    return { ...empty, error: error instanceof Error ? error.message : "Autopilot could not reach its database." };
+    return { ...empty, error: error instanceof Error ? error.message : "Kismet could not reach its database." };
   }
 }

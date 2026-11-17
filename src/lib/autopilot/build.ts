@@ -79,7 +79,7 @@ async function writeChange(
   const holder = primary ? locked.get(primary.path) : undefined;
   if (holder) throw new FileBusy(`Waiting for “${holder.title}” to finish: it changes ${primary.path}, which this needs too.`);
   const editable = files.filter((f) => /^\s*["']use client["']/.test(f.content) && !locked.has(f.path));
-  if (editable.length === 0) throw new Error("None of the relevant files is a client component Autopilot can edit.");
+  if (editable.length === 0) throw new Error("None of the relevant files is a client component Kismet can edit.");
   const text = await askForJson(
     [
       "Edit exactly one file to add an A/B experiment. Return JSON {path, content, summary}.",
@@ -131,10 +131,10 @@ function pullBody(experiment: Experiment, signal: Signal | undefined, summary: s
     `### Why (${evidence.length} pieces of evidence${synthetic ? `, ${synthetic} synthetic` : ""})`,
     ...evidence.slice(0, 8).map((e) => `- ${e.synthetic ? "_(synthetic)_ " : ""}[${e.source}] ${e.title}`),
     "",
-    `The change is dark until Autopilot starts the experiment (flag \`${experiment.flag}\`, 50/50 split).`,
-    "Approve it from Kismet's Autopilot page, or merge this PR — merging is the approval.",
+    `The change is dark until Kismet starts the experiment (flag \`${experiment.flag}\`, 50/50 split).`,
+    "Approve it from Kismet's Experiments page, or merge this PR — merging is the approval.",
     "",
-    "_Opened by Kismet Autopilot._",
+    "_Opened by Kismet._",
   ]
     .filter((line) => line !== "")
     .join("\n");
@@ -224,7 +224,7 @@ export async function followPulls(start: (experiment: Experiment) => Promise<unk
       await updateExperiment(experiment.id, {
         status: "failed",
         endedAt: new Date().toISOString(),
-        note: "The preview build failed, so Autopilot closed the PR and will try another version.",
+        note: "The preview build failed, so Kismet closed the PR and will try another version.",
       });
       await setSignalStatus(experiment.signalId, "open");
       await log("build", `Preview build failed for “${experiment.title}”; closed PR #${experiment.prNumber}.`, experiment.id);

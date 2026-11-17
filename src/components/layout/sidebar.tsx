@@ -23,7 +23,6 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
-  Bot,
   Boxes,
   CircleAlert,
   ChevronRight,
@@ -54,7 +53,7 @@ type NavItem = { id: string; label: string; href: string; icon: typeof MessageSq
 // What a new user needs: talk to Kismet and see the experiments it runs.
 const PRIMARY: NavItem[] = [
   { id: "chat", label: "Chat", href: "/ai", icon: MessageSquare },
-  { id: "autopilot", label: "Experiments", href: "/autopilot", icon: FlaskConical },
+  { id: "experiments", label: "Experiments", href: "/experiments", icon: FlaskConical },
   { id: "features", label: "Features", href: "/features", icon: Layers },
   { id: "graph", label: "Graph", href: "/graph", icon: GitBranch },
 ];
@@ -69,7 +68,6 @@ const MORE: NavItem[] = [
   { id: "design", label: "Design", href: "/design", icon: Frame },
   { id: "explorer", label: "Explorer", href: "/explorer", icon: FolderTree },
   { id: "agents", label: "Agents", href: "/agents", icon: Boxes },
-  { id: "experiments", label: "Demo lab", href: "/experiments", icon: Bot },
 ];
 
 const MORE_KEY = "kismet-nav-more-open";

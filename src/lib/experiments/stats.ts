@@ -1,5 +1,6 @@
-import type { ArmMeasure, ExpectedChange, ExperimentMetric, ReadoutState } from "@/lib/experiments/allocation";
-import { metricValue } from "@/lib/experiments/allocation";
+import type { ArmMeasure, ExpectedChange, ExperimentMetric, ReadoutState } from "./allocation.ts";
+
+export * from "./legacy-stats.ts";
 
 const Z_ALPHA = 1.959963984540054;
 const Z_BETA = 0.8416212335729143;
@@ -9,6 +10,13 @@ export interface CompareResult {
   pValue: number | null;
   ciLow: number | null;
   ciHigh: number | null;
+}
+
+function metricValue(arm: ArmMeasure, metric: ExperimentMetric): number | null {
+  if (metric === "conversion") return arm.conversion;
+  if (metric === "orders") return arm.ordersPerUser;
+  if (metric === "revenue") return arm.revenuePerUser;
+  return arm.aov;
 }
 
 export function compareArms(control: ArmMeasure, treatment: ArmMeasure, metric: ExperimentMetric): CompareResult {

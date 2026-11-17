@@ -10,7 +10,7 @@ export function defaultAutopilotRepo(): string {
   return process.env.AUTOPILOT_REPO?.trim() || "0308ehub/sentinel";
 }
 
-export const NO_REPO_MESSAGE = "Choose the repository Autopilot ships to in Settings → Connectors → GitHub.";
+export const NO_REPO_MESSAGE = "Choose the repository Kismet ships to in Settings → Connectors → GitHub.";
 
 /**
  * The repository chosen by the account whose loop is running, or the signed-in account.
