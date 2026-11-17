@@ -1,4 +1,5 @@
 import { autopilotConfigured } from "@/lib/autopilot/db";
+import { siteAutopilotUser, withAutopilotUser } from "@/lib/autopilot/scope";
 import { addEvents, type NewEvent } from "@/lib/autopilot/store";
 import type { Arm } from "@/lib/autopilot/assign";
 
@@ -62,8 +63,10 @@ export async function POST(request: Request) {
       synthetic: false,
     });
   }
+  const userId = siteAutopilotUser();
+  if (!userId) return new Response(null, { status: 204 });
   try {
-    await addEvents(events);
+    await withAutopilotUser(userId, () => addEvents(events));
   } catch (error) {
     console.error("[autopilot] events", error);
   }

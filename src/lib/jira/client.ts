@@ -1,6 +1,6 @@
 import "server-only";
 
-import { currentUserId } from "@/lib/connections/current";
+import { actingUserId } from "@/lib/connections/current";
 import { getConnection } from "@/lib/connections/store";
 import type { JiraIssue, JiraStatus } from "@/lib/jira/types";
 
@@ -70,7 +70,7 @@ export function normalizeJiraConfig(secret: JiraSecret): JiraConfig {
 }
 
 async function readConfig(): Promise<JiraConfig | null> {
-  const userId = await currentUserId();
+  const userId = await actingUserId();
   if (userId) {
     try {
       const stored = await getConnection<JiraSecret>(userId, "jira");

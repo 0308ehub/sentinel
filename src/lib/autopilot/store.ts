@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db, newId } from "@/lib/autopilot/db";
+import { autopilotUser } from "@/lib/autopilot/scope";
 import { parseMetricSpec, type Arm, type FlagState, type MetricSpec } from "@/lib/autopilot/assign";
 import {
   READY_MIN_EVIDENCE,
@@ -17,6 +18,24 @@ import {
 } from "@/lib/autopilot/types";
 
 type Row = Record<string, unknown>;
+
+function scopeUser(): string {
+  return autopilotUser();
+}
+
+/** Rows written before accounts were split belong to the deployment owner. */
+export async function claimLegacyRows(userId: string): Promise<void> {
+  const named = process.env.KISMET_AUTOPILOT_USER_ID?.trim();
+  const owner = named || (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.NODE_ENV !== "production" ? "local" : "");
+  if (!owner || userId !== owner) return;
+  const sql = await db();
+  await sql`update kismet.evidence set user_id = ${userId} where user_id = ''`;
+  await sql`update kismet.signals set user_id = ${userId} where user_id = ''`;
+  await sql`update kismet.experiments set user_id = ${userId} where user_id = ''`;
+  await sql`update kismet.flags set user_id = ${userId} where user_id = ''`;
+  await sql`update kismet.events set user_id = ${userId} where user_id = ''`;
+  await sql`update kismet.activity set user_id = ${userId} where user_id = ''`;
+}
 
 const iso = (value: unknown): string => (value instanceof Date ? value.toISOString() : String(value));
 const isoOrNull = (value: unknown): string | null => (value == null ? null : iso(value));
@@ -85,8 +104,10 @@ export interface NewEvidence {
 export async function addEvidence(items: NewEvidence[]): Promise<number> {
   if (items.length === 0) return 0;
   const sql = await db();
+  const userId = scopeUser();
   const rows = items.map((item) => ({
     id: newId("ev"),
+    user_id: userId,
     source: item.source,
     synthetic: item.synthetic,
     title: item.title.slice(0, 300),
@@ -102,7 +123,7 @@ export async function addEvidence(items: NewEvidence[]): Promise<number> {
 export async function unassignedEvidence(limit: number): Promise<Evidence[]> {
   const sql = await db();
   const rows = await sql`
-    select * from kismet.evidence where signal_id is null order by occurred_at asc limit ${limit}
+    select * from kismet.evidence where user_id = ${scopeUser()} and signal_id is null order by occurred_at asc limit ${limit}
   `;
   return rows.map(toEvidence);
 }
@@ -111,8 +132,8 @@ export async function createSignal(input: { title: string; problem: string; area
   const sql = await db();
   const id = newId("sig");
   await sql`
-    insert into kismet.signals (id, title, problem, area)
-    values (${id}, ${input.title.slice(0, 200)}, ${input.problem.slice(0, 1000)}, ${input.area.slice(0, 120)})
+    insert into kismet.signals (id, user_id, title, problem, area)
+    values (${id}, ${scopeUser()}, ${input.title.slice(0, 200)}, ${input.problem.slice(0, 1000)}, ${input.area.slice(0, 120)})
   `;
   return id;
 }
@@ -120,20 +141,22 @@ export async function createSignal(input: { title: string; problem: string; area
 export async function assignEvidence(signalId: string, evidenceIds: string[]): Promise<void> {
   if (evidenceIds.length === 0) return;
   const sql = await db();
-  await sql`update kismet.evidence set signal_id = ${signalId} where id in ${sql(evidenceIds)} and signal_id is null`;
-  await sql`update kismet.signals set updated_at = now() where id = ${signalId}`;
+  const userId = scopeUser();
+  await sql`update kismet.evidence set signal_id = ${signalId} where user_id = ${userId} and id in ${sql(evidenceIds)} and signal_id is null`;
+  await sql`update kismet.signals set updated_at = now() where user_id = ${userId} and id = ${signalId}`;
 }
 
 export async function setSignalStatus(id: string, status: SignalStatus): Promise<void> {
   const sql = await db();
-  await sql`update kismet.signals set status = ${status}, updated_at = now() where id = ${id}`;
+  await sql`update kismet.signals set status = ${status}, updated_at = now() where user_id = ${scopeUser()} and id = ${id}`;
 }
 
 export async function listSignals(): Promise<Signal[]> {
   const sql = await db();
-  const signals = await sql`select * from kismet.signals order by updated_at desc limit 200`;
+  const userId = scopeUser();
+  const signals = await sql`select * from kismet.signals where user_id = ${userId} order by updated_at desc limit 200`;
   const evidence = await sql`
-    select * from kismet.evidence where signal_id is not null order by occurred_at desc limit 2000
+    select * from kismet.evidence where user_id = ${userId} and signal_id is not null order by occurred_at desc limit 2000
   `;
   const bySignal = new Map<string, Evidence[]>();
   for (const row of evidence) {
@@ -164,13 +187,13 @@ export async function listSignals(): Promise<Signal[]> {
 
 export async function listExperiments(): Promise<Experiment[]> {
   const sql = await db();
-  const rows = await sql`select * from kismet.experiments order by created_at desc limit 100`;
+  const rows = await sql`select * from kismet.experiments where user_id = ${scopeUser()} order by created_at desc limit 100`;
   return rows.map(toExperiment);
 }
 
 export async function getExperiment(id: string): Promise<Experiment | null> {
   const sql = await db();
-  const rows = await sql`select * from kismet.experiments where id = ${id}`;
+  const rows = await sql`select * from kismet.experiments where user_id = ${scopeUser()} and id = ${id}`;
   return rows[0] ? toExperiment(rows[0]) : null;
 }
 
@@ -191,9 +214,9 @@ export async function createExperiment(input: {
   const id = newId("exp");
   await sql`
     insert into kismet.experiments
-      (id, signal_id, version, title, hypothesis, metric, metric_spec, page, guardrail, control, treatment, flag, status)
+      (id, user_id, signal_id, version, title, hypothesis, metric, metric_spec, page, guardrail, control, treatment, flag, status)
     values
-      (${id}, ${input.signalId}, ${input.version}, ${input.title.slice(0, 200)}, ${input.hypothesis.slice(0, 1000)},
+      (${id}, ${scopeUser()}, ${input.signalId}, ${input.version}, ${input.title.slice(0, 200)}, ${input.hypothesis.slice(0, 1000)},
        ${input.metric.slice(0, 120)}, ${sql.json(input.metricSpec)}, ${input.page.slice(0, 200)}, ${input.guardrail.slice(0, 300)}, ${input.control.slice(0, 500)},
        ${input.treatment.slice(0, 500)}, ${input.flag}, 'building')
   `;
@@ -242,7 +265,7 @@ export async function updateExperiment(
   if (patch.startedAt !== undefined) columns.started_at = patch.startedAt;
   if (patch.endedAt !== undefined) columns.ended_at = patch.endedAt;
   if (Object.keys(columns).length === 0) return;
-  await sql`update kismet.experiments set ${sql(columns)} where id = ${id}`;
+  await sql`update kismet.experiments set ${sql(columns)} where user_id = ${scopeUser()} and id = ${id}`;
 }
 
 export async function log(kind: string, message: string, ref?: string): Promise<void> {
@@ -250,16 +273,17 @@ export async function log(kind: string, message: string, ref?: string): Promise<
   if (kind === "error") {
     // The same failure repeats every run until someone fixes it; record it once a day.
     const [recent] = await sql`
-      select 1 from kismet.activity where kind = 'error' and message = ${message.slice(0, 500)} and at > now() - interval '1 day' limit 1
+      select 1 from kismet.activity
+      where user_id = ${scopeUser()} and kind = 'error' and message = ${message.slice(0, 500)} and at > now() - interval '1 day' limit 1
     `;
     if (recent) return;
   }
-  await sql`insert into kismet.activity (kind, message, ref) values (${kind}, ${message.slice(0, 500)}, ${ref ?? null})`;
+  await sql`insert into kismet.activity (user_id, kind, message, ref) values (${scopeUser()}, ${kind}, ${message.slice(0, 500)}, ${ref ?? null})`;
 }
 
 export async function listActivity(limit = 40): Promise<Activity[]> {
   const sql = await db();
-  const rows = await sql`select * from kismet.activity order by id desc limit ${limit}`;
+  const rows = await sql`select * from kismet.activity where user_id = ${scopeUser()} order by id desc limit ${limit}`;
   return rows.map((row) => ({
     id: Number(row.id),
     at: iso(row.at),
@@ -271,7 +295,7 @@ export async function listActivity(limit = 40): Promise<Activity[]> {
 
 export async function lastRunAt(): Promise<string | null> {
   const sql = await db();
-  const rows = await sql`select max(at) as at from kismet.activity where kind = 'tick'`;
+  const rows = await sql`select max(at) as at from kismet.activity where user_id = ${scopeUser()} and kind = 'tick'`;
   return isoOrNull(rows[0]?.at);
 }
 
@@ -279,7 +303,7 @@ export async function evidenceCounts(sinceDays: number): Promise<{ total: number
   const sql = await db();
   const rows = await sql`
     select count(*)::int as total, count(*) filter (where not synthetic)::int as real
-    from kismet.evidence where occurred_at > now() - make_interval(days => ${sinceDays})
+    from kismet.evidence where user_id = ${scopeUser()} and occurred_at > now() - make_interval(days => ${sinceDays})
   `;
   return { total: Number(rows[0]?.total ?? 0), real: Number(rows[0]?.real ?? 0) };
 }
@@ -289,12 +313,13 @@ export async function withTickLock<T>(fn: () => Promise<T>): Promise<T | null> {
   const sql = await db();
   return sql.reserve().then(async (conn) => {
     try {
-      const [{ locked }] = await conn`select pg_try_advisory_lock(424242) as locked`;
+      const userId = scopeUser();
+      const [{ locked }] = await conn`select pg_try_advisory_lock(hashtext(${userId})) as locked`;
       if (!locked) return null;
       try {
         return await fn();
       } finally {
-        await conn`select pg_advisory_unlock(424242)`;
+        await conn`select pg_advisory_unlock(hashtext(${userId}))`;
       }
     } finally {
       conn.release();
@@ -315,7 +340,7 @@ function toFlag(row: Row): FlagState {
 
 export async function listFlags(): Promise<FlagState[]> {
   const sql = await db();
-  const rows = await sql`select * from kismet.flags where status <> 'off'`;
+  const rows = await sql`select * from kismet.flags where user_id = ${scopeUser()} and status <> 'off'`;
   return rows.map(toFlag);
 }
 
@@ -326,18 +351,19 @@ export async function setFlag(
   slice?: { layer: string | null; slotStart: number; slotEnd: number }
 ): Promise<void> {
   const sql = await db();
+  const userId = scopeUser();
   if (slice) {
     await sql`
-      insert into kismet.flags (key, status, treatment_pct, layer, slot_start, slot_end)
-      values (${key}, ${status}, ${treatmentPct}, ${slice.layer}, ${slice.slotStart}, ${slice.slotEnd})
-      on conflict (key) do update set status = excluded.status, treatment_pct = excluded.treatment_pct,
+      insert into kismet.flags (user_id, key, status, treatment_pct, layer, slot_start, slot_end)
+      values (${userId}, ${key}, ${status}, ${treatmentPct}, ${slice.layer}, ${slice.slotStart}, ${slice.slotEnd})
+      on conflict (user_id, key) do update set status = excluded.status, treatment_pct = excluded.treatment_pct,
         layer = excluded.layer, slot_start = excluded.slot_start, slot_end = excluded.slot_end, updated_at = now()
     `;
     return;
   }
   await sql`
-    insert into kismet.flags (key, status, treatment_pct) values (${key}, ${status}, ${treatmentPct})
-    on conflict (key) do update set status = excluded.status, treatment_pct = excluded.treatment_pct, updated_at = now()
+    insert into kismet.flags (user_id, key, status, treatment_pct) values (${userId}, ${key}, ${status}, ${treatmentPct})
+    on conflict (user_id, key) do update set status = excluded.status, treatment_pct = excluded.treatment_pct, updated_at = now()
   `;
 }
 
@@ -354,7 +380,9 @@ export interface NewEvent {
 export async function addEvents(events: NewEvent[]): Promise<void> {
   if (events.length === 0) return;
   const sql = await db();
+  const userId = scopeUser();
   const rows = events.map((e) => ({
+    user_id: userId,
     visitor: e.visitor.slice(0, 64),
     name: e.name,
     page: e.page.slice(0, 200),
@@ -384,12 +412,12 @@ export async function countArms(flag: string, since: string, spec: MetricSpec): 
     with exposed as (
       select visitor, min(arms ->> ${flag}) as arm, bool_or(synthetic) as synthetic
       from kismet.events
-      where at >= ${since} and arms ? ${flag}
+      where user_id = ${scopeUser()} and at >= ${since} and arms ? ${flag}
       group by visitor
     ),
     converted as (
       select distinct e.visitor from kismet.events e
-      where e.at >= ${since} and e.arms ? ${flag} and ${converts}
+      where e.user_id = ${scopeUser()} and e.at >= ${since} and e.arms ? ${flag} and ${converts}
     )
     select x.arm,
            count(*)::int as visitors,
@@ -427,12 +455,12 @@ export async function countArmsAcross(flag: string, other: string, since: string
     with exposed as (
       select visitor, min(arms ->> ${flag}) as arm, min(arms ->> ${other}) as other_arm
       from kismet.events
-      where at >= ${since} and arms ? ${flag} and arms ? ${other}
+      where user_id = ${scopeUser()} and at >= ${since} and arms ? ${flag} and arms ? ${other}
       group by visitor
     ),
     converted as (
       select distinct e.visitor from kismet.events e
-      where e.at >= ${since} and e.arms ? ${flag} and ${converts}
+      where e.user_id = ${scopeUser()} and e.at >= ${since} and e.arms ? ${flag} and ${converts}
     )
     select x.arm, x.other_arm, count(*)::int as visitors, count(c.visitor)::int as conversions
     from exposed x left join converted c on c.visitor = x.visitor
@@ -460,12 +488,12 @@ export async function elementStats(sinceDays: number, minVisitors: number): Prom
   const rows = await sql`
     with views as (
       select page, count(distinct visitor)::int as visitors, bool_and(synthetic) as synthetic
-      from kismet.events where name = 'view' and at > now() - make_interval(days => ${sinceDays})
+      from kismet.events where user_id = ${scopeUser()} and name = 'view' and at > now() - make_interval(days => ${sinceDays})
       group by page having count(distinct visitor) >= ${minVisitors}
     ),
     clicks as (
       select page, element, count(distinct visitor)::int as clickers
-      from kismet.events where name = 'click' and at > now() - make_interval(days => ${sinceDays})
+      from kismet.events where user_id = ${scopeUser()} and name = 'click' and at > now() - make_interval(days => ${sinceDays})
       group by page, element
     )
     select v.page, c.element, v.visitors, c.clickers, v.synthetic
@@ -480,10 +508,20 @@ export async function elementStats(sinceDays: number, minVisitors: number): Prom
   }));
 }
 
+export async function knownEvidenceUrls(urls: string[]): Promise<Set<string>> {
+  const unique = [...new Set(urls.filter((url) => url.length > 0))];
+  if (unique.length === 0) return new Set();
+  const sql = await db();
+  const rows = await sql<{ url: string }[]>`
+    select url from kismet.evidence where user_id = ${scopeUser()} and url in ${sql(unique)}
+  `;
+  return new Set(rows.map((row) => row.url).filter((url): url is string => typeof url === "string"));
+}
+
 export async function hasEvidenceTitled(title: string, sinceDays: number): Promise<boolean> {
   const sql = await db();
   const rows = await sql`
-    select 1 from kismet.evidence where title = ${title} and occurred_at > now() - make_interval(days => ${sinceDays}) limit 1
+    select 1 from kismet.evidence where user_id = ${scopeUser()} and title = ${title} and occurred_at > now() - make_interval(days => ${sinceDays}) limit 1
   `;
   return rows.length > 0;
 }
@@ -491,7 +529,7 @@ export async function hasEvidenceTitled(title: string, sinceDays: number): Promi
 /** The file before and after an experiment's change, as stored when it was built. */
 export async function experimentDraft(id: string): Promise<{ path: string; content: string; original: string | null } | null> {
   const sql = await db();
-  const [row] = await sql`select draft_path, draft, original from kismet.experiments where id = ${id}`;
+  const [row] = await sql`select draft_path, draft, original from kismet.experiments where user_id = ${scopeUser()} and id = ${id}`;
   if (!row?.draft_path || !row?.draft) return null;
   return { path: String(row.draft_path), content: String(row.draft), original: (row.original as string | null) ?? null };
 }

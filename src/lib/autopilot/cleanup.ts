@@ -100,7 +100,7 @@ export async function buildCleanup(): Promise<string | null> {
     }
 
     const pull = await openPullRequest({
-      fullName: autopilotRepo(),
+      fullName: await autopilotRepo(),
       base: await baseBranch(),
       branch: `autopilot/${experiment.flag}-cleanup`,
       path: file.path,
@@ -142,7 +142,7 @@ export async function approveCleanup(experiment: Experiment): Promise<string> {
     await log("cleanup", `Approved the cleanup for “${experiment.title}” (dry run).`, experiment.id);
     return "Approved (dry run: nothing was merged).";
   }
-  await mergePull(autopilotRepo(), experiment.cleanup.prNumber, `Finish experiment: ${experiment.title}`);
+  await mergePull(await autopilotRepo(), experiment.cleanup.prNumber, `Finish experiment: ${experiment.title}`);
   await updateExperiment(experiment.id, { cleanupStatus: "merged", cleanupNote: "Merged. The experiment switch is gone." });
   await log("cleanup", `Merged the cleanup for “${experiment.title}”.`, experiment.id);
   return "Merged. The experiment code is cleaned up.";
@@ -150,7 +150,7 @@ export async function approveCleanup(experiment: Experiment): Promise<string> {
 
 export async function dismissCleanup(experiment: Experiment): Promise<string> {
   if (experiment.cleanup?.status !== "awaiting") throw new Error("There is no cleanup waiting for approval.");
-  if (experiment.cleanup.prNumber) await closePull(autopilotRepo(), experiment.cleanup.prNumber).catch(() => {});
+  if (experiment.cleanup.prNumber) await closePull(await autopilotRepo(), experiment.cleanup.prNumber).catch(() => {});
   await updateExperiment(experiment.id, { cleanupStatus: "closed", cleanupNote: "Dismissed by you. The switch stays in the code." });
   await log("cleanup", `You dismissed the cleanup for “${experiment.title}”.`, experiment.id);
   return "Dismissed. The experiment switch stays in the code.";
@@ -159,7 +159,7 @@ export async function dismissCleanup(experiment: Experiment): Promise<string> {
 /** Follows cleanup pull requests the same way experiment PRs are followed. */
 export async function followCleanups(): Promise<string | null> {
   if (simulated()) return null;
-  const repo = autopilotRepo();
+  const repo = await autopilotRepo();
   const waiting = (await listExperiments()).filter((e) => e.cleanup?.status === "awaiting" && e.cleanup.prNumber);
   const done: string[] = [];
   for (const experiment of waiting) {

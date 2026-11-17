@@ -119,7 +119,8 @@ export interface AutopilotState {
   lastRunAt: string | null;
   synthetic: boolean;
   dryRun: boolean;
-  repo: string;
+  /** Where this account's changes go; null until the account chooses a repository. */
+  repo: string | null;
   summary: {
     evidenceThisWeek: number;
     realThisWeek: number;

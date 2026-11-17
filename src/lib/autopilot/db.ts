@@ -102,6 +102,7 @@ create table if not exists kismet.flags (
 alter table kismet.flags add column if not exists layer text;
 alter table kismet.flags add column if not exists slot_start integer not null default 0;
 alter table kismet.flags add column if not exists slot_end integer not null default 100;
+alter table kismet.flags add column if not exists user_id text not null default '';
 
 create table if not exists kismet.events (
   id bigserial primary key,
@@ -114,6 +115,7 @@ create table if not exists kismet.events (
   synthetic boolean not null default false
 );
 create index if not exists events_name_idx on kismet.events (name, element);
+alter table kismet.events add column if not exists user_id text not null default '';
 
 create table if not exists kismet.activity (
   id bigserial primary key,
@@ -121,6 +123,43 @@ create table if not exists kismet.activity (
   kind text not null,
   message text not null,
   ref text
+);
+alter table kismet.activity add column if not exists user_id text not null default '';
+alter table kismet.evidence add column if not exists user_id text not null default '';
+alter table kismet.signals add column if not exists user_id text not null default '';
+alter table kismet.experiments add column if not exists user_id text not null default '';
+
+create index if not exists evidence_user_idx on kismet.evidence (user_id);
+create index if not exists signals_user_idx on kismet.signals (user_id);
+create index if not exists experiments_user_idx on kismet.experiments (user_id);
+create index if not exists events_user_idx on kismet.events (user_id, at);
+create index if not exists activity_user_idx on kismet.activity (user_id, id desc);
+create unique index if not exists flags_user_key on kismet.flags (user_id, key);
+create unique index if not exists experiments_user_flag on kismet.experiments (user_id, flag);
+
+-- Flag names used to be unique across the whole product. Each account can now reuse one.
+do $$
+declare row record;
+begin
+  for row in
+    select rel.relname as table_name, con.conname as constraint_name
+    from pg_constraint con
+    join pg_class rel on rel.oid = con.conrelid
+    join pg_namespace nsp on nsp.oid = rel.relnamespace
+    where nsp.nspname = 'kismet'
+      and (
+        (rel.relname = 'flags' and con.contype = 'p')
+        or (rel.relname = 'experiments' and con.contype = 'u' and pg_get_constraintdef(con.oid) = 'UNIQUE (flag)')
+      )
+  loop
+    execute format('alter table kismet.%I drop constraint %I', row.table_name, row.constraint_name);
+  end loop;
+end $$;
+
+create table if not exists kismet.autopilot_repo (
+  user_id text primary key,
+  repo text not null,
+  updated_at timestamptz not null default now()
 );
 
 create table if not exists kismet.connections (

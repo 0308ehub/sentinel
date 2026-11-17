@@ -3,7 +3,7 @@ import "server-only";
 import { readdir, readFile as readLocal } from "node:fs/promises";
 import path from "node:path";
 import { isUiPath, listUiFiles, rankUiPath, readFile, repoDefaultBranch, type GitHubFile } from "@/lib/github/client";
-import { autopilotRepo } from "@/lib/autopilot/repo";
+import { autopilotRepo, chosenAutopilotRepo } from "@/lib/autopilot/repo";
 
 // Where Autopilot reads the product's code: GitHub normally, or a local checkout
 // (AUTOPILOT_LOCAL_REPO) so the loop can be tested without touching GitHub at all.
@@ -15,8 +15,9 @@ function localRoot(): string | null {
   return process.env.AUTOPILOT_LOCAL_REPO?.trim() || null;
 }
 
-export function sourceLabel(): string {
-  return localRoot() ? "your local code" : autopilotRepo();
+/** Where this account's changes go, or null when it has not chosen a repository. */
+export async function sourceLabel(): Promise<string | null> {
+  return localRoot() ? "your local code" : chosenAutopilotRepo();
 }
 
 async function walk(root: string, dir = ""): Promise<string[]> {
@@ -32,12 +33,12 @@ async function walk(root: string, dir = ""): Promise<string[]> {
 }
 
 export async function baseBranch(): Promise<string> {
-  return localRoot() ? "local" : repoDefaultBranch(autopilotRepo());
+  return localRoot() ? "local" : repoDefaultBranch(await autopilotRepo());
 }
 
 export async function listSourceFiles(base: string, limit: number): Promise<string[]> {
   const root = localRoot();
-  if (!root) return listUiFiles(autopilotRepo(), base, limit);
+  if (!root) return listUiFiles(await autopilotRepo(), base, limit);
   const files = await walk(root);
   files.sort((a, b) => rankUiPath(a) - rankUiPath(b) || a.length - b.length);
   return files.slice(0, limit);
@@ -45,7 +46,7 @@ export async function listSourceFiles(base: string, limit: number): Promise<stri
 
 export async function readSourceFile(file: string, base: string): Promise<GitHubFile | null> {
   const root = localRoot();
-  if (!root) return readFile(autopilotRepo(), file, base);
+  if (!root) return readFile(await autopilotRepo(), file, base);
   if (!isUiPath(file)) return null;
   const content = await readLocal(path.join(root, file), "utf8").catch(() => null);
   if (content === null || Buffer.byteLength(content) > MAX_FILE_BYTES) return null;

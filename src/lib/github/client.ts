@@ -1,6 +1,6 @@
 import "server-only";
 
-import { currentUserId } from "@/lib/connections/current";
+import { actingUserId } from "@/lib/connections/current";
 import { getConnection } from "@/lib/connections/store";
 
 const API = "https://api.github.com";
@@ -62,7 +62,7 @@ interface TreePayload {
 }
 
 async function token(): Promise<string> {
-  const userId = await currentUserId();
+  const userId = await actingUserId();
   if (userId) {
     try {
       const stored = await getConnection<{ token?: unknown }>(userId, "github");

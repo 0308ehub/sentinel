@@ -123,7 +123,7 @@ export async function buildNext(): Promise<string | null> {
   const experiment = experiments.find((e) => e.status === "building" && !e.prNumber);
   if (!experiment) return null;
   const signal = (await listSignals()).find((s) => s.id === experiment.signalId);
-  const repo = autopilotRepo();
+  const repo = await autopilotRepo();
 
   try {
     const base = await baseBranch();
@@ -179,7 +179,7 @@ export async function buildNext(): Promise<string | null> {
 /** Follows open pull requests: preview build results, and merges or closes done on GitHub directly. */
 export async function followPulls(start: (experiment: Experiment) => Promise<unknown>): Promise<string | null> {
   if (autopilotDryRun() || isLocalSource()) return null;
-  const repo = autopilotRepo();
+  const repo = await autopilotRepo();
   const waiting = (await listExperiments()).filter((e) => e.status === "awaiting_approval" && e.prNumber);
   const done: string[] = [];
   for (const experiment of waiting) {

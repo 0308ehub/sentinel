@@ -1,17 +1,21 @@
 import "server-only";
 
 import { autopilotConfigured } from "@/lib/autopilot/db";
-import { autopilotDryRun } from "@/lib/autopilot/repo";
+import { autopilotDryRun, NO_REPO_MESSAGE } from "@/lib/autopilot/repo";
+import { withAutopilotUser } from "@/lib/autopilot/scope";
+import { currentUserId } from "@/lib/connections/current";
 import { isLocalSource, sourceLabel } from "@/lib/autopilot/source";
 import { buildNext, followPulls } from "@/lib/autopilot/build";
 import { buildCleanup, followCleanups } from "@/lib/autopilot/cleanup";
 import { clusterEvidence } from "@/lib/autopilot/cluster";
 import { designNext } from "@/lib/autopilot/design";
+import { workspaceEvidence } from "@/lib/autopilot/filed";
 import { analyticsFindings } from "@/lib/autopilot/findings";
 import { startExperiment, startQueued } from "@/lib/autopilot/lifecycle";
 import { measureRunning } from "@/lib/autopilot/measure";
 import { simulateTraffic } from "@/lib/autopilot/simulate";
 import {
+  claimLegacyRows,
   evidenceCounts,
   lastRunAt,
   listActivity,
@@ -41,8 +45,13 @@ async function step(name: string, result: TickResult, fn: () => Promise<string |
   }
 }
 
-/** One pass of the loop. Every step is safe to repeat, so a missed or doubled tick does no harm. */
-export async function runTick(): Promise<TickResult> {
+/** One pass of one account's loop. Every step is safe to repeat, so a missed or doubled tick does no harm. */
+export async function runTick(userId: string): Promise<TickResult> {
+  await claimLegacyRows(userId);
+  return withAutopilotUser(userId, () => runScopedTick());
+}
+
+async function runScopedTick(): Promise<TickResult> {
   const result: TickResult = { ran: false, steps: [], errors: [] };
   const outcome = await withTickLock(async () => {
     result.ran = true;
@@ -57,6 +66,7 @@ export async function runTick(): Promise<TickResult> {
     });
     await step("traffic", result, async () => (synthetic ? simulateTraffic() : null));
     await step("analytics", result, analyticsFindings);
+    await step("filed", result, workspaceEvidence);
 
     // Notice: group evidence into problems.
     await step("notice", result, async () => {
@@ -64,18 +74,23 @@ export async function runTick(): Promise<TickResult> {
       return sorted ? `Sorted ${sorted} pieces of evidence into problems.` : null;
     });
 
-    // After the gate: follow PRs, measure live experiments, and act on results.
-    await step("follow", result, () => followPulls(startExperiment));
-    await step("measure", result, measureRunning);
-    await step("queue", result, startQueued);
+    // Steps that touch code need a repository; an account that has not chosen one stops at noticing.
+    if (!(await sourceLabel())) {
+      await step("repo", result, async () => NO_REPO_MESSAGE);
+    } else {
+      // After the gate: follow PRs, measure live experiments, and act on results.
+      await step("follow", result, () => followPulls(startExperiment));
+      await step("measure", result, measureRunning);
+      await step("queue", result, startQueued);
 
-    // Decided experiments: remove the switch and the losing version from the code.
-    await step("follow-cleanup", result, followCleanups);
-    await step("cleanup", result, buildCleanup);
+      // Decided experiments: remove the switch and the losing version from the code.
+      await step("follow-cleanup", result, followCleanups);
+      await step("cleanup", result, buildCleanup);
 
-    // Before the gate: design the next experiment and build its PR.
-    await step("design", result, designNext);
-    await step("build", result, buildNext);
+      // Before the gate: design the next experiment and build its PR.
+      await step("design", result, designNext);
+      await step("build", result, buildNext);
+    }
 
     await log("tick", result.errors.length ? `Ran with ${result.errors.length} error(s).` : "Ran.");
     return result;
@@ -92,34 +107,41 @@ export async function autopilotState(): Promise<AutopilotState> {
     lastRunAt: null,
     synthetic: syntheticEnabled(),
     dryRun: autopilotDryRun() || isLocalSource(),
-    repo: sourceLabel(),
+    repo: null,
     summary: { evidenceThisWeek: 0, realThisWeek: 0, readySignals: 0, running: 0, needsYou: 0 },
   };
   if (!empty.configured) return empty;
+  const userId = await currentUserId();
+  if (!userId) return empty;
   try {
-    const [signals, experiments, activity, last, counts] = await Promise.all([
-      listSignals(),
-      listExperiments(),
-      listActivity(),
-      lastRunAt(),
-      evidenceCounts(7),
-    ]);
-    return {
-      ...empty,
-      signals,
-      experiments,
-      activity,
-      lastRunAt: last,
-      summary: {
-        evidenceThisWeek: counts.total,
-        realThisWeek: counts.real,
-        readySignals: signals.filter((s) => s.ready && s.status === "open").length,
-        running: experiments.filter((e) => e.status === "running").length,
-        needsYou: experiments.filter(
-          (e) => e.status === "awaiting_approval" || e.status === "awaiting_rollout" || e.cleanup?.status === "awaiting"
-        ).length,
-      },
-    };
+    await claimLegacyRows(userId);
+    return await withAutopilotUser(userId, async () => {
+      const [signals, experiments, activity, last, counts, repo] = await Promise.all([
+        listSignals(),
+        listExperiments(),
+        listActivity(),
+        lastRunAt(),
+        evidenceCounts(7),
+        sourceLabel(),
+      ]);
+      return {
+        ...empty,
+        repo,
+        signals,
+        experiments,
+        activity,
+        lastRunAt: last,
+        summary: {
+          evidenceThisWeek: counts.total,
+          realThisWeek: counts.real,
+          readySignals: signals.filter((s) => s.ready && s.status === "open").length,
+          running: experiments.filter((e) => e.status === "running").length,
+          needsYou: experiments.filter(
+            (e) => e.status === "awaiting_approval" || e.status === "awaiting_rollout" || e.cleanup?.status === "awaiting"
+          ).length,
+        },
+      };
+    });
   } catch (error) {
     return { ...empty, error: error instanceof Error ? error.message : "Autopilot could not reach its database." };
   }

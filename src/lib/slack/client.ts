@@ -1,6 +1,6 @@
 import "server-only";
 
-import { currentUserId } from "@/lib/connections/current";
+import { actingUserId } from "@/lib/connections/current";
 import { getConnection } from "@/lib/connections/store";
 import type { SlackChannel, SlackMessage, SlackStatus } from "@/lib/slack/types";
 
@@ -29,7 +29,7 @@ const HINTS: Record<string, string> = {
 };
 
 async function getToken(): Promise<string> {
-  const userId = await currentUserId();
+  const userId = await actingUserId();
   if (userId) {
     try {
       const connection = await getConnection<{ botToken?: unknown }>(userId, "slack");

@@ -116,6 +116,19 @@ export function AutopilotView() {
           <div className="flex items-start justify-between gap-4">
             <div>
               <h1 className="text-lg font-semibold">Autopilot</h1>
+              <p className="text-sm text-muted-foreground">
+                {state.repo ? (
+                  <>This account ships to {state.repo}.</>
+                ) : (
+                  <>
+                    No repository yet.{" "}
+                    <a href="/settings/connectors/github" className="underline underline-offset-2">
+                      Choose one in Settings → Connectors → GitHub
+                    </a>{" "}
+                    so Autopilot can build experiments.
+                  </>
+                )}
+              </p>
             </div>
             <Button onClick={runNow} disabled={running || !state.configured}>
               {running ? <Loader2 className="animate-spin" /> : <Play />}

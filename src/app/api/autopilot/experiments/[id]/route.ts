@@ -1,6 +1,8 @@
 import { approveCleanup, dismissCleanup } from "@/lib/autopilot/cleanup";
 import { approve, reject, rollout, stop } from "@/lib/autopilot/lifecycle";
+import { withAutopilotUser } from "@/lib/autopilot/scope";
 import { getExperiment } from "@/lib/autopilot/store";
+import { currentUserId } from "@/lib/connections/current";
 import { GitHubApiError } from "@/lib/github/client";
 
 export const dynamic = "force-dynamic";
@@ -9,11 +11,17 @@ const ACTIONS = ["approve", "reject", "rollout", "stop", "approve-cleanup", "dis
 type Action = (typeof ACTIONS)[number];
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const userId = await currentUserId();
+  if (!userId) return Response.json({ error: "Sign in required." }, { status: 401 });
   const { id } = await params;
   const body = (await request.json().catch(() => ({}))) as { action?: string };
   const action = ACTIONS.find((a) => a === body.action) as Action | undefined;
   if (!action) return Response.json({ error: "Unknown action." }, { status: 400 });
 
+  return withAutopilotUser(userId, () => act(id, action));
+}
+
+async function act(id: string, action: Action): Promise<Response> {
   const experiment = await getExperiment(id);
   if (!experiment) return Response.json({ error: "Experiment not found." }, { status: 404 });
 

@@ -2,6 +2,7 @@ import "server-only";
 
 import { auth } from "@clerk/nextjs/server";
 import { headers } from "next/headers";
+import { tryAutopilotUser } from "@/lib/autopilot/scope";
 
 async function isCronRequest(): Promise<boolean> {
   const secret = process.env.CRON_SECRET?.trim();
@@ -26,4 +27,9 @@ export async function currentUserId(): Promise<string | null> {
   // The Vercel cron has no signed-in user; it acts for the one owner named in KISMET_AUTOPILOT_USER_ID.
   if (await isCronRequest()) return process.env.KISMET_AUTOPILOT_USER_ID?.trim() || null;
   return null;
+}
+
+/** The signed-in account, unless a cron tick is acting for one specific account. */
+export async function actingUserId(): Promise<string | null> {
+  return tryAutopilotUser() ?? (await currentUserId());
 }

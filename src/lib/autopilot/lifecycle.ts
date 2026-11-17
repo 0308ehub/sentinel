@@ -55,7 +55,7 @@ export async function approve(experiment: Experiment): Promise<string> {
       : "Approved. It's queued behind an experiment on the same page and starts when that one finishes.";
   }
   if (!experiment.prNumber) throw new Error("This experiment has no pull request yet.");
-  await mergePull(autopilotRepo(), experiment.prNumber, `Experiment: ${experiment.title}`);
+  await mergePull(await autopilotRepo(), experiment.prNumber, `Experiment: ${experiment.title}`);
   const started = await startExperiment(experiment);
   return started
     ? "Merged and started. The new version reaches its visitors once the deploy finishes."
@@ -64,7 +64,7 @@ export async function approve(experiment: Experiment): Promise<string> {
 
 export async function reject(experiment: Experiment): Promise<string> {
   if (experiment.status !== "awaiting_approval") throw new Error("This experiment isn't waiting for approval.");
-  if (experiment.prNumber) await closePull(autopilotRepo(), experiment.prNumber).catch(() => {});
+  if (experiment.prNumber) await closePull(await autopilotRepo(), experiment.prNumber).catch(() => {});
   await updateExperiment(experiment.id, { status: "rejected", endedAt: new Date().toISOString(), note: "Rejected by you." });
   await setSignalStatus(experiment.signalId, "open");
   await log("gate", `You rejected “${experiment.title}”. Autopilot will try a different idea.`, experiment.id);

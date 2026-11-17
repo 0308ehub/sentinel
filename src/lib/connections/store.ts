@@ -35,6 +35,14 @@ export async function saveConnection(
   `;
 }
 
+export async function listConnectionUsers(provider: Provider): Promise<string[]> {
+  const sql = await db();
+  const rows = await sql<{ user_id: string }[]>`
+    select user_id from kismet.connections where provider = ${provider}
+  `;
+  return rows.map((row) => row.user_id);
+}
+
 export async function deleteConnection(userId: string, provider: Provider): Promise<void> {
   const sql = await db();
   await sql`delete from kismet.connections where user_id = ${userId} and provider = ${provider}`;

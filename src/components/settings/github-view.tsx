@@ -18,6 +18,7 @@ export function GitHubView() {
   const [token, setToken] = useState("");
   const [refresh, setRefresh] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [target, setTarget] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -34,11 +35,16 @@ export function GitHubView() {
           return;
         }
         setLogin(body.login || "");
-        const reposRes = await fetch("/api/github/repos", { cache: "no-store" });
+        const [reposRes, targetRes] = await Promise.all([
+          fetch("/api/github/repos", { cache: "no-store" }),
+          fetch("/api/autopilot/repo", { cache: "no-store" }),
+        ]);
         const reposBody = (await reposRes.json()) as { repos?: RepoOption[]; hint?: string };
+        const targetBody = (await targetRes.json()) as { repo?: string };
         if (!cancelled) {
           if (!reposRes.ok) setHint(reposBody.hint || "Could not list repositories.");
           else setRepos(reposBody.repos ?? []);
+          if (targetRes.ok && targetBody.repo) setTarget(targetBody.repo);
         }
       })
       .catch(() => {
@@ -66,6 +72,21 @@ export function GitHubView() {
     }
     setToken("");
     setRefresh((value) => value + 1);
+  }
+
+  async function chooseRepo(repo: string) {
+    const previous = target;
+    setTarget(repo);
+    setHint("");
+    const res = await fetch("/api/autopilot/repo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ repo }),
+    });
+    if (!res.ok) {
+      setTarget(previous);
+      setHint("Could not save the repository Autopilot ships to.");
+    }
   }
 
   return (
@@ -115,6 +136,27 @@ export function GitHubView() {
             </Button>
           </div>
           {hint && <p className="mt-3 text-xs text-destructive">{hint}</p>}
+          <div className="mt-4 max-w-lg space-y-1">
+            <Label htmlFor="autopilot-repo">Repository Autopilot ships to</Label>
+            <select
+              id="autopilot-repo"
+              className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
+              value={target}
+              onChange={(event) => void chooseRepo(event.target.value)}
+            >
+              {!target && (
+                <option value="" disabled>
+                  Choose a repository…
+                </option>
+              )}
+              {target && !(repos ?? []).some((repo) => repo.fullName === target) && (
+                <option value={target}>{target}</option>
+              )}
+              {(repos ?? []).map((repo) => (
+                <option key={repo.fullName} value={repo.fullName}>{repo.fullName}</option>
+              ))}
+            </select>
+          </div>
           <ul className="mt-4 divide-y divide-border rounded-xl border border-border">
             {(repos ?? []).length === 0 ? (
               <li className="px-3 py-3 text-sm text-muted-foreground">
