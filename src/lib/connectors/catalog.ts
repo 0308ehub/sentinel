@@ -19,7 +19,7 @@ export interface ConnectorDefinition {
   filesAs: string;
   /** Existing setup page for connectors the server already reads. */
   setupHref?: string;
-  live?: "slack" | "jira" | "databricks" | "google";
+  live?: "slack" | "jira" | "databricks" | "google" | "postgres";
   /** How records move between the tool and the product graph. */
   flow?: string;
 }
@@ -344,6 +344,8 @@ const RAW_CONNECTORS: ConnectorDefinition[] = [
     category: "Warehouse",
     description: "A read-only application or warehouse database.",
     filesAs: "tables",
+    live: "postgres",
+    flow: "Reads tables. Nothing is written back.",
     fields: [secret("url", "Connection URL", "postgres://user:password@host:5432/db")],
   },
   {

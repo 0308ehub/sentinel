@@ -4,6 +4,7 @@ import { getSlackContext } from "@/lib/slack/context";
 import { runOrchestrated } from "@/lib/ai/orchestrate";
 import type { OrchestratedTask } from "@/lib/ai/policy";
 import { workspaceBrief } from "@/lib/workspace/cloud";
+import { postgresBrief } from "@/lib/postgres/client";
 
 export async function sourceBrief(): Promise<string> {
   const parts: string[] = [];
@@ -27,6 +28,8 @@ export async function sourceBrief(): Promise<string> {
   }
   const workspace = await workspaceBrief();
   if (workspace) parts.push(workspace);
+  const database = await postgresBrief();
+  if (database) parts.push(database);
   return parts.join("\n\n");
 }
 

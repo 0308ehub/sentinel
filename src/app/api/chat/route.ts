@@ -9,6 +9,7 @@ import { getSlackContext } from "@/lib/slack/context";
 import { SlackApiError } from "@/lib/slack/client";
 import { recentRepoNotes } from "@/lib/github/client";
 import { workspaceBrief } from "@/lib/workspace/cloud";
+import { postgresBrief } from "@/lib/postgres/client";
 
 export const maxDuration = 120;
 
@@ -133,9 +134,10 @@ export async function POST(request: Request) {
     }
   }
 
-  const [company, github] = await Promise.all([
+  const [company, github, database] = await Promise.all([
     workspaceBrief().catch(() => ""),
     allowConnectors ? recentRepoNotes().catch(() => "") : Promise.resolve(""),
+    allowConnectors ? postgresBrief().catch(() => "") : Promise.resolve(""),
   ]);
 
   const latestQuestion = [...messages].reverse().find((message) => message.role === "user")?.content ?? "";
@@ -160,6 +162,7 @@ export async function POST(request: Request) {
     workLog ? `Recent work:\n${workLog}` : "",
     company,
     github,
+    database,
     linkedPage ? `Text from the link on screen (${linkedPage.title}, ${linkedPage.url}):\n${linkedPage.text}` : "",
     slackNote,
     slackText ? `\nSlack excerpts:\n${slackText}` : "",

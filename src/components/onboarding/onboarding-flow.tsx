@@ -157,7 +157,7 @@ export function OnboardingFlow({ step }: { step: string }) {
         description="Pick everything that fits. This steers what gets filed first."
         onBack={() => go("company")}
         nextDisabled={draft.goals.length === 0}
-        onNext={() => go("connect", { goals: draft.goals })}
+        onNext={() => go("database", { goals: draft.goals })}
       >
         <div className="space-y-2">
           {GOALS.map((goal) => {
@@ -182,6 +182,10 @@ export function OnboardingFlow({ step }: { step: string }) {
         </div>
       </OnboardingShell>
     );
+  }
+
+  if (step === "database") {
+    return <DatabaseStep onBack={() => go("goals")} onNext={() => go("connect")} />;
   }
 
   if (step === "connect") {
@@ -227,6 +231,105 @@ export function OnboardingFlow({ step }: { step: string }) {
   );
 }
 
+function DatabaseStep({ onBack, onNext }: { onBack: () => void; onNext: () => void }) {
+  const [url, setUrl] = useState("");
+  const [status, setStatus] = useState<{
+    configured?: boolean;
+    connected?: boolean;
+    database?: string;
+    tables?: { schema: string; name: string }[];
+    error?: string;
+  } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancel = false;
+    void fetch("/api/postgres/status")
+      .then((response) => response.json())
+      .then((body) => {
+        if (!cancel) setStatus(body);
+      })
+      .catch(() => {
+        if (!cancel) setStatus({ configured: false, connected: false });
+      });
+    return () => {
+      cancel = true;
+    };
+  }, []);
+
+  async function connect() {
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/postgres/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      const body = (await response.json()) as typeof status;
+      setStatus(body);
+      if (!body?.connected) setError(body?.error || "Could not connect to that database.");
+      else setUrl("");
+    } catch {
+      setError("Could not connect to that database.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const connected = Boolean(status?.connected);
+  const tables = status?.tables ?? [];
+
+  return (
+    <OnboardingShell
+      step="database"
+      title="Connect a database"
+      description="Paste a read-only Postgres URL for the database Kismet should read. Kismet checks the connection, saves it for this workspace, and does not write to it. You can skip this and add it later."
+      onBack={onBack}
+      onNext={onNext}
+      nextLabel={connected ? "Continue" : "Skip for now"}
+    >
+      {connected ? (
+        <div className="rounded-xl border border-[#e6e8ec] px-4 py-3 text-sm">
+          <p>Connected to {status?.database}.</p>
+          {tables.length > 0 ? (
+            <p className="mt-2 text-[#5c6570]">{tables.map((table) => `${table.schema}.${table.name}`).join(", ")}</p>
+          ) : null}
+        </div>
+      ) : (
+        <>
+          <Field label="Connection URL">
+            <input
+              value={url}
+              onChange={(event) => setUrl(event.target.value)}
+              placeholder="postgres://user:password@host:5432/database"
+              className={inputClass}
+              autoComplete="off"
+              spellCheck={false}
+              type="text"
+            />
+          </Field>
+          <button
+            type="button"
+            onClick={() => void connect()}
+            disabled={busy || !url.trim()}
+            className="mt-3 inline-flex h-10 items-center rounded-md bg-[#111] px-4 text-sm font-medium text-white disabled:opacity-30"
+          >
+            {busy ? "Checking…" : "Test and save"}
+          </button>
+        </>
+      )}
+      {status && status.configured === false ? (
+        <p className="mt-4 text-sm text-[#5c6570]">
+          This deploy still needs its own database. Set DATABASE_URL to the Supabase pooler URI, then connect the database you want Kismet to read.
+        </p>
+      ) : null}
+      {error ? <p className="mt-4 text-sm text-[#5c6570]">{error}</p> : null}
+    </OnboardingShell>
+  );
+}
+
 function ConnectStep({ onBack, onNext }: { onBack: () => void; onNext: () => void }) {
   const [ready, setReady] = useState(false);
 
@@ -259,6 +362,7 @@ function OrganizeStep({
     { id: "company", label: "Saving the company", state: "wait" },
     { id: "goals", label: "Noting what you want to accomplish", state: "wait" },
     { id: "slack", label: "Checking Slack", state: "wait" },
+    { id: "database", label: "Checking the database", state: "wait" },
     { id: "jira", label: "Checking Jira", state: "wait" },
     { id: "ready", label: "Preparing the workspace", state: "wait" },
   ]);
@@ -303,6 +407,25 @@ function OrganizeStep({
       } catch {
         mark("slack", "Slack could not be reached. You can try again in Settings.", "done");
       }
+      mark("database", "Checking the database", "run");
+      try {
+        const databaseRes = await fetch("/api/postgres/status");
+        const database = (await databaseRes.json()) as {
+          connected?: boolean;
+          database?: string;
+          tables?: { name: string }[];
+        };
+        const count = database.tables?.length ?? 0;
+        mark(
+          "database",
+          database.connected
+            ? `Postgres · ${database.database ?? "database"}${count ? ` · ${count} table${count === 1 ? "" : "s"}` : ""}`
+            : "No database connected yet. You can add one in Settings.",
+          "done",
+        );
+      } catch {
+        mark("database", "The database could not be reached. You can try again in Settings.", "done");
+      }
       mark("jira", "Checking Jira", "run");
       try {
         const jiraRes = await fetch("/api/jira/status");
@@ -333,7 +456,7 @@ function OrganizeStep({
     <OnboardingShell
       step="organize"
       title="Setting up your workspace"
-      description="Kismet is saving what you told us and reading Slack."
+      description="Kismet is saving what you told us and checking what you connected."
       onBack={finished ? onBack : undefined}
       onNext={finished ? onNext : undefined}
       nextLabel="See how Kismet works"

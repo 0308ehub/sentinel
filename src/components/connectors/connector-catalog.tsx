@@ -39,7 +39,8 @@ export function ConnectorCatalog({ onConnectionsChange }: { onConnectionsChange?
       fetch("/api/jira/status", { cache: "no-store" }).then((res) => res.json()).catch(() => ({ connected: false })),
       fetch("/api/databricks/status", { cache: "no-store" }).then((res) => res.json()).catch(() => ({ connected: false })),
       fetch("/api/google/status", { cache: "no-store" }).then((res) => res.json()).catch(() => ({ connected: false })),
-    ]).then(([slack, jira, databricks, google]) => {
+      fetch("/api/postgres/status", { cache: "no-store" }).then((res) => res.json()).catch(() => ({ connected: false })),
+    ]).then(([slack, jira, databricks, google, postgres]) => {
       if (cancelled) return;
       setLive({
         slack: {
@@ -57,6 +58,10 @@ export function ConnectorCatalog({ onConnectionsChange }: { onConnectionsChange?
         google: {
           connected: Boolean(google.connected),
           label: google.connected ? google.email : google.configured ? undefined : "Needs a Google Cloud client",
+        },
+        postgres: {
+          connected: Boolean(postgres.connected),
+          label: postgres.connected ? postgres.database : postgres.error,
         },
       });
     });
@@ -157,10 +162,14 @@ export function ConnectorCatalog({ onConnectionsChange }: { onConnectionsChange?
               setOpenId(null);
             }}
             onRemoved={() => {
-              removeConnector(open.id);
-              graphStore.getState().detachSource(open.id);
-              refreshSaved();
-              setOpenId(null);
+              void (async () => {
+                if (open.id === "postgres") await fetch("/api/postgres/disconnect", { method: "POST" });
+                removeConnector(open.id);
+                graphStore.getState().detachSource(open.id);
+                refreshSaved();
+                setLive((current) => ({ ...current, postgres: open.id === "postgres" ? { connected: false } : current.postgres }));
+                setOpenId(null);
+              })();
             }}
           />
         )}
@@ -197,7 +206,7 @@ function ConnectorForm({
   const [values, setValues] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
 
-  function save() {
+  async function save() {
     const next: Record<string, string> = { ...(existing?.values ?? {}) };
     for (const field of connector.fields) {
       const value = values[field.key]?.trim() ?? "";
@@ -209,7 +218,20 @@ function ConnectorForm({
       setError(`Add ${missing.map((field) => field.label).join(", ")}.`);
       return;
     }
-    if (missing.length === 0) writeConnector(connector.id, next);
+    if (connector.id === "postgres" && next.url) {
+      const response = await fetch("/api/postgres/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: next.url }),
+      });
+      const body = (await response.json()) as { connected?: boolean; error?: string };
+      if (!body.connected) {
+        setError(body.error || "Could not connect to that database.");
+        return;
+      }
+    } else if (missing.length === 0) {
+      writeConnector(connector.id, next);
+    }
     onSaved();
   }
 
@@ -251,7 +273,7 @@ function ConnectorForm({
             </Button>
           )}
           {connector.fields.length > 0 && (
-            <Button type="button" size="sm" onClick={save}>
+            <Button type="button" size="sm" onClick={() => void save()}>
               Save
             </Button>
           )}
