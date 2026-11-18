@@ -10,10 +10,14 @@ import { useAnalyticsLibrary } from "@/stores/analytics-store";
 import { useNotificationStore } from "@/stores/notification-store";
 import { useQueryEditorStore } from "@/stores/query-editor-store";
 import { WorkspaceNotes } from "@/components/workspace/notes-panel";
+import { useVariant } from "@/lib/autopilot/variant";
+import { setDraft, startNewChat } from "@/lib/chat/session";
 import type { GraphNode, NodeStatus, NodeType, Priority } from "@/types/graph";
 
 const OPEN: NodeStatus[] = ["DRAFT", "ACTIVE", "IN_PROGRESS", "AT_RISK", "STALE"];
 const RUNNING: NodeStatus[] = ["ACTIVE", "IN_PROGRESS", "AT_RISK"];
+const REPLAY_PATTERN_PROMPT =
+  "Find common themes across our customer session replay notes and summaries. Group the recurring behaviors and friction points, and say which replays each one comes from.";
 
 export function DashboardView() {
   const graphReady = useGraphHydrated();
@@ -28,6 +32,7 @@ export function DashboardView() {
   const notifications = useNotificationStore((state) => state.items);
   const markAsRead = useNotificationStore((state) => state.markAsRead);
   const notebooks = useQueryEditorStore((state) => state.savedNotebooks);
+  const variant = useVariant("ap-add-replay-pattern-prompt-card-on-dashbo-v1");
 
   const tickets = nodes
     .filter((node) => isTicket(node) && node.ownerId === CURRENT_USER.id && OPEN.includes(node.status))
@@ -112,6 +117,25 @@ export function DashboardView() {
           </div>
 
           <div className="space-y-10">
+            {variant === "treatment" ? (
+              <section
+                data-track="ap-add-replay-pattern-prompt-card-on-dashbo-v1"
+                className="rounded-md border border-border px-4 py-3"
+              >
+                <h2 className="text-sm font-medium">Find patterns in session replays</h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">Ask the AI for common themes across replay notes or summaries</p>
+                <Link
+                  href="/ai"
+                  onClick={() => {
+                    startNewChat();
+                    setDraft({ text: REPLAY_PATTERN_PROMPT, chips: [], files: [] });
+                  }}
+                  className="mt-2 inline-block text-xs text-brand hover:underline"
+                >
+                  Start in AI
+                </Link>
+              </section>
+            ) : null}
             <Section title="Analytics library" href="/analytics" hrefLabel="Open">
               {!libraryReady || !notebooksReady ? null : dashboards.length === 0 && metrics.length === 0 && notebooks.length === 0 ? (
                 <Empty>The library is empty.</Empty>
