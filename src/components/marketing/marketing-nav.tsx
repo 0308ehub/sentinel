@@ -2,53 +2,27 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { Menu, X } from "lucide-react";
+import { ChevronDown, Menu, X } from "lucide-react";
 import { BrandLogo } from "@/components/marketing/brand-logo";
 
 type Item = { href: string; name: string; detail: string };
 
-const MODELS: Item[] = [
-  {
-    href: "/benchmark",
-    name: "PM Benchmark",
-    detail: "How product models compare. We will build this out.",
-  },
+const PRODUCTS: Item[] = [
+  { href: "/docs/experiment", name: "Experiments", detail: "What to test, the statistic, and when to stop." },
+  { href: "/docs/optimize", name: "Guardrails", detail: "The numbers that stop a test before it ships." },
+  { href: "/docs/ship", name: "Ship", detail: "The change goes out through Cursor or Claude Code." },
 ];
 
-const PRODUCTS: Item[] = [
-  {
-    href: "/docs/optimize",
-    name: "Optimize",
-    detail: "An agent that keeps shipping small tests inside guardrails.",
-  },
-  {
-    href: "/docs/experiment",
-    name: "Experiment",
-    detail: "Design and code experiments, with the stats, the QA, and a write-up.",
-  },
-  {
-    href: "/docs/explore",
-    name: "Explore",
-    detail: "The product, the numbers, and what people already said.",
-  },
-  {
-    href: "/docs/plan",
-    name: "Plan",
-    detail: "A feature, a decision, and a hypothesis from the evidence.",
-  },
-  {
-    href: "/docs/ship",
-    name: "Ship",
-    detail: "The handoff into the tools the team already uses.",
-  },
+const SOLUTIONS: Item[] = [
+  { href: "/enterprise", name: "Product teams", detail: "A shared loop for what the company should test next." },
+  { href: "/contact", name: "Startups", detail: "Run the loop before you have a warehouse full of history." },
 ];
 
 const RESOURCES: Item[] = [
   { href: "/blog", name: "Blog", detail: "Notes from the team." },
-  { href: "/docs", name: "Docs", detail: "How Kismet works." },
-  { href: "/learn", name: "Learn", detail: "What it does, and what it connects to." },
-  { href: "/connectors", name: "Connectors", detail: "The tools Kismet can read." },
-  { href: "/contact", name: "Contact", detail: "Request a demo or talk to us." },
+  { href: "/learn", name: "Learn", detail: "How a test is defined, watched, and stopped." },
+  { href: "/connectors", name: "Connectors", detail: "The company context Kismet can read." },
+  { href: "/benchmark", name: "Benchmark", detail: "How product models compare." },
 ];
 
 const COMPARE: Item[] = [
@@ -59,7 +33,7 @@ const COMPARE: Item[] = [
 ];
 
 const LINKS = [
-  { href: "/enterprise", label: "Enterprise" },
+  { href: "/docs", label: "Docs" },
   { href: "/pricing", label: "Pricing" },
 ];
 
@@ -106,13 +80,8 @@ export function MarketingNav() {
           className="ml-8 hidden items-center gap-6 md:flex lg:absolute lg:left-1/2 lg:ml-0 lg:-translate-x-1/2"
           aria-label="Primary"
         >
-          <NavMenu label="Models" items={MODELS} open={open === "models"} onOpen={() => setOpen("models")} onClose={() => setOpen((current) => (current === "models" ? null : current))} onNavigate={close} />
-          <NavMenu label="Product" items={PRODUCTS} open={open === "product"} onOpen={() => setOpen("product")} onClose={() => setOpen((current) => (current === "product" ? null : current))} onNavigate={close} />
-          {LINKS.map((item) => (
-            <Link key={item.href} href={item.href} onMouseEnter={() => setOpen(null)} className="text-sm font-medium text-[#2a2a28] hover:text-[#6d6d68]">
-              {item.label}
-            </Link>
-          ))}
+          <NavMenu label="Products" items={PRODUCTS} open={open === "products"} onOpen={() => setOpen("products")} onClose={() => setOpen((current) => (current === "products" ? null : current))} onNavigate={close} />
+          <NavMenu label="Solutions" items={SOLUTIONS} open={open === "solutions"} onOpen={() => setOpen("solutions")} onClose={() => setOpen((current) => (current === "solutions" ? null : current))} onNavigate={close} />
           <NavMenu
             label="Resources"
             items={RESOURCES}
@@ -122,17 +91,28 @@ export function MarketingNav() {
             onClose={() => setOpen((current) => (current === "resources" ? null : current))}
             onNavigate={close}
           />
+          {LINKS.map((item) => (
+            <Link key={item.href} href={item.href} onMouseEnter={() => setOpen(null)} className="text-sm font-medium text-[#3a3a38] hover:text-[#0571d3]">
+              {item.label}
+            </Link>
+          ))}
         </nav>
 
         <div className="ml-auto flex items-center gap-2 sm:gap-3">
-          <Link href="/sign-in" className="px-2 text-sm font-medium text-[#2a2a28] hover:text-[#6d6d68]">
+          <Link href="/sign-in" className="hidden px-2 text-sm font-medium text-[#2a2a28] hover:text-[#0571d3] sm:inline">
             Sign in
           </Link>
           <Link
             href="/contact"
-            className="inline-flex h-8 items-center rounded-full border border-[#e4e3de] bg-white px-3.5 text-sm font-medium text-[#2a2a28] hover:bg-[#fbfbfa]"
+            className="hidden h-8 items-center rounded-md bg-[#f4f4f2] px-3 text-sm font-medium text-[#111] hover:text-[#0571d3] sm:inline-flex"
           >
-            Request a demo
+            Contact sales
+          </Link>
+          <Link
+            href="/sign-up"
+            className="inline-flex h-8 items-center rounded-md bg-[#111] px-3 text-sm font-medium text-white hover:bg-[#0571d3]"
+          >
+            Sign up
           </Link>
           <button
             type="button"
@@ -148,8 +128,8 @@ export function MarketingNav() {
 
       {mobile && (
         <div className="border-t border-[#eceae4] px-5 py-4 md:hidden">
-          <MobileGroup label="Models" items={MODELS} onNavigate={close} />
-          <MobileGroup label="Product" items={PRODUCTS} onNavigate={close} />
+          <MobileGroup label="Products" items={PRODUCTS} onNavigate={close} />
+          <MobileGroup label="Solutions" items={SOLUTIONS} onNavigate={close} />
           <div className="mt-3 flex flex-col">
             {LINKS.map((item) => (
               <Link key={item.href} href={item.href} onClick={close} className="py-2 text-sm font-medium text-[#2a2a28]">
@@ -159,6 +139,14 @@ export function MarketingNav() {
           </div>
           <MobileGroup label="Resources" items={RESOURCES} onNavigate={close} />
           <MobileGroup label="Compare" items={[{ href: "/compare", name: "All comparisons", detail: "" }, ...COMPARE]} onNavigate={close} />
+          <div className="mt-4 flex flex-col gap-2">
+            <Link href="/sign-in" onClick={close} className="py-1.5 text-sm font-medium text-[#111]">
+              Sign in
+            </Link>
+            <Link href="/contact" onClick={close} className="py-1.5 text-sm font-medium text-[#111]">
+              Contact sales
+            </Link>
+          </div>
         </div>
       )}
     </div>
@@ -196,9 +184,10 @@ function NavMenu({
         aria-expanded={open}
         aria-haspopup="true"
         onFocus={onOpen}
-        className="text-sm font-medium text-[#2a2a28] hover:text-[#6d6d68]"
+        className="inline-flex items-center gap-1 text-sm font-medium text-[#3a3a38] hover:text-[#0571d3]"
       >
         {label}
+        <ChevronDown className="h-3.5 w-3.5 text-[#8a8a84]" aria-hidden />
       </button>
       {open && (
         <div className="absolute left-0 top-full z-30 pt-3">

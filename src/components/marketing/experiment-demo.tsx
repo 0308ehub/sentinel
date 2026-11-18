@@ -15,7 +15,6 @@ import {
 } from "recharts";
 import { BarChart3, Boxes, FlaskConical, GitPullRequest, MessageSquare, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { AgentMark } from "@/components/inbox/agent-mark";
 import { obrienFlemingBoundaries } from "@/lib/experiments/stats";
 import { cn } from "@/lib/utils";
 
@@ -46,7 +45,7 @@ const SCENES = [
   {
     id: "ship",
     ms: 5000,
-    line: "A pull request opens on x/ranker. Shipping puts the new prompt on 20% of auctions.",
+    line: "Cursor or Claude Code opens the change on x/ranker. Kismet keeps the statistic, and shipping puts the new prompt on 20% of auctions.",
   },
   {
     id: "run",
@@ -74,8 +73,6 @@ const CONNECTORS = {
 } as const;
 
 type ConnectorId = keyof typeof CONNECTORS;
-
-const AGENT = { name: "Experiments", letter: "E", color: "#00c853" };
 
 const SOURCE_ORDER: ConnectorId[] = [
   "databricks",
@@ -133,7 +130,7 @@ const CODE_AFTER = `def score(bid, p_purchase, purchases_14d, age_days):
 
 const NAV = [
   { icon: MessageSquare, label: "Chat", jumpTo: null, scenes: [] as string[] },
-  { icon: Boxes, label: "Agents", jumpTo: "context" as const, scenes: ["context", "propose"] },
+  { icon: Boxes, label: "Context", jumpTo: "context" as const, scenes: ["context", "propose"] },
   { icon: BarChart3, label: "Analytics", jumpTo: "analytics" as const, scenes: ["analytics"] },
   { icon: FlaskConical, label: "Experiments", jumpTo: "plan" as const, scenes: ["plan", "run"] },
   { icon: GitPullRequest, label: "Ship", jumpTo: "ship" as const, scenes: ["ship"] },
@@ -297,12 +294,13 @@ function ContextScene({ progress }: { progress: number }) {
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <div className="flex items-center gap-3 border-b border-border px-4 py-3">
-        <AgentMark name={AGENT.name} icon={AGENT.letter} color={AGENT.color} size={36} />
         <div className="min-w-0">
-          <div className="text-sm font-semibold">{AGENT.name}</div>
+          <div className="text-sm font-semibold">Company context</div>
           <div className="text-[11px] text-muted-foreground">{typing ? "Reading sources" : "Sources read"}</div>
         </div>
-        <LogoStack ids={SOURCE_ORDER} visible={sourceCount} />
+        <div className="ml-auto">
+          <LogoStack ids={SOURCE_ORDER} visible={sourceCount} />
+        </div>
       </div>
       <div className="min-h-0 flex-1 overflow-auto px-5 py-4">
         <p className="max-w-2xl text-sm leading-relaxed">
@@ -317,7 +315,7 @@ function ContextScene({ progress }: { progress: number }) {
 function LogoStack({ ids, visible }: { ids: ConnectorId[]; visible?: number }) {
   const shown = ids.slice(0, visible ?? ids.length);
   return (
-    <div className="mt-2 flex items-center" aria-label={shown.map((id) => CONNECTORS[id].name).join(", ")}>
+    <div className="flex items-center" aria-label={shown.map((id) => CONNECTORS[id].name).join(", ")}>
       {shown.map((id, index) => (
         <span
           key={id}
@@ -480,7 +478,7 @@ function ShipScene({ progress, onShip }: { progress: number; onShip: () => void 
     <div className="flex h-full flex-col p-4">
       <div className="text-sm font-semibold">Ship the prompt</div>
       <p className="mt-1 text-xs text-muted-foreground">
-        {shipped ? "Merged to main. The listing page did not change." : "Pull request opened from Kismet. The listing page does not change."}
+        {shipped ? "Merged from Cursor. The listing page did not change. Kismet still owns the statistic." : "Claude Code or Cursor writes the diff. Kismet already defined the metric, the looks, and the guardrails."}
       </p>
       <div className="mt-4 max-w-xl overflow-auto rounded-xl border border-border">
         <div className="flex items-center gap-2 border-b border-border px-3 py-2">

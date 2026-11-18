@@ -61,17 +61,20 @@ function rings(hills: Hill[]) {
 const LINES_A = rings(HILLS_A);
 const LINES_B = rings(HILLS_B);
 
-export function TopoField({ id = "kismet-topo" }: { id?: string }) {
+export function TopoField({ id = "kismet-topo", ink = false }: { id?: string; ink?: boolean }) {
+  const stroke = ink ? "#111" : `url(#${id})`;
   return (
     <svg className="topo-field" viewBox="0 0 1200 760" preserveAspectRatio="xMidYMid slice" aria-hidden>
-      <defs>
-        <linearGradient id={id} x1="0%" y1="100%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#0571d3" />
-          <stop offset="46%" stopColor="#1aa0b8" />
-          <stop offset="100%" stopColor="#8ee0b0" />
-        </linearGradient>
-      </defs>
-      <g className="topo-drift-a" fill="none" stroke={`url(#${id})`} strokeWidth="1.35">
+      {ink ? null : (
+        <defs>
+          <linearGradient id={id} x1="0%" y1="100%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#0571d3" />
+            <stop offset="46%" stopColor="#1aa0b8" />
+            <stop offset="100%" stopColor="#8ee0b0" />
+          </linearGradient>
+        </defs>
+      )}
+      <g className="topo-drift-a" fill="none" stroke={stroke} strokeWidth="1.35">
         {LINES_A.map((d, index) => (
           <path key={`a-${index}`} d={d} opacity={0.4 + (index % 4) * 0.1} />
         ))}
