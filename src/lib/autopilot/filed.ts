@@ -1,11 +1,14 @@
 import "server-only";
 
-import { addEvidence, knownEvidenceUrls, type NewEvidence } from "@/lib/autopilot/store";
+import { addEvidence, knownEvidenceUrls, log, type NewEvidence } from "@/lib/autopilot/store";
 import { evidenceFromGraph, type FiledEvidence } from "@/lib/autopilot/workspace-evidence";
 import { actingUserId } from "@/lib/connections/current";
 import { listRecentIssues } from "@/lib/jira/client";
-import { listBotChannels, listRecentMessages } from "@/lib/slack/client";
+import { listBotChannels, listRecentMessages, SlackApiError } from "@/lib/slack/client";
 import { loadStates } from "@/lib/workspace/state-store";
+
+/** Most new items filed per tick, newest first; the rest arrive on later ticks. */
+const MAX_NEW_EVIDENCE = 20;
 
 async function graphEvidence(userId: string): Promise<FiledEvidence[]> {
   try {
@@ -59,9 +62,13 @@ async function slackEvidence(): Promise<FiledEvidence[]> {
         });
       }
     }
-    return found.slice(0, 12);
+    return found;
   } catch (error) {
-    console.error("[autopilot] slack evidence", error);
+    // An account without Slack connected is normal; anything else should show in the activity log.
+    if (!(error instanceof SlackApiError && error.code === "not_connected")) {
+      const reason = error instanceof SlackApiError ? error.hint || error.code : error instanceof Error ? error.message : String(error);
+      await log("error", `Could not read Slack: ${reason}`).catch(() => {});
+    }
     return [];
   }
 }
@@ -81,7 +88,11 @@ export async function workspaceEvidence(): Promise<string | null> {
   if (!userId) return null;
   const candidates = [...(await graphEvidence(userId)), ...(await jiraEvidence()), ...(await slackEvidence())];
   const known = await knownEvidenceUrls(candidates.map((item) => item.url));
-  const fresh = candidates.filter((item) => item.url && !known.has(item.url));
+  // Drop what's already filed before capping, so old messages in one channel can't crowd out new ones.
+  const fresh = candidates
+    .filter((item) => item.url && !known.has(item.url))
+    .sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt))
+    .slice(0, MAX_NEW_EVIDENCE);
   const added = await addEvidence(fresh.map(asNew));
   return added ? `Collected ${added} from the workspace, Slack, and Jira.` : null;
 }
