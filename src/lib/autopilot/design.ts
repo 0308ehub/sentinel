@@ -49,6 +49,7 @@ interface DesignAnswer {
   metric?: unknown;
   page?: string;
   guardrail?: string;
+  guardrailMetric?: unknown;
 }
 
 interface ChangeAnswer extends DesignAnswer {
@@ -102,7 +103,8 @@ async function designCandidate(candidate: Signal, experiments: Experiment[], per
       '{"kind":"click","text":"<visible label of the button or link that completes the task in both versions, e.g. the submit button of a dialog>"}',
       'or {"kind":"visit","path":"/some/path"} (visitor reaches that page in either version).',
       "page is the route the change appears on, like /features or /settings/connectors.",
-      "Return JSON: {title, hypothesis, control, treatment, metric, page, guardrail}. Keep each field to one or two sentences.",
+      "Optionally choose a guardrail outcome that must not get worse, using the same metric format; omit guardrailMetric if none fits.",
+      "Return JSON: {title, hypothesis, control, treatment, metric, page, guardrail, guardrailMetric}. Keep each text field to one or two sentences.",
       "If earlier attempts failed or were rejected, try a meaningfully different idea.",
       "Build on LEARNINGS: repeat what won in new places, do not retry ideas that lost, were flat, or that a person rejected, unless you change them meaningfully and say how.",
       "Prefer one of the GOALS as the metric when the change can plausibly move it; otherwise use the closest outcome both versions share.",
@@ -137,6 +139,7 @@ async function designCandidate(candidate: Signal, experiments: Experiment[], per
     proposed = await request(`${user}\n\nFEEDBACK\n${feedback}`);
   }
   const { answer, spec, estimate } = proposed;
+  const guardrailSpec = parseMetricSpec(answer.guardrailMetric);
   if (!answer.title || !answer.treatment || !spec) throw new Error("The experiment design was missing a title, change or metric.");
   if (estimate.days > maxDays && !personApproved) {
     const journeys = await recentJourneys();
@@ -195,7 +198,8 @@ async function designCandidate(candidate: Signal, experiments: Experiment[], per
     metric: describeMetric(spec),
     metricSpec: spec,
     page: answer.page?.trim().startsWith("/") ? answer.page.trim() : candidate.area,
-    guardrail: answer.guardrail ?? "",
+    guardrail: answer.guardrail ?? (guardrailSpec ? describeMetric(guardrailSpec) : ""),
+    guardrailSpec,
     control: answer.control ?? "",
     treatment: answer.treatment,
     flag,

@@ -84,6 +84,7 @@ create table if not exists kismet.experiments (
   ended_at timestamptz
 );
 alter table kismet.experiments add column if not exists metric_spec jsonb;
+alter table kismet.experiments add column if not exists guardrail_spec jsonb;
 alter table kismet.experiments add column if not exists draft_path text;
 alter table kismet.experiments add column if not exists draft text;
 alter table kismet.experiments add column if not exists original text;

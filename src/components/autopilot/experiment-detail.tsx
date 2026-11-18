@@ -588,11 +588,29 @@ function ResultsCanvas({
               arm={treatment}
               improvement={compare?.lift ?? readout?.lift ?? null}
               interval={compare}
-              significance={significanceLabel(readout?.pValue ?? null)}
+              significance={significanceLabel(readout?.sequentialP ?? null)}
               remaining={treatment ? Math.max(0, (experiment?.estimate?.perArm ?? DECISION_VISITORS) - treatment.visitors) : null}
             />
           </tbody>
         </table>
+        <p className="mt-2 text-[11px] text-[#9aa0a8]">
+          Peeking-safe: checking early won&apos;t create false winners. Decisions wait at least {readout?.minimumDays ?? 7} days.
+        </p>
+        {readout?.srm && (
+          <div className="mt-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">
+            The visitor split looks broken ({readout.srm.observed[0].toLocaleString("en-US")} vs {readout.srm.observed[1].toLocaleString("en-US")}, expected about even). Results are paused until it&apos;s fixed.
+          </div>
+        )}
+        {readout?.guardrail && (
+          <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-4 border-t border-[#eef0f3] pt-3 text-xs">
+            <span className="font-medium">{experiment?.guardrail || "Guardrail"}</span>
+            <span className="tabular-nums">{displayRate(readout.guardrail.control.rate)}</span>
+            <span className="tabular-nums">{displayRate(readout.guardrail.treatment.rate)}</span>
+            <span className={readout.guardrail.worse ? "font-medium text-red-700" : "font-medium text-green-700"}>
+              {readout.guardrail.worse ? "Worse" : "OK"}
+            </span>
+          </div>
+        )}
         {readout && readout.syntheticShare > 0 && (
           <p className="mt-2 text-xs text-[#6b7280]">{Math.round(readout.syntheticShare * 100)}% of this traffic is synthetic.</p>
         )}
@@ -847,6 +865,10 @@ function signedPercent(value: number): string {
 function significanceLabel(pValue: number | null): string {
   if (pValue == null) return "—";
   return `${Math.max(0, Math.min(99, Math.round((1 - pValue) * 100)))}%`;
+}
+
+function displayRate(rate: number | null): string {
+  return rate == null ? "—" : `${(rate * 100).toFixed(1)}%`;
 }
 
 function rateInterval(control: ArmResult, treatment: ArmResult): { lift: number; low: number; high: number } | null {

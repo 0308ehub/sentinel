@@ -76,6 +76,7 @@ function toExperiment(row: Row): Experiment {
     hypothesis: String(row.hypothesis ?? ""),
     metric: String(row.metric ?? ""),
     metricSpec: parseMetricSpec(row.metric_spec),
+    guardrailSpec: parseMetricSpec(row.guardrail_spec),
     page: String(row.page ?? ""),
     overlap: (row.overlap as string | null) ?? null,
     guardrail: String(row.guardrail ?? ""),
@@ -435,6 +436,7 @@ export async function createExperiment(input: {
   metricSpec: MetricSpec;
   page: string;
   guardrail: string;
+  guardrailSpec?: MetricSpec | null;
   control: string;
   treatment: string;
   flag: string;
@@ -446,10 +448,10 @@ export async function createExperiment(input: {
   const id = newId("exp");
   await sql`
     insert into kismet.experiments
-      (id, user_id, signal_id, version, kind, title, hypothesis, metric, metric_spec, page, guardrail, control, treatment, flag, estimate, rationale, status)
+      (id, user_id, signal_id, version, kind, title, hypothesis, metric, metric_spec, guardrail_spec, page, guardrail, control, treatment, flag, estimate, rationale, status)
     values
       (${id}, ${scopeUser()}, ${input.signalId}, ${input.version}, ${input.kind ?? "test"}, ${input.title.slice(0, 200)}, ${input.hypothesis.slice(0, 1000)},
-       ${input.metric.slice(0, 120)}, ${sql.json(input.metricSpec)}, ${input.page.slice(0, 200)}, ${input.guardrail.slice(0, 300)}, ${input.control.slice(0, 500)},
+       ${input.metric.slice(0, 120)}, ${sql.json(input.metricSpec)}, ${input.guardrailSpec ? sql.json(input.guardrailSpec) : null}, ${input.page.slice(0, 200)}, ${input.guardrail.slice(0, 300)}, ${input.control.slice(0, 500)},
        ${input.treatment.slice(0, 500)}, ${input.flag}, ${sql.json(input.estimate as never)}, ${input.rationale ? sql.json(input.rationale as never) : null}, 'building')
   `;
   return id;

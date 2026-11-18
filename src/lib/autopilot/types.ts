@@ -70,6 +70,22 @@ export interface Readout {
   arms: ArmResult[];
   lift: number | null;
   pValue: number | null;
+  /** Running minimum of the always-valid mSPRT p-value. */
+  sequentialP: number | null;
+  srm?: {
+    pValue: number;
+    expected: [number, number];
+    observed: [number, number];
+  };
+  /** Prevents repeated activity entries if a mismatch clears and later returns. */
+  srmLogged?: boolean;
+  guardrail?: {
+    control: ArmResult;
+    treatment: ArmResult;
+    pValue: number | null;
+    worse: boolean;
+  };
+  minimumDays: number;
   verdict: "collecting" | "won" | "lost" | "flat";
   /** Set when this result depends on which version of another running experiment visitors saw. */
   interaction: string | null;
@@ -115,6 +131,7 @@ export interface Experiment {
   hypothesis: string;
   metric: string;
   metricSpec: MetricSpec | null;
+  guardrailSpec: MetricSpec | null;
   /** The page the change appears on, used to keep experiments on the same page apart. */
   page: string;
   /** How this experiment shares traffic with others, or what it waits for, in plain words. */
