@@ -2,7 +2,7 @@ import { cancelBuild } from "@/lib/autopilot/agent-build";
 import { approveCleanup, dismissCleanup } from "@/lib/autopilot/cleanup";
 import { approve, reject, rollout, stop } from "@/lib/autopilot/lifecycle";
 import { withAutopilotUser } from "@/lib/autopilot/scope";
-import { getExperiment } from "@/lib/autopilot/store";
+import { getExperiment, visitorSeries } from "@/lib/autopilot/store";
 import { currentUserId } from "@/lib/connections/current";
 import { GitHubApiError } from "@/lib/github/client";
 
@@ -10,6 +10,18 @@ export const dynamic = "force-dynamic";
 
 const ACTIONS = ["approve", "reject", "cancel", "rollout", "stop", "approve-cleanup", "dismiss-cleanup"] as const;
 type Action = (typeof ACTIONS)[number];
+
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const userId = await currentUserId();
+  if (!userId) return Response.json({ error: "Sign in required." }, { status: 401 });
+  const { id } = await params;
+  return withAutopilotUser(userId, async () => {
+    const experiment = await getExperiment(id);
+    if (!experiment) return Response.json({ error: "Experiment not found." }, { status: 404 });
+    const series = experiment.startedAt ? await visitorSeries(experiment.flag, experiment.startedAt) : [];
+    return Response.json({ series });
+  });
+}
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const userId = await currentUserId();

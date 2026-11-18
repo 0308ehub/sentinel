@@ -477,6 +477,34 @@ export async function countArms(flag: string, since: string, spec: MetricSpec): 
   });
 }
 
+export interface DailyVisitors {
+  day: string;
+  control: number;
+  treatment: number;
+}
+
+/** Distinct visitors per arm, one point per day, since the experiment started. */
+export async function visitorSeries(flag: string, since: string): Promise<DailyVisitors[]> {
+  const sql = await db();
+  const rows = await sql<{ day: string; arm: string; visitors: number }[]>`
+    select to_char(date_trunc('day', at), 'YYYY-MM-DD') as day,
+           coalesce(arms ->> ${flag}, '') as arm,
+           count(distinct visitor)::int as visitors
+    from kismet.events
+    where user_id = ${scopeUser()} and at >= ${since} and arms ? ${flag}
+    group by 1, 2
+    order by 1
+  `;
+  const byDay = new Map<string, DailyVisitors>();
+  for (const row of rows) {
+    const point = byDay.get(row.day) ?? { day: row.day, control: 0, treatment: 0 };
+    if (row.arm === "control") point.control = Number(row.visitors);
+    else if (row.arm === "treatment") point.treatment = Number(row.visitors);
+    byDay.set(row.day, point);
+  }
+  return [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day));
+}
+
 export interface CrossCount {
   arm: Arm;
   otherArm: Arm;
