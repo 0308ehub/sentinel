@@ -22,6 +22,14 @@ export function githubAppInstallUrl(slug: string, state: string): URL {
   return url;
 }
 
+export function githubAuthorizeUrl(clientId: string, state: string, redirectUri: string): URL {
+  const url = new URL("https://github.com/login/oauth/authorize");
+  url.searchParams.set("client_id", clientId);
+  url.searchParams.set("state", state);
+  url.searchParams.set("redirect_uri", redirectUri);
+  return url;
+}
+
 export function githubStateMatches(expected: string | null | undefined, received: string | null | undefined): boolean {
   if (!expected || !received) return false;
   const left = Buffer.from(expected);

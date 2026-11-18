@@ -121,15 +121,17 @@ export function GitHubView() {
     }
   }
 
-  function install() {
+  function install(adjust = false) {
     popupCleanup?.();
     setWaiting(true);
     setHint("");
     const cleanup = openGitHubInstall("/settings/connectors/github", (status, error) => {
       setWaiting(false);
       setPopupCleanup(null);
+      // Saving repo access on GitHub's configure page may not come back to Kismet; re-read the list anyway.
+      if (adjust && error === "popup_closed") setRefresh((value) => value + 1);
       handleInstallResult(status, error);
-    });
+    }, { install: adjust });
     setPopupCleanup(() => cleanup);
   }
 
@@ -161,7 +163,7 @@ export function GitHubView() {
             <p className="text-xs text-destructive">{appErrorMessage(searchParams.get("error")!)}</p>
           )}
           {appAvailable && (
-            <Button size="sm" disabled={waiting} onClick={install}>
+            <Button size="sm" disabled={waiting} onClick={() => install()}>
               {waiting ? "Waiting for GitHub…" : "Install Kismet on GitHub"}
             </Button>
           )}
@@ -210,7 +212,7 @@ export function GitHubView() {
               selected={target}
               busy={saving || waiting}
               onImport={(repo) => void chooseRepo(repo)}
-              onAdjust={via === "app" ? install : undefined}
+              onAdjust={via === "app" ? () => install(true) : undefined}
             />
             {waiting && <p className="mt-2 text-sm text-muted-foreground">Waiting for GitHub…</p>}
           </div>

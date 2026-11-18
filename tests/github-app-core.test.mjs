@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   createAppJwt,
   chooseGitHubInstallation,
+  githubAuthorizeUrl,
   githubPopupHtml,
   githubStateMatches,
   normalizePrivateKey,
@@ -56,4 +57,12 @@ test("GitHub App state rejects mismatches", () => {
   assert.equal(githubStateMatches("same-state", "other-state"), false);
   assert.equal(githubStateMatches("short", "a-much-longer-state"), false);
   assert.equal(githubStateMatches(undefined, "state"), false);
+});
+
+test("GitHub authorize URL asks GitHub who the person is and returns to Kismet's callback", () => {
+  const url = githubAuthorizeUrl("Iv1.abc", "s1", "https://app.example.com/api/github/app/callback");
+  assert.equal(url.origin + url.pathname, "https://github.com/login/oauth/authorize");
+  assert.equal(url.searchParams.get("client_id"), "Iv1.abc");
+  assert.equal(url.searchParams.get("state"), "s1");
+  assert.equal(url.searchParams.get("redirect_uri"), "https://app.example.com/api/github/app/callback");
 });

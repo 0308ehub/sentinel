@@ -197,15 +197,17 @@ function GitHubStep({ onBack, onNext }: { onBack: () => void; onNext: () => void
     }
   }
 
-  function install() {
+  function install(adjust = false) {
     popupCleanup.current?.();
     setWaiting(true);
     setError("");
     popupCleanup.current = openGitHubInstall("/onboarding/github", (status, code) => {
       popupCleanup.current = null;
       setWaiting(false);
+      // Saving repo access on GitHub's configure page may not come back to Kismet; re-read the list anyway.
+      if (adjust && code === "popup_closed") setRefresh((value) => value + 1);
       handleInstallResult(status, code);
-    });
+    }, { install: adjust });
   }
 
   function handleInstallResult(status: GitHubInstallStatus, code?: string) {
@@ -258,7 +260,7 @@ function GitHubStep({ onBack, onNext }: { onBack: () => void; onNext: () => void
             selected={repo}
             busy={busy || waiting}
             onImport={(value) => void chooseRepo(value)}
-            onAdjust={via === "app" ? () => { install(); } : undefined}
+            onAdjust={via === "app" ? () => { install(true); } : undefined}
           />
           {waiting ? <p className="mt-3 text-sm text-[#5c6570]">Waiting for GitHub…</p> : null}
         </div>

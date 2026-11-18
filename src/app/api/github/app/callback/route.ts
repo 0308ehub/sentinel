@@ -1,8 +1,9 @@
+import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import { currentUserId } from "@/lib/connections/current";
 import { getConnection, saveConnection } from "@/lib/connections/store";
 import { githubAppConfigured } from "@/lib/github/app";
-import { githubPopupHtml, githubStateMatches, normalizeGitHubInstallations } from "@/lib/github/app-core";
+import { githubAppInstallUrl, githubPopupHtml, githubStateMatches, normalizeGitHubInstallations } from "@/lib/github/app-core";
 
 type GitHubSecret = Parameters<typeof normalizeGitHubInstallations>[0];
 import { validOAuthReturnPath } from "@/lib/slack/oauth-return";
@@ -97,7 +98,18 @@ export async function GET(request: Request) {
     const installations = installationRows.flatMap((item) =>
       typeof item.id === "number" && item.account?.login ? [{ id: item.id, account: item.account.login }] : [],
     );
-    if (!installations.length) throw new Error("installation_account_missing");
+    if (!installations.length) {
+      // Signed in, but the app isn't installed anywhere they can reach yet: continue to the install page
+      // in the same window with a fresh state. The popup and return cookies stay for the install's callback.
+      const next = randomBytes(32).toString("base64url");
+      const response = NextResponse.redirect(githubAppInstallUrl(process.env.GITHUB_APP_SLUG!.trim(), next));
+      const secure = url.protocol === "https:" ? "; Secure" : "";
+      response.headers.append(
+        "Set-Cookie",
+        `kismet_github_state=${encodeURIComponent(next)}; HttpOnly; Path=/; Max-Age=600; SameSite=Lax${secure}`,
+      );
+      return response;
+    }
     await saveConnection(
       userId,
       "github",
