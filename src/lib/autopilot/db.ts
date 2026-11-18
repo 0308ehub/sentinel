@@ -110,6 +110,10 @@ alter table kismet.experiments add column if not exists kind text not null defau
 alter table kismet.experiments add column if not exists rationale jsonb;
 alter table kismet.experiments add column if not exists directional jsonb;
 alter table kismet.signals add column if not exists snoozed_until timestamptz;
+alter table kismet.signals add column if not exists kind text;
+alter table kismet.signals add column if not exists kind_reason text;
+alter table kismet.experiments add column if not exists verified_at timestamptz;
+alter table kismet.experiments add column if not exists verdict text;
 
 create table if not exists kismet.autopilot_learnings (
   id text primary key,

@@ -39,6 +39,8 @@ import {
 import { syntheticEnabled, syntheticEvidence } from "@/lib/autopilot/synthetic";
 import type { AutopilotState } from "@/lib/autopilot/types";
 import { buildThemes } from "@/lib/autopilot/themes";
+import { triageSignals } from "@/lib/autopilot/triage";
+import { verifyFixes } from "@/lib/autopilot/verify-fixes";
 
 export interface TickResult {
   ran: boolean;
@@ -88,6 +90,7 @@ async function runScopedTick(): Promise<TickResult> {
       const sorted = await clusterEvidence();
       return sorted ? `Sorted ${sorted} pieces of evidence into problems.` : null;
     });
+    await step("triage", result, triageSignals);
 
     // Steps that touch code need a repository; an account that has not chosen one stops at noticing.
     if (!(await sourceLabel())) {
@@ -97,6 +100,7 @@ async function runScopedTick(): Promise<TickResult> {
       // After the gate: follow PRs, measure live experiments, and act on results.
       await step("follow", result, () => followPulls(startExperiment));
       await step("measure", result, measureRunning);
+      await step("verify-fixes", result, verifyFixes);
       await step("learn", result, learnFromFinished);
       await step("queue", result, startQueued);
 

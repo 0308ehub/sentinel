@@ -12,6 +12,18 @@ import { closePull, deleteBranch, mergePull } from "@/lib/github/client";
  * experiments on the same page or metric. If there's no room yet, it queues and starts later.
  */
 export async function startExperiment(experiment: Experiment): Promise<boolean> {
+  if (experiment.kind === "fix") {
+    const mergedAt = new Date().toISOString();
+    await updateExperiment(experiment.id, {
+      status: "rolled_out",
+      startedAt: mergedAt,
+      overlap: null,
+      note: "Merged. Kismet is watching whether these complaints stop.",
+    });
+    await setSignalStatus(experiment.signalId, "experimenting");
+    await log("gate", `Merged “${experiment.title}”. Kismet is watching for more complaints.`, experiment.id);
+    return true;
+  }
   if (experiment.kind === "change") {
     await setFlag(experiment.flag, "rolled_out", 100);
     await updateExperiment(experiment.id, {
@@ -67,8 +79,9 @@ export async function approve(experiment: Experiment): Promise<string> {
       : "Approved. It's queued behind an experiment on the same page and starts when that one finishes.";
   }
   if (!experiment.prNumber) throw new Error("This experiment has no pull request yet.");
-  await mergePull(await autopilotRepo(), experiment.prNumber, `Experiment: ${experiment.title}`);
+  await mergePull(await autopilotRepo(), experiment.prNumber, experiment.kind === "fix" ? experiment.title : `Experiment: ${experiment.title}`);
   const started = await startExperiment(experiment);
+  if (experiment.kind === "fix") return "Merged. Kismet is watching whether these complaints stop.";
   return started
     ? "Merged and started. The new version reaches its visitors once the deploy finishes."
     : "Merged. It's queued behind an experiment on the same page and starts when that one finishes.";

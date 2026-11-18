@@ -15,6 +15,28 @@ interface TaskSignal {
   evidence: { title: string; source?: string; synthetic?: boolean }[];
 }
 
+function fixBranch(flag: string): string {
+  return `kismet/${flag.replace(/-v\d+$/, "")}`;
+}
+
+export function fixTask(experiment: TaskExperiment, signal: TaskSignal | undefined): string {
+  const branch = fixBranch(experiment.flag);
+  const complaints = signal?.evidence.slice(0, 8).map((item) => `- [${item.source ?? "unknown"}] ${item.title}`) ?? [];
+  return [
+    "Fix this reported bug in the repository at /workspace/repo.",
+    `BUG: ${signal?.title ?? experiment.title} — ${signal?.problem ?? experiment.hypothesis}`,
+    complaints.length ? `COMPLAINTS:\n${complaints.join("\n")}` : "",
+    `AREA/PAGE: ${experiment.page}`,
+    `BROKEN BEHAVIOR: ${experiment.control}`,
+    `INTENDED FIX: ${experiment.treatment}`,
+    "Reproduce or locate the bug by reading the code and cite the relevant path:line in your final response. Make the smallest correct fix of the root cause.",
+    "Add or update a test when the repository has tests nearby. Run the project's relevant checks. Never add a feature flag, variant, experiment gate, or A/B test.",
+    `Work on branch ${branch} from the default branch. Never touch unrelated code. Commit and push the change, but do not open or merge a pull request.`,
+    "If you cannot find a real bug supported by the complaints, say so plainly and do not push a branch.",
+    `If you pushed the fix, end your final response with exactly: BRANCH: ${branch}`,
+  ].filter(Boolean).join("\n\n");
+}
+
 export function codeRules(flag: string, external: boolean): string {
   if (external) {
     return [
@@ -110,4 +132,26 @@ export function pullBody(experiment: TaskExperiment, signal: TaskSignal | undefi
     "",
     "_Opened by Kismet._",
   ].filter((line) => line !== "").join("\n");
+}
+
+export function fixPullBody(experiment: TaskExperiment, signal: TaskSignal | undefined, agentReport: string): string {
+  return [
+    `## ${experiment.title}`,
+    "",
+    "### Complaints",
+    ...(signal?.evidence.slice(0, 8).map((item) => `- [${item.source ?? "unknown"}] “${item.title}”`) ?? ["- No complaint text available."]),
+    "",
+    "### What was broken",
+    experiment.hypothesis || experiment.control,
+    "",
+    "### Fix",
+    experiment.treatment,
+    "",
+    "### Tests run",
+    agentReport.trim() || "See the commits and pull request checks for the coding agent's verification.",
+    "",
+    "After merge, Kismet watches for new complaints for 14 days.",
+    "",
+    "_Opened by Kismet._",
+  ].join("\n");
 }

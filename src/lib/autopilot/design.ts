@@ -61,6 +61,53 @@ interface ChangeAnswer extends DesignAnswer {
   question?: string;
 }
 
+async function designFix(candidate: Signal, experiments: Experiment[]): Promise<string> {
+  const previous = experiments.filter((experiment) => experiment.signalId === candidate.id);
+  const version = previous.length + 1;
+  const system = [
+    "You are fixing a reported bug. Explain what is most likely broken given the evidence, the fix, and what could go wrong.",
+    "Do not propose experiments, flags, variants, or A/B tests.",
+    "Return JSON: {title,hypothesis,control,treatment,page,reasoning,evidence:[{source,quote}],confidence,confidenceReason,risks}.",
+    "title is a short description without a Fix prefix. hypothesis says what is broken. treatment is the intended fix in one or two sentences.",
+    "confidence must be high or medium. Cite 2–6 complaints when available.",
+  ].join(" ");
+  const user = JSON.stringify({
+    problem: { title: candidate.title, description: candidate.problem, area: candidate.area },
+    complaints: candidate.evidence.slice(0, 15).map((item) => ({ source: item.source, author: item.author, title: item.title, body: item.body })),
+  });
+  const answer = readJson<ChangeAnswer>(await askForJson(system, user, false, undefined, "experiment"));
+  const cited = (answer.evidence ?? []).filter((item) => item.source?.trim() && item.quote?.trim()).slice(0, 6);
+  if (!answer.title?.trim() || !answer.treatment?.trim() || !answer.reasoning?.trim() || !answer.confidence || answer.confidence === "low" || !cited.length) {
+    throw new Error("The fix design was missing a title, fix, reasoning, confidence, or complaint.");
+  }
+  const shortTitle = answer.title.trim().replace(/^fix:\s*/i, "");
+  await createExperiment({
+    signalId: candidate.id,
+    version,
+    kind: "fix",
+    title: `Fix: ${shortTitle}`,
+    hypothesis: answer.hypothesis?.trim() || candidate.problem,
+    metric: "",
+    metricSpec: null,
+    page: answer.page?.trim().startsWith("/") ? answer.page.trim() : candidate.area,
+    guardrail: "",
+    control: answer.control?.trim() || candidate.problem,
+    treatment: answer.treatment.trim(),
+    flag: `fix-${slug(shortTitle)}-v${version}`,
+    estimate: null,
+    rationale: {
+      reasoning: answer.reasoning.trim(),
+      evidence: cited.map((item) => ({ source: item.source!.trim(), quote: item.quote!.trim() })),
+      confidence: answer.confidence,
+      confidenceReason: answer.confidenceReason?.trim() ?? "",
+      risks: answer.risks?.trim() ?? "",
+    },
+  });
+  await setSignalStatus(candidate.id, "experimenting");
+  await log("design", `Proposed a fix “${shortTitle}” for “${candidate.title}”.`, candidate.id);
+  return `Proposed a fix for “${candidate.title}”.`;
+}
+
 function attemptsSummary(previous: Experiment[]): string {
   if (previous.length === 0) return "No earlier attempts.";
   return previous
@@ -78,6 +125,7 @@ function attemptsSummary(previous: Experiment[]): string {
  * but builds it anyway with its estimate instead of snoozing it.
  */
 async function designCandidate(candidate: Signal, experiments: Experiment[], personApproved = false): Promise<string | null> {
+  if (candidate.kind === "bug") return designFix(candidate, experiments);
   const previous = experiments.filter((e) => e.signalId === candidate.id).sort((a, b) => a.version - b.version);
   if (previous.length >= MAX_VERSIONS) {
     await setSignalStatus(candidate.id, "dismissed");

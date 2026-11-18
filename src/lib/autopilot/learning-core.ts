@@ -1,6 +1,7 @@
 import type { Experiment, Learning, LearningOutcome } from "@/lib/autopilot/types";
 
 export function outcomeFor(experiment: Experiment): LearningOutcome {
+  if (experiment.kind === "fix" && experiment.verdict) return experiment.verdict;
   if (experiment.status === "rejected" && experiment.rejectedBy !== "kismet") return "rejected";
   if (experiment.kind === "change" && experiment.startedAt) return "directional";
   const verdict = experiment.readout?.verdict;
@@ -33,6 +34,8 @@ export function fallbackLearning(experiment: Experiment, outcome: LearningOutcom
   const page = experiment.page || "the tested page";
   const metric = experiment.metric || "the target metric";
   const lift = experiment.readout?.lift;
+  if (outcome === "fixed") return `After fixing ${change} on ${page}, no new complaints arrived for 14 days.`;
+  if (outcome === "not_fixed") return `The fix for ${change} on ${page} did not stop the complaints; the problem needs another root-cause investigation.`;
   if (outcome === "directional") {
     const before = experiment.directional?.before;
     const after = experiment.directional?.after;

@@ -20,6 +20,7 @@ export interface Theme {
   trend: ThemeTrend;
   quotes: ThemeQuote[];
   hasNumbers: boolean;
+  kind: Signal["kind"];
 }
 
 const person = (evidence: Pick<Evidence, "author">) => {
@@ -93,6 +94,7 @@ export function buildThemes(signals: Signal[], now: Date): Theme[] {
         trend,
         quotes: representativeQuotes(qualitative),
         hasNumbers: signal.evidence.some((item) => item.source === "analytics"),
+        kind: signal.kind,
       }];
     })
     .sort((a, b) => b.people - a.people || b.mentions - a.mentions);

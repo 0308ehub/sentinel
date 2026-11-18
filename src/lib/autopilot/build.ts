@@ -106,6 +106,11 @@ export async function buildNext(): Promise<string | null> {
     await setSignalStatus(experiment.signalId, "open");
     return `Stopped “${experiment.title}”. The coding agent did not ship a change.`;
   }
+  if (experiment.kind === "fix") {
+    if (await agentBuildAvailable()) return startAgentBuild(experiment, signal);
+    await updateExperiment(experiment.id, { note: "A coding agent is required to build this fix." });
+    return null;
+  }
   // The account's own agent (Cursor or Claude Code) pushes to GitHub, so a dry run keeps to the paths below.
   const builder = await accountBuilder();
   if (builder !== "kismet" && !autopilotDryRun() && !isLocalSource()) return startDispatchBuild(experiment, signal, builder);
@@ -172,7 +177,7 @@ export async function followPulls(start: (experiment: Experiment) => Promise<unk
     const pull = await getPull(repo, experiment.prNumber!);
     if (pull.merged) {
       await start(experiment);
-      done.push(`Started “${experiment.title}” (merged on GitHub).`);
+      done.push(experiment.kind === "fix" ? `Merged “${experiment.title}” on GitHub; watching for complaints.` : `Started “${experiment.title}” (merged on GitHub).`);
       continue;
     }
     if (pull.state === "closed") {

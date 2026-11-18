@@ -9,7 +9,7 @@ function experiment(overrides = {}) {
     flag: "short-form", status: "stopped", rejectedBy: null, branch: null, prUrl: null, prNumber: null, note: null,
     readout: null, rationale: null, directional: null, estimate: null, draftPath: null, coderSessionId: null, agentFailed: false, builder: null, buildRef: null,
     buildUrl: null, buildStartedAt: null, cleanup: null, createdAt: "2026-01-01T00:00:00.000Z", startedAt: null,
-    endedAt: "2026-01-02T00:00:00.000Z", ...overrides,
+    endedAt: "2026-01-02T00:00:00.000Z", verifiedAt: null, verdict: null, ...overrides,
   };
 }
 
@@ -27,6 +27,8 @@ test("outcomeFor maps every finished experiment result", () => {
   assert.equal(outcomeFor(experiment({ readout: readout("collecting") })), "inconclusive");
   assert.equal(outcomeFor(experiment({ status: "rejected", rejectedBy: "person" })), "rejected");
   assert.equal(outcomeFor(experiment({ kind: "change", status: "rolled_out", startedAt: "2026-01-01T00:00:00Z" })), "directional");
+  assert.equal(outcomeFor(experiment({ kind: "fix", status: "rolled_out", verdict: "fixed" })), "fixed");
+  assert.equal(outcomeFor(experiment({ kind: "fix", status: "rolled_out", verdict: "not_fixed" })), "not_fixed");
 });
 
 test("fallbackLearning writes result, flat, inconclusive, and rejection takeaways", () => {
@@ -35,6 +37,8 @@ test("fallbackLearning writes result, flat, inconclusive, and rejection takeaway
   assert.match(fallbackLearning(measured, "flat"), /made no measurable difference/);
   assert.match(fallbackLearning(experiment(), "inconclusive"), /did not collect enough evidence/);
   assert.equal(fallbackLearning(experiment(), "rejected"), "A person rejected this change before it ran: a shorter form.");
+  assert.match(fallbackLearning(experiment({ kind: "fix" }), "fixed"), /no new complaints/);
+  assert.match(fallbackLearning(experiment({ kind: "fix" }), "not_fixed"), /did not stop the complaints/);
   assert.equal(
     fallbackLearning(experiment({ kind: "change", directional: { before: { visitors: 20, conversions: 2 }, after: { visitors: 25, conversions: 5 }, at: "2026-01-15T00:00:00Z" } }), "directional"),
     "After shipping a shorter form to everyone on /signup, signup completion moved from 10.0% to 20.0% (not a controlled test).",

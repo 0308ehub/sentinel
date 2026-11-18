@@ -296,7 +296,7 @@ export function ExperimentBoard({
                       </div>
                       <div className="text-xs text-[#9aa0a8]">{row.key}</div>
                     </td>
-                    <td className="whitespace-nowrap">{row.kind === "experiment" && row.experiment.kind === "change" ? "Change" : "A/B Test"}</td>
+                    <td className="whitespace-nowrap">{row.kind === "experiment" ? row.experiment.kind === "fix" ? "Fix" : row.experiment.kind === "change" ? "Change" : "A/B Test" : row.signal.kind === "bug" ? "Fix" : "A/B Test"}</td>
                     <td>{row.feature}</td>
                     <td>
                       <Env live={row.live} muted={row.suggested} />
@@ -339,7 +339,7 @@ function ThemesTable({ themes, onOpen }: { themes: AutopilotState["themes"]; onO
       </tr></thead>
       <tbody>{themes.length === 0 ? <tr><td colSpan={6} className="px-3 py-8 text-sm text-[#6b7280]">Themes appear as Kismet reads feedback, Slack, tickets and what you told it.</td></tr> : themes.map((theme) => (
         <tr key={theme.signalId} tabIndex={0} className="cursor-pointer border-b border-[#eef0f3] text-[#374151] hover:bg-[#f8fafc] focus:bg-[#f8fafc] [&>td]:px-3" onClick={() => onOpen(theme.signalId)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(theme.signalId); } }}>
-          <td className="max-w-sm py-3"><div className="font-medium text-[#111827]">{theme.title}</div><div className="mt-0.5 text-xs text-[#9aa0a8]">{theme.problem}</div></td>
+          <td className="max-w-sm py-3"><div className="flex items-center gap-2"><span className="font-medium text-[#111827]">{theme.title}</span>{theme.kind && <span className="rounded border border-[#d5d8de] bg-[#f8fafc] px-1.5 py-0.5 text-[10px] font-medium uppercase text-[#6b7280]">{theme.kind === "bug" ? "Bug" : "Idea"}</span>}</div><div className="mt-0.5 text-xs text-[#9aa0a8]">{theme.problem}</div></td>
           <td>{theme.people}</td><td>{theme.mentions}</td><td className="whitespace-nowrap">{trend[theme.trend]}</td>
           <td className="text-center" aria-label={theme.hasNumbers ? "Also in the numbers" : "Not in the numbers"}>{theme.hasNumbers ? "✓" : "—"}</td>
           <td className="max-w-lg py-3"><ul className="space-y-1 text-xs">{theme.quotes.map((quote, index) => <li key={`${quote.source}-${index}`}>“{quote.text}” <span className="text-[#9aa0a8]">— {quote.source}{quote.author ? ` · ${quote.author}` : ""}</span></li>)}</ul></td>

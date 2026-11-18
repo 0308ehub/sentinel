@@ -1,10 +1,10 @@
 import "server-only";
 
-import { experimentBranch, experimentTask, gateInPatch, pullBody } from "@/lib/autopilot/agent-task";
+import { experimentBranch, experimentTask, fixPullBody, fixTask, gateInPatch, pullBody } from "@/lib/autopilot/agent-task";
 import { cancelOutsideBuild } from "@/lib/autopilot/dispatch";
 import { autopilotDryRun, autopilotRepo, defaultAutopilotRepo } from "@/lib/autopilot/repo";
 import { autopilotUser } from "@/lib/autopilot/scope";
-import { listExperiments, listSignals, log, setSignalStatus, updateExperiment } from "@/lib/autopilot/store";
+import { listExperiments, listSignals, log, setSignalStatus, snoozeSignal, updateExperiment } from "@/lib/autopilot/store";
 import { isLocalSource } from "@/lib/autopilot/source";
 import { startSnapshot } from "@/lib/autopilot/snapshots";
 import type { Experiment, Signal } from "@/lib/autopilot/types";
@@ -34,12 +34,12 @@ export async function startAgentBuild(experiment: Experiment, signal: Signal | u
   const session = await client().beta.sessions.create({
     agent: process.env.KISMET_CODER_AGENT_ID!,
     environment_id: process.env.KISMET_CODER_ENVIRONMENT_ID!,
-    title: `Experiment: ${experiment.title}`.slice(0, 80),
+    title: experiment.kind === "fix" ? experiment.title.slice(0, 80) : `Experiment: ${experiment.title}`.slice(0, 80),
     budget: { type: "limit", max_list_cost: { amount: SESSION_BUDGET_CENTS, currency: "USD" } },
     metadata: { kismet_user: autopilotUser(), kismet_experiment: experiment.id },
     resources: [{ type: "github_repository", url: `https://github.com/${repo}`, authorization_token: token,
       mount_path: "/workspace/repo" }],
-    initial_events: [{ type: "user.message", content: [{ type: "text", text: experimentTask(experiment, signal, external) }] }],
+    initial_events: [{ type: "user.message", content: [{ type: "text", text: experiment.kind === "fix" ? fixTask(experiment, signal) : experimentTask(experiment, signal, external) }] }],
   });
   await updateExperiment(experiment.id, {
     coderSessionId: session.id,
@@ -70,22 +70,24 @@ export async function finishBuild(
   signal: Signal | undefined,
   branch: string,
   by = "Kismet's coding agent",
+  agentReport = "",
 ): Promise<string> {
   const repo = await autopilotRepo();
   const base = await repoDefaultBranch(repo);
   const files = await compareFiles(repo, base, branch);
   const external = repo !== defaultAutopilotRepo();
   const gate = external ? `kismet.variant("${experiment.flag}")` : `useVariant("${experiment.flag}")`;
-  if (!gateInPatch(files, gate)) return failBuild(experiment, "the coding agent did not add the experiment gate");
-  const changed = files.find((file) => file.patch?.includes(gate));
-  if (!changed) return failBuild(experiment, "the gated file could not be found");
+  if (experiment.kind !== "fix" && !gateInPatch(files, gate)) return failBuild(experiment, "the coding agent did not add the experiment gate");
+  const changed = experiment.kind === "fix" ? files.find((file) => file.patch) : files.find((file) => file.patch?.includes(gate));
+  if (!changed) return failBuild(experiment, experiment.kind === "fix" ? "the coding agent did not change any files" : "the gated file could not be found");
   const [draft, original] = await Promise.all([
     readFile(repo, changed.filename, branch),
     readFile(repo, changed.filename, base),
   ]);
   if (!draft || !original) return failBuild(experiment, "the gated file could not be read");
   const pull = await createPullFromBranch(
-    repo, branch, base, `Experiment: ${experiment.title}`, pullBody(experiment, signal, experiment.treatment),
+    repo, branch, base, experiment.kind === "fix" ? experiment.title : `Experiment: ${experiment.title}`,
+    experiment.kind === "fix" ? fixPullBody(experiment, signal, agentReport) : pullBody(experiment, signal, experiment.treatment),
   );
   await updateExperiment(experiment.id, {
     status: "awaiting_approval", prUrl: pull.url, prNumber: pull.number, branch,
@@ -115,15 +117,25 @@ async function followOne(experiment: Experiment, signal: Signal | undefined): Pr
     return null;
   }
   if (view.status === "running" || view.status === "rescheduling") return null;
-  if (view.status === "idle" && view.stopReason === "end_turn" && view.branch) {
-    return finishBuild(experiment, signal, view.branch);
-  }
   const said = [...view.items].reverse().find((item) => item.kind === "agent" && item.text);
+  const agentReport = said?.kind === "agent" ? said.text : "";
+  if (view.status === "idle" && view.stopReason === "end_turn" && view.branch) {
+    return finishBuild(experiment, signal, view.branch, "Kismet's coding agent", agentReport);
+  }
   const explanation = said && said.kind === "agent" ? said.text.split("\n").map((line) => line.trim()).find(Boolean)?.slice(0, 240) : "";
   const reason = view.status === "terminated" ? "the coding session terminated" :
     view.stopReason === "budget_reached" ? "the coding session reached its budget" :
       view.branch ? "the coding session did not finish normally" :
         explanation || "the coding agent did not report a branch";
+  const couldNotFindBug = /could not find|couldn't find|cannot find|no (?:real )?bug|could not reproduce|couldn't reproduce|cannot reproduce/i.test(agentReport);
+  if (experiment.kind === "fix" && !view.branch && couldNotFindBug) {
+    const note = `Could not find a real bug to fix: ${reason}`;
+    await updateExperiment(experiment.id, { status: "failed", coderSessionId: null, agentFailed: true, endedAt: new Date().toISOString(), note });
+    await setSignalStatus(experiment.signalId, "open");
+    await snoozeSignal(experiment.signalId);
+    await log("build", `${note}. Kismet will look again in 7 days.`, experiment.id);
+    return note;
+  }
   return failBuild(experiment, reason);
 }
 

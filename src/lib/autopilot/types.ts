@@ -26,6 +26,8 @@ export interface Signal {
   problem: string;
   area: string;
   status: SignalStatus;
+  kind: "bug" | "idea" | null;
+  kindReason: string | null;
   createdAt: string;
   updatedAt: string;
   evidence: Evidence[];
@@ -126,7 +128,7 @@ export interface Experiment {
   id: string;
   signalId: string;
   version: number;
-  kind: "test" | "change";
+  kind: "test" | "change" | "fix";
   title: string;
   hypothesis: string;
   metric: string;
@@ -164,9 +166,11 @@ export interface Experiment {
   createdAt: string;
   startedAt: string | null;
   endedAt: string | null;
+  verifiedAt: string | null;
+  verdict: "fixed" | "not_fixed" | null;
 }
 
-export type LearningOutcome = "won" | "lost" | "flat" | "inconclusive" | "rejected" | "directional";
+export type LearningOutcome = "won" | "lost" | "flat" | "inconclusive" | "rejected" | "directional" | "fixed" | "not_fixed";
 
 export interface Learning {
   id: string;

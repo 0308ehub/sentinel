@@ -23,6 +23,7 @@ export async function learnFromFinished(): Promise<string | null> {
         "Say what changed, what happened to the metric including the numeric result and certainty when available,",
         "and what this suggests trying or avoiding next. Return JSON: {learning}.",
         experiment.kind === "change" ? "This was shipped to everyone and followed up with a directional before/after, not a controlled test. Say that plainly and do not claim causation." : "",
+        experiment.kind === "fix" ? "This was a bug fix verified by whether complaints continued, not a controlled test. Say that plainly and do not discuss lift or causation." : "",
       ].join(" ");
       const user = JSON.stringify({ problem, experiment: {
         title: experiment.title, hypothesis: experiment.hypothesis, control: experiment.control,

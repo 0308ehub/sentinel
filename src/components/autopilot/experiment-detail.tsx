@@ -135,7 +135,7 @@ export function ExperimentDetail({
         <div>
           <h1 className="text-xl leading-tight text-[#111827]">{title}</h1>
           <p className="mt-2 text-xs text-[#6b7280]">
-            {experiment?.kind === "change" ? "Change" : "A/B Test"} · <span className={status === "Running" ? "text-[#1f9d55]" : "text-[#374151]"}>{status}</span>
+            {experiment?.kind === "fix" ? "Fix" : experiment?.kind === "change" ? "Change" : "A/B Test"} · <span className={status === "Running" ? "text-[#1f9d55]" : "text-[#374151]"}>{status}</span>
           </p>
           {suggested && (
             <p className="mt-2 inline-flex rounded border border-[#c7d7fe] bg-[#eef4ff] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-brand">
@@ -148,7 +148,7 @@ export function ExperimentDetail({
           <Fact label="Days running" value={daysRunning(experiment)} />
           <Fact label="Audiences" value="Everyone" />
           <Fact label="Experiment visitors" value={visitors ? visitors.toLocaleString("en-US") : "—"} />
-          {experiment?.estimate && experiment.kind !== "change" && (
+          {experiment?.estimate && experiment.kind === "test" && (
             <div>
               <Fact label="Expected result" value={`~${experiment.estimate.days} days`} />
               <p className="mt-1 text-[11px] leading-4 text-[#9aa0a8]">
@@ -219,7 +219,7 @@ function MainPanel(props: {
   const { experiment, decisions, ...results } = props;
   const hasChange = hasCodeChange(experiment);
   const hasResults = Boolean(
-    props.readout || experiment?.status === "running" || experiment?.status === "awaiting_rollout" || experiment?.endedAt,
+    experiment?.kind === "fix" || props.readout || experiment?.status === "running" || experiment?.status === "awaiting_rollout" || experiment?.endedAt,
   );
   const change = experiment && hasChange ? (
     <section>
@@ -237,7 +237,7 @@ function MainPanel(props: {
       <div>
         {change}
         <p className="border-t border-[#e6e8ec] px-4 py-3 text-xs text-[#6b7280]">
-          Results appear here once the experiment is live and counting visitors.
+          {experiment?.kind === "fix" ? "After merging, Kismet watches whether these complaints stop for 14 days." : "Results appear here once the experiment is live and counting visitors."}
         </p>
       </div>
     );
@@ -245,7 +245,7 @@ function MainPanel(props: {
   return (
     <div>
       {!change && decisions && <div className="flex justify-end border-b border-[#e6e8ec] px-4 py-3">{decisions}</div>}
-      {experiment?.kind === "change" ? <ChangeFollowUp experiment={experiment} /> : <ResultsCanvas experiment={experiment} {...results} />}
+      {experiment?.kind === "fix" ? <FixFollowUp experiment={experiment} signal={props.signal} /> : experiment?.kind === "change" ? <ChangeFollowUp experiment={experiment} /> : <ResultsCanvas experiment={experiment} {...results} />}
       {change && <div className="border-t border-[#e6e8ec]">{change}</div>}
     </div>
   );
@@ -274,8 +274,8 @@ function Autonomous({
         </div>
       )}
       {experiment?.hypothesis && <p>{experiment.hypothesis}</p>}
-      {experiment?.kind === "change" && experiment.rationale && <ChangeRationaleBlock experiment={experiment} />}
-      {experiment && <p className="text-[#374151]">{experiment.metric}</p>}
+      {(experiment?.kind === "change" || experiment?.kind === "fix") && experiment.rationale && <ChangeRationaleBlock experiment={experiment} signal={signal} />}
+      {experiment?.metric && <p className="text-[#374151]">{experiment.metric}</p>}
       {experiment?.guardrail && <p className="text-[#374151]">Guardrail: {experiment.guardrail}</p>}
       {suggested && !experiment && (
         <p className="text-[#374151]">Approving this lets Kismet design the change, the metric, and the guardrail.</p>
@@ -311,16 +311,19 @@ function LearningBadge({ outcome }: { outcome: Learning["outcome"] }) {
   return <span className={`rounded border px-1.5 py-0.5 text-[10px] font-medium uppercase ${styles}`}>{outcome}</span>;
 }
 
-function ChangeRationaleBlock({ experiment }: { experiment: Experiment }) {
+function ChangeRationaleBlock({ experiment, signal }: { experiment: Experiment; signal: Signal | null }) {
   const [copied, setCopied] = useState(false);
   const rationale = experiment.rationale;
   if (!rationale) return null;
   return (
     <div className="space-y-2 rounded border border-[#dbe7ff] bg-[#f8fbff] p-3 text-[#374151]">
-      <p className="font-medium text-[#111827]">Why Kismet thinks this helps</p>
+      <p className="font-medium text-[#111827]">{experiment.kind === "fix" ? "Why Kismet thinks this is a bug" : "Why Kismet thinks this helps"}</p>
       <p className="leading-5">{rationale.reasoning}</p>
       <ul className="space-y-1">
-        {rationale.evidence.map((item, index) => <li key={`${item.source}-${index}`}>“{item.quote}” <span className="text-[#6b7280]">— {item.source}</span></li>)}
+        {rationale.evidence.map((item, index) => {
+          const author = signal?.evidence.find((evidence) => evidence.source === item.source && `${evidence.title} ${evidence.body}`.toLowerCase().includes(item.quote.toLowerCase().slice(0, 40)))?.author;
+          return <li key={`${item.source}-${index}`}>“{item.quote}” <span className="text-[#6b7280]">— {item.source}{author ? ` · ${author}` : ""}</span></li>;
+        })}
       </ul>
       <p><span className="font-medium">Confidence: {rationale.confidence === "high" ? "High" : "Medium"}</span> — {rationale.confidenceReason}</p>
       <p><span className="font-medium">What could go wrong:</span> {rationale.risks}</p>
@@ -385,10 +388,10 @@ function Decisions({
           <>
             <Button size="sm" className="bg-[#111] text-white hover:bg-[#2a2a2a]" onClick={onApprove} disabled={busy !== null}>
               {busy === id + "approve" && <Loader2 className="animate-spin" />}
-              {experiment.kind === "change" ? "Approve & ship to everyone" : "Approve & ship"}
+              {experiment.kind === "fix" ? "Approve & merge" : experiment.kind === "change" ? "Approve & ship to everyone" : "Approve & ship"}
             </Button>
             <Button size="sm" variant="outline" onClick={onReject} disabled={busy !== null}>
-              Discard change
+              {experiment.kind === "fix" ? "Discard fix" : "Discard change"}
             </Button>
           </>
         )}
@@ -524,6 +527,26 @@ function ChangeFollowUp({ experiment }: { experiment: Experiment }) {
             <div className="rounded bg-[#f8fafc] p-3"><p className="text-xs text-[#6b7280]">14 days before</p><p className="mt-1 text-2xl font-medium">{display(rate(result.before))}</p><p className="text-xs text-[#6b7280]">{result.before.conversions} conversions · {result.before.visitors} visitors</p></div>
             <div className="rounded bg-[#f8fafc] p-3"><p className="text-xs text-[#6b7280]">After shipping</p><p className="mt-1 text-2xl font-medium">{display(rate(result.after))}</p><p className="text-xs text-[#6b7280]">{result.after.conversions} conversions · {result.after.visitors} visitors</p></div>
           </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function FixFollowUp({ experiment, signal }: { experiment: Experiment; signal: Signal | null }) {
+  const complaints = experiment.startedAt
+    ? signal?.evidence.filter((item) => item.source !== "analytics" && Date.parse(item.occurredAt) > Date.parse(experiment.startedAt!)).length ?? 0
+    : 0;
+  return (
+    <section className="px-4 py-5 text-[#374151]">
+      <div className="rounded border border-[#e1e4e8] p-4">
+        <h2 className="text-sm font-medium text-[#111827]">Follow-up</h2>
+        {experiment.verifiedAt ? (
+          <p className="mt-3 text-sm">{experiment.note}</p>
+        ) : experiment.startedAt ? (
+          <p className="mt-3 text-sm">Watching since {formatDay(experiment.startedAt)}: {complaints} new complaint{complaints === 1 ? "" : "s"} so far.</p>
+        ) : (
+          <p className="mt-3 text-sm">After merging, Kismet watches whether these complaints stop for 14 days.</p>
         )}
       </div>
     </section>

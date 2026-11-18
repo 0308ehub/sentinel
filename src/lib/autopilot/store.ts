@@ -71,7 +71,7 @@ function toExperiment(row: Row): Experiment {
     id: String(row.id),
     signalId: String(row.signal_id),
     version: Number(row.version),
-    kind: row.kind === "change" ? "change" : "test",
+    kind: row.kind === "change" || row.kind === "fix" ? row.kind : "test",
     title: String(row.title),
     hypothesis: String(row.hypothesis ?? ""),
     metric: String(row.metric ?? ""),
@@ -113,6 +113,8 @@ function toExperiment(row: Row): Experiment {
     createdAt: iso(row.created_at),
     startedAt: isoOrNull(row.started_at),
     endedAt: isoOrNull(row.ended_at),
+    verifiedAt: isoOrNull(row.verified_at),
+    verdict: row.verdict === "fixed" || row.verdict === "not_fixed" ? row.verdict : null,
   };
 }
 
@@ -180,6 +182,14 @@ export async function setSignalStatus(id: string, status: SignalStatus): Promise
   await sql`update kismet.signals set status = ${status}, updated_at = now() where user_id = ${scopeUser()} and id = ${id}`;
 }
 
+export async function setSignalTriage(id: string, kind: "bug" | "idea", reason: string): Promise<void> {
+  const sql = await db();
+  await sql`
+    update kismet.signals set kind = ${kind}, kind_reason = ${reason.slice(0, 500)}, updated_at = now()
+    where user_id = ${scopeUser()} and id = ${id} and kind is null
+  `;
+}
+
 export async function listSignals(): Promise<Signal[]> {
   const sql = await db();
   const userId = scopeUser();
@@ -213,6 +223,8 @@ export async function listSignals(): Promise<Signal[]> {
         problem: String(row.problem ?? ""),
         area: String(row.area ?? ""),
         status: row.status as SignalStatus,
+        kind: row.kind === "bug" || row.kind === "idea" ? row.kind : null,
+        kindReason: (row.kind_reason as string | null) ?? null,
         createdAt: iso(row.created_at),
         updatedAt: iso(row.updated_at),
         evidence: items,
@@ -220,6 +232,7 @@ export async function listSignals(): Promise<Signal[]> {
         staleEvidence: staleBySignal.get(String(row.id)) ?? 0,
         sources,
         ready: signalIsReady({
+          kind: row.kind === "bug" || row.kind === "idea" ? row.kind : null,
           distinctEvidence,
           distinctSources: sources.length,
           evidence: items,
@@ -433,14 +446,14 @@ export async function createExperiment(input: {
   title: string;
   hypothesis: string;
   metric: string;
-  metricSpec: MetricSpec;
+  metricSpec?: MetricSpec | null;
   page: string;
   guardrail: string;
   guardrailSpec?: MetricSpec | null;
   control: string;
   treatment: string;
   flag: string;
-  estimate: ResultEstimate;
+  estimate?: ResultEstimate | null;
   kind?: Experiment["kind"];
   rationale?: Experiment["rationale"];
 }): Promise<string> {
@@ -451,8 +464,8 @@ export async function createExperiment(input: {
       (id, user_id, signal_id, version, kind, title, hypothesis, metric, metric_spec, guardrail_spec, page, guardrail, control, treatment, flag, estimate, rationale, status)
     values
       (${id}, ${scopeUser()}, ${input.signalId}, ${input.version}, ${input.kind ?? "test"}, ${input.title.slice(0, 200)}, ${input.hypothesis.slice(0, 1000)},
-       ${input.metric.slice(0, 120)}, ${sql.json(input.metricSpec)}, ${input.guardrailSpec ? sql.json(input.guardrailSpec) : null}, ${input.page.slice(0, 200)}, ${input.guardrail.slice(0, 300)}, ${input.control.slice(0, 500)},
-       ${input.treatment.slice(0, 500)}, ${input.flag}, ${sql.json(input.estimate as never)}, ${input.rationale ? sql.json(input.rationale as never) : null}, 'building')
+       ${input.metric.slice(0, 120)}, ${input.metricSpec ? sql.json(input.metricSpec) : null}, ${input.guardrailSpec ? sql.json(input.guardrailSpec) : null}, ${input.page.slice(0, 200)}, ${input.guardrail.slice(0, 300)}, ${input.control.slice(0, 500)},
+       ${input.treatment.slice(0, 500)}, ${input.flag}, ${input.estimate ? sql.json(input.estimate as never) : null}, ${input.rationale ? sql.json(input.rationale as never) : null}, 'building')
   `;
   return id;
 }
@@ -485,6 +498,8 @@ export async function updateExperiment(
     overlap: string | null;
     startedAt: string | null;
     endedAt: string | null;
+    verifiedAt: string | null;
+    verdict: "fixed" | "not_fixed" | null;
   }>
 ): Promise<void> {
   const sql = await db();
@@ -514,6 +529,8 @@ export async function updateExperiment(
   if (patch.overlap !== undefined) columns.overlap = patch.overlap;
   if (patch.startedAt !== undefined) columns.started_at = patch.startedAt;
   if (patch.endedAt !== undefined) columns.ended_at = patch.endedAt;
+  if (patch.verifiedAt !== undefined) columns.verified_at = patch.verifiedAt;
+  if (patch.verdict !== undefined) columns.verdict = patch.verdict;
   if (Object.keys(columns).length === 0) return;
   await sql`update kismet.experiments set ${sql(columns)} where user_id = ${scopeUser()} and id = ${id}`;
 }
