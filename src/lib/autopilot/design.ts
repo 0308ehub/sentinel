@@ -19,9 +19,9 @@ async function productContext(): Promise<string> {
     [
       "Kismet is a Next.js web app for product managers.",
       "Pages: /ai (chat), /experiments, /dashboard, /explorer, /features (feature list), /features/[id], /board, /timeline, /graph,",
-      "/analytics, /decisions, /connectors, /settings, /settings/connectors/*.",
+      "/analytics, /decisions, /integrations, /settings, /settings/connectors/*.",
       "The live /experiments page is a table: name, type, feature, environments, modified, created, and a Results button.",
-      "A blue Create New Experiment button runs Kismet's loop. Suggested rows are grey, marked Suggested, until a person approves them.",
+      "A black Create New Experiment button runs Kismet's loop. Suggested rows are grey, marked Suggested, until a person approves them.",
       "Opening a running experiment shows variations, conversions per visitor, improvement, a confidence interval, and visitors over time.",
       "Design a change to controls that are on the page today, or add one new control. Do not make a missing button more prominent.",
       "Creating a feature happens through the command palette item Propose feature…, whose submit button is Propose & open workspace.",

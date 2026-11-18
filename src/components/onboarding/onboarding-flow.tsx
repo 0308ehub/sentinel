@@ -259,7 +259,7 @@ function GitHubStep({ onBack, onNext }: { onBack: () => void; onNext: () => void
     >
       {connected ? (
         <div className="rounded-xl border border-[#e6e8ec] p-4">
-          <p className="mb-4 flex items-center gap-2 text-sm font-medium"><Check className="h-4 w-4 text-[#0571d3]" />Connected{login ? ` as ${login}` : ""}</p>
+          <p className="mb-4 flex items-center gap-2 text-sm font-medium"><Check className="h-4 w-4 text-brand" />Connected{login ? ` as ${login}` : ""}</p>
           <GitHubImportList
             repos={repos}
             namespaces={namespaces}
@@ -365,7 +365,7 @@ function GitHubToken({
           href="https://github.com/settings/personal-access-tokens/new"
           target="_blank"
           rel="noreferrer"
-          className="text-[#0571d3] underline underline-offset-2 focus-visible:outline focus-visible:outline-2"
+          className="text-brand underline underline-offset-2 focus-visible:outline focus-visible:outline-2"
         >
           Create a fine-grained token
         </a>{" "}
@@ -576,7 +576,7 @@ function EvidenceCard({ title, connected, detail, children }: { title: string; c
     <section className="rounded-xl border border-[#e6e8ec] p-4">
       <div className="flex items-center justify-between">
         <h2 className="font-medium">{title}</h2>
-        {connected ? <span className="flex items-center gap-1 text-sm text-[#0571d3]"><Check className="h-4 w-4" />Connected{detail ? ` · ${detail}` : ""}</span> : null}
+        {connected ? <span className="flex items-center gap-1 text-sm text-brand"><Check className="h-4 w-4" />Connected{detail ? ` · ${detail}` : ""}</span> : null}
       </div>
       {!connected ? <div className="mt-4">{children}</div> : null}
     </section>

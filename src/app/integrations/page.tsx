@@ -3,14 +3,14 @@ import { MarketingFrame } from "@/components/marketing/marketing-frame";
 import { ConnectorsGallery } from "@/components/marketing/connectors-gallery";
 
 export const metadata: Metadata = {
-  title: "Connectors — Kismet",
-  description: "The tools Kismet can read from the company you already run.",
+  title: "Integrations — Kismet",
+  description: "Search Kismet's integrations. Connect them once and Kismet already has the company context.",
 };
 
-export default function ConnectorsPage() {
+export default function IntegrationsPage() {
   return (
     <MarketingFrame>
-      <main className="px-6 py-10 md:px-12">
+      <main>
         <ConnectorsGallery />
       </main>
     </MarketingFrame>

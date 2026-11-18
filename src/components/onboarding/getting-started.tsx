@@ -66,7 +66,7 @@ export function GettingStarted() {
           return (
             <li key={item.key}>
               <Link href={item.href} className="flex items-center gap-2 rounded-md px-1 py-1.5 text-sm hover:bg-muted focus-visible:outline focus-visible:outline-2">
-                {done ? <Check className="h-4 w-4 text-[#0571d3]" aria-hidden /> : <Circle className="h-4 w-4 text-muted-foreground" aria-hidden />}
+                {done ? <Check className="h-4 w-4 text-brand" aria-hidden /> : <Circle className="h-4 w-4 text-muted-foreground" aria-hidden />}
                 <span className={done ? "text-muted-foreground line-through" : "text-foreground"}>{item.label}</span>
               </Link>
             </li>

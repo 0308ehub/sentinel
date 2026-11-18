@@ -30,7 +30,7 @@ function funnelDefaults(products: string[]): FunnelStepInput[] {
   return steps;
 }
 
-const COLORS = ["#0571d3", "#16803c", "#7c3aed", "#d97706", "#db2777", "#0f766e", "#111111", "#ca8a04"];
+const COLORS = ["#0a4f8c", "#16803c", "#7c3aed", "#d97706", "#db2777", "#0f766e", "#111111", "#ca8a04"];
 
 const MEASURES: { id: ExploreMeasure; label: string }[] = [
   { id: "uniques", label: "Uniques" },

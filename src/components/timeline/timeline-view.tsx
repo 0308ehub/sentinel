@@ -10,11 +10,11 @@ import { PersonAvatar } from "@/components/shared/person-avatar";
 const EVENT_COLORS: Record<string, string> = {
   idea: "#1d4e89",
   research: "#6a717c",
-  decision: "#0571d3",
+  decision: "#0a4f8c",
   documentation: "#8b949e",
   design: "#374151",
   implementation: "#1d4e89",
-  launch: "#0571d3",
+  launch: "#0a4f8c",
   feedback: "#d93025",
   experiment: "#c4a15a",
 };

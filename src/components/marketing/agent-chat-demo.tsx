@@ -66,7 +66,7 @@ export function AgentChatDemo() {
               onClick={() => show(PROMPTS.findIndex((item) => item.tag === tag))}
               className={cn(
                 "rounded-full px-2 py-0.5 text-xs",
-                prompt.tag === tag ? "bg-[#eef3f8] font-medium text-[#1c3a5a]" : "text-[#6a717c] hover:text-[#111]",
+                prompt.tag === tag ? "bg-[#f3f4f6] font-medium text-[#111]" : "text-[#6a717c] hover:text-[#111]",
               )}
             >
               {tag}
@@ -79,7 +79,7 @@ export function AgentChatDemo() {
             type="button"
             aria-label="Send"
             onClick={() => show((index + 1) % PROMPTS.length)}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[#0571d3] text-white hover:bg-[#0460b5]"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[#111] text-white hover:bg-[#2a2a2a]"
           >
             <ArrowUp className="h-4 w-4" />
           </button>

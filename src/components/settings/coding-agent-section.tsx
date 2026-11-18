@@ -153,7 +153,7 @@ export function CodingAgentSection({ repo }: { repo: string }) {
             <p className="text-xs text-muted-foreground">
               Create a key in the{" "}
               <a
-                className="text-[#0571d3] hover:underline"
+                className="text-brand hover:underline"
                 href="https://cursor.com/dashboard/integrations"
                 target="_blank"
                 rel="noreferrer"

@@ -162,7 +162,7 @@ export function readLiving(metadata: Record<string, unknown>, seed?: { introduct
       ? doc.comments.filter(isComment).slice(0, 30).map((item) => ({
           id: item.id,
           author: text(item.author, 40) || "Kismet",
-          color: text(item.color, 20) || "#0571d3",
+          color: text(item.color, 20) || "#0a4f8c",
           section: "document" as const,
           body: text(item.body, 2000),
           at: text(item.at, 40),

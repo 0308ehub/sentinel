@@ -29,10 +29,10 @@ import "./feature-bento.css";
 // its chrome. Ask, plan, and ship loop. Connector bubbles keep drifting.
 
 const LOOK: LookTokens = {
-  "--ss-accent": "#0571d3",
-  "--ss-accent-2": "#0460b5",
-  "--ss-accent-soft": "rgba(5, 113, 211, 0.12)",
-  "--ss-accent-text": "#0460b5",
+  "--ss-accent": "#0a4f8c",
+  "--ss-accent-2": "#083e70",
+  "--ss-accent-soft": "rgba(10, 79, 140, 0.12)",
+  "--ss-accent-text": "#0a4f8c",
   "--ss-font": "var(--font-satoshi), Satoshi, ui-sans-serif, system-ui, sans-serif",
   "--ss-radius-md": "10px",
   "--ss-radius-lg": "16px",
@@ -84,7 +84,6 @@ const BUBBLE_IDS = [
   "dbt",
   "segment",
   "fivetran",
-  "statsig",
   "hotjar",
   "braze",
   "mailchimp",

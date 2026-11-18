@@ -134,7 +134,7 @@ export function JiraIssuesView() {
                 href="https://id.atlassian.com/manage-profile/security/api-tokens"
                 target="_blank"
                 rel="noreferrer"
-                className="text-[#0571d3] underline-offset-2 hover:underline"
+                className="text-brand underline-offset-2 hover:underline"
               >
                 id.atlassian.com/manage-profile/security/api-tokens
               </a>
@@ -206,7 +206,7 @@ export function JiraIssuesView() {
                   className="block rounded-md border border-border px-3 py-2 hover:bg-muted/40"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs text-[#0571d3]">{issue.key}</span>
+                    <span className="font-mono text-xs text-brand">{issue.key}</span>
                     <Badge variant="muted">{issue.status}</Badge>
                     <ExternalLink className="ml-auto h-3 w-3 text-muted-foreground" />
                   </div>

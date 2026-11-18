@@ -243,7 +243,7 @@ function DocRow({ doc }: { doc: GoogleDoc; }) {
   return (
     <div className="border-b border-border pb-3 last:border-0 last:pb-0">
       {doc.link ? (
-        <a href={doc.link} target="_blank" rel="noreferrer" className="text-sm font-medium text-[#0571d3] hover:underline">
+        <a href={doc.link} target="_blank" rel="noreferrer" className="text-sm font-medium text-brand hover:underline">
           {doc.name}
         </a>
       ) : (

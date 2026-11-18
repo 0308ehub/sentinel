@@ -1,33 +1,33 @@
 @import "tailwindcss";
 
 :root {
-  /* Kismet — white, black, cool gray, logo blue #0571D3 */
+  /* Kismet — black and white, with a darker blue kept for small accents */
   --background: #ffffff;
   --foreground: #111111;
   --card: #ffffff;
   --card-foreground: #111111;
   --popover: #ffffff;
   --popover-foreground: #111111;
-  --primary: #0571d3;
+  --primary: #111111;
   --primary-foreground: #ffffff;
   --secondary: #f4f5f7;
   --secondary-foreground: #111111;
   --muted: #f4f5f7;
   --muted-foreground: #6a717c;
-  --accent: #eef3f8;
+  --accent: #f3f4f6;
   --accent-foreground: #111111;
   --destructive: #d93025;
   --destructive-foreground: #ffffff;
   --border: #e6e8ec;
   --input: #d8dce3;
-  --ring: #0571d3;
+  --ring: #111111;
   --sidebar: #f6f7f9;
   --sidebar-foreground: #111111;
   --sidebar-border: #eceef1;
   --sidebar-accent: #f4f5f7;
-  --success: #0571d3;
+  --success: #1a7f37;
   --warning: #f9ab00;
-  --brand: #0571d3;
+  --brand: #0a4f8c;
   --radius: 6px;
   color-scheme: light;
 }
@@ -40,20 +40,20 @@
   --card-foreground: #111111;
   --popover: #ffffff;
   --popover-foreground: #111111;
-  --primary: #0571d3;
+  --primary: #111111;
   --primary-foreground: #ffffff;
   --secondary: #f4f5f7;
   --secondary-foreground: #111111;
   --muted: #f4f5f7;
   --muted-foreground: #6a717c;
-  --accent: #eef3f8;
+  --accent: #f3f4f6;
   --accent-foreground: #111111;
   --destructive: #d93025;
   --destructive-foreground: #ffffff;
   --border: #e6e8ec;
   --input: #d8dce3;
-  --ring: #0571d3;
-  --brand: #0571d3;
+  --ring: #111111;
+  --brand: #0a4f8c;
 }
 
 .brand-logo-dark {
@@ -83,8 +83,8 @@
   --card-foreground: #f3f4f6;
   --popover: #191a1d;
   --popover-foreground: #f3f4f6;
-  --primary: #6aabeb;
-  --primary-foreground: #0c0d0f;
+  --primary: #f3f4f6;
+  --primary-foreground: #111111;
   --secondary: #232428;
   --secondary-foreground: #f3f4f6;
   --muted: #1c1d21;
@@ -95,14 +95,14 @@
   --destructive-foreground: #1a0c0a;
   --border: #2c2e33;
   --input: #2c2e33;
-  --ring: #6aabeb;
+  --ring: #f3f4f6;
   --sidebar: #16171a;
   --sidebar-foreground: #f3f4f6;
   --sidebar-border: #232428;
   --sidebar-accent: #1c1d21;
   --success: #3d9a50;
   --warning: #e8a317;
-  --brand: #6aabeb;
+  --brand: #8eafd0;
   color-scheme: dark;
 }
 
@@ -273,25 +273,25 @@ body {
 .pixel-invert {
   background-color: #07090d;
   background-image:
-    radial-gradient(circle, #0571d3 1.25px, transparent 1.6px),
-    linear-gradient(to right, rgba(5, 113, 211, 0.45) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(5, 113, 211, 0.45) 1px, transparent 1px);
+    radial-gradient(circle, #f4f5f7 1.25px, transparent 1.6px),
+    linear-gradient(to right, rgba(255, 255, 255, 0.16) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.16) 1px, transparent 1px);
   background-size: 18px 18px, 18px 18px, 18px 18px;
   background-position: 8px 8px, 0 0, 0 0;
 }
 
 .pixel-scan {
   height: 1px;
-  background: linear-gradient(90deg, transparent, #0571d3, transparent);
-  box-shadow: 0 0 16px #0571d3;
+  background: linear-gradient(90deg, transparent, #f4f5f7, transparent);
+  box-shadow: 0 0 16px rgba(255, 255, 255, 0.35);
   animation: kismet-scan 7.5s linear infinite;
 }
 
 .pixel-dot {
   width: 4px;
   height: 4px;
-  background: #0571d3;
-  box-shadow: 0 0 10px rgba(5, 113, 211, 0.85);
+  background: #f4f5f7;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.45);
   animation: kismet-blink 3.2s ease-in-out infinite;
 }
 
@@ -329,7 +329,7 @@ body {
   }
   78% {
     opacity: 1;
-    box-shadow: 0 0 10px rgba(5, 113, 211, 0.9);
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.55);
   }
 }
 
@@ -363,9 +363,9 @@ body {
   overflow: hidden;
   border-radius: 22px;
   background:
-    radial-gradient(42% 58% at 8% 92%, rgba(5, 113, 211, 0.38), transparent 70%),
-    radial-gradient(40% 52% at 96% 8%, rgba(142, 224, 176, 0.72), transparent 68%),
-    linear-gradient(155deg, #d5eafb 0%, #eef8f4 48%, #d7f3e4 100%);
+    radial-gradient(42% 58% at 8% 92%, rgba(10, 79, 140, 0.16), transparent 70%),
+    radial-gradient(40% 52% at 96% 8%, rgba(17, 17, 17, 0.05), transparent 68%),
+    linear-gradient(155deg, #f3f4f6 0%, #ffffff 48%, #e8eaed 100%);
   box-shadow:
     0 28px 70px rgba(17, 40, 48, 0.07),
     inset 0 1px 0 rgba(255, 255, 255, 0.7);
@@ -430,7 +430,7 @@ body {
 
 .demo-wash-experiment {
   background:
-    radial-gradient(38% 46% at 12% 78%, rgba(5, 113, 211, 0.55), transparent 70%),
+    radial-gradient(38% 46% at 12% 78%, rgba(10, 79, 140, 0.22), transparent 70%),
     radial-gradient(34% 42% at 88% 18%, rgba(243, 163, 107, 0.5), transparent 68%),
     radial-gradient(36% 40% at 72% 92%, rgba(124, 92, 219, 0.42), transparent 70%);
 }
@@ -438,7 +438,7 @@ body {
 .demo-wash-chat {
   background:
     radial-gradient(40% 48% at 8% 24%, rgba(15, 157, 138, 0.48), transparent 70%),
-    radial-gradient(38% 46% at 92% 78%, rgba(5, 113, 211, 0.5), transparent 68%),
+    radial-gradient(38% 46% at 92% 78%, rgba(10, 79, 140, 0.2), transparent 68%),
     radial-gradient(30% 36% at 48% 100%, rgba(124, 92, 219, 0.38), transparent 70%);
 }
 

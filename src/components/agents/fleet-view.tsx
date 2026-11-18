@@ -231,7 +231,7 @@ function StatusPill({ status }: { status: AgentStatus }) {
         status === "done" && "bg-emerald-100 text-emerald-800",
         status === "thinking" && "bg-amber-100 text-amber-800",
         status === "paused" && "bg-muted text-muted-foreground",
-        status === "working" && "bg-sky-100 text-sky-800",
+        status === "working" && "bg-secondary text-foreground",
       )}
     >
       {STATUS_LABEL[status]}

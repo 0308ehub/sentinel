@@ -196,7 +196,7 @@ export function GitHubView() {
           </div>
           {via === "app" && (
             <a
-              className="mt-2 inline-block text-xs text-[#0571d3] hover:underline"
+              className="mt-2 inline-block text-xs text-brand hover:underline"
               href="https://github.com/settings/installations"
               target="_blank"
               rel="noreferrer"
@@ -249,7 +249,7 @@ function TokenForm({
       </div>
       <p className="text-xs text-muted-foreground">
         Create a fine-grained token at{" "}
-        <a className="text-[#0571d3] hover:underline" href="https://github.com/settings/tokens" target="_blank" rel="noreferrer">
+        <a className="text-brand hover:underline" href="https://github.com/settings/tokens" target="_blank" rel="noreferrer">
           github.com/settings/tokens
         </a>{" "}
         with Contents and Pull requests read/write access.

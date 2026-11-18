@@ -20,6 +20,7 @@ const nextConfig: NextConfig = {
     return [
       { source: "/autopilot", destination: "/experiments", permanent: true },
       { source: "/autopilot/install", destination: "/experiments/install", permanent: true },
+      { source: "/connectors", destination: "/integrations", permanent: true },
     ];
   },
   async headers() {

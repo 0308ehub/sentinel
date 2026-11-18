@@ -144,7 +144,7 @@ function TrendChart({ points, metric }: { points: ChartPoint[]; metric: TrendMet
         <XAxis dataKey="day" tick={{ fontSize: 11 }} tickFormatter={(value: string) => value.slice(5)} />
         <YAxis tick={{ fontSize: 11 }} width={48} />
         <Tooltip />
-        <Line type="monotone" dataKey={metric} stroke="#0571d3" strokeWidth={2} dot={false} />
+        <Line type="monotone" dataKey={metric} stroke="#111111" strokeWidth={2} dot={false} />
       </LineChart>
     </ResponsiveContainer>
   );
@@ -158,7 +158,7 @@ function AreaTrend({ points, metric }: { points: ChartPoint[]; metric: TrendMetr
         <XAxis dataKey="day" tick={{ fontSize: 11 }} tickFormatter={(value: string) => value.slice(5)} axisLine={false} tickLine={false} />
         <YAxis tick={{ fontSize: 11 }} width={48} axisLine={false} tickLine={false} />
         <Tooltip />
-        <Area type="monotone" dataKey={metric} stroke="#0571d3" fill="#0571d3" fillOpacity={0.16} strokeWidth={2} />
+        <Area type="monotone" dataKey={metric} stroke="#111111" fill="#111111" fillOpacity={0.16} strokeWidth={2} />
       </AreaChart>
     </ResponsiveContainer>
   );
@@ -172,7 +172,7 @@ function BreakdownChart({ points }: { points: BarPoint[] }) {
         <XAxis dataKey="label" tick={{ fontSize: 11 }} interval={0} angle={-20} height={60} textAnchor="end" />
         <YAxis tick={{ fontSize: 11 }} width={48} />
         <Tooltip />
-        <Bar dataKey="revenue" fill="#0571d3" radius={[3, 3, 0, 0]} />
+        <Bar dataKey="revenue" fill="#111111" radius={[3, 3, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );
@@ -194,7 +194,7 @@ function FunnelChart({ steps }: { steps: FunnelStep[] }) {
               </span>
             </div>
             <div className="h-8 rounded-sm bg-muted">
-              <div className="h-full rounded-sm bg-[#0571d3]" style={{ width: `${Math.max(step.conversion * 100, 2)}%` }} />
+              <div className="h-full rounded-sm bg-[#111111]" style={{ width: `${Math.max(step.conversion * 100, 2)}%` }} />
             </div>
           </div>
         );

@@ -179,7 +179,7 @@ export function DataSourcesPanel({ onInsertQuery }: DataSourcesPanelProps) {
       ) : !connected ? (
         <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
           No databases connected.{" "}
-          <Link href="/settings/connectors/databricks" className="text-[#0571d3] underline-offset-2 hover:underline">
+          <Link href="/settings/connectors/databricks" className="text-brand underline-offset-2 hover:underline">
             Set up Databricks
           </Link>
         </div>

@@ -40,14 +40,14 @@ export function getNodeLabel(type: NodeType): string {
 
 export function getNodeColor(type: NodeType): string {
   const colors: Record<NodeType, string> = {
-    PRODUCT: "#0571d3",
+    PRODUCT: "#0a4f8c",
     FEATURE: "#111111",
     CUSTOMER_PROBLEM: "#d93025",
     CUSTOMER: "#5c6772",
     USER_SEGMENT: "#7d8794",
     REQUIREMENT: "#6a717c",
     DECISION: "#1d4e89",
-    GOAL: "#0571d3",
+    GOAL: "#0a4f8c",
     EXPERIMENT: "#c4a15a",
     METRIC: "#0e7c86",
     DASHBOARD: "#0e7c86",
@@ -59,7 +59,7 @@ export function getNodeColor(type: NodeType): string {
     PULL_REQUEST: "#1d4e89",
     COMMIT: "#4b5563",
     RELEASE: "#111111",
-    LAUNCH: "#0571d3",
+    LAUNCH: "#0a4f8c",
     SUPPORT_TICKET: "#d93025",
     CUSTOMER_INTERVIEW: "#6a717c",
     SLACK_THREAD: "#3d5a80",
@@ -70,7 +70,7 @@ export function getNodeColor(type: NodeType): string {
     API: "#1d4e89",
     DATABASE_TABLE: "#0e7c86",
     SERVICE: "#374151",
-    AI_INSIGHT: "#0571d3",
+    AI_INSIGHT: "#0a4f8c",
   };
   return colors[type] ?? "#5f6368";
 }

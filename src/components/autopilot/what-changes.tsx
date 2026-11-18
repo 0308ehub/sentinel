@@ -182,7 +182,7 @@ function VisualPreview({ experiment, changes, siteUrl, when, addedText }: {
       {snapshot?.status === "none" && hasSource && !shouldAutoRender && (
         <button
           type="button"
-          className="mt-2 text-xs text-[#2563eb] hover:underline"
+          className="mt-2 text-xs text-brand hover:underline"
           onClick={() => {
             startAttempted.current = true;
             startRender().catch((reason: unknown) => {
@@ -268,7 +268,7 @@ function PreviewBody({ experiment, changes, liveOrigin, isLive, when, addedText 
 }) {
   if (!liveOrigin) return (
     <p className="rounded border border-[#e1e4e8] bg-[#f8f9fa] p-3 text-sm text-[#6b7280]">
-      <Link href="/experiments/install" className="text-[#2563eb] hover:underline">Add your site&apos;s URL on the install page</Link> to see both versions here.
+      <Link href="/experiments/install" className="text-brand hover:underline">Add your site&apos;s URL on the install page</Link> to see both versions here.
     </p>
   );
   const control = previewHref(liveOrigin, experiment.page, experiment.flag, "control", isLive);
@@ -276,8 +276,8 @@ function PreviewBody({ experiment, changes, liveOrigin, isLive, when, addedText 
   const treatment = treatmentOrigin ? previewHref(treatmentOrigin, experiment.page, experiment.flag, "treatment", isLive) : null;
   if (!isLive) return (
     <div className="flex flex-wrap items-center gap-3 rounded border border-[#e1e4e8] bg-[#f8f9fa] p-3 text-sm">
-      {treatment && <a href={treatment} target="_blank" rel="noreferrer" className="text-[#2563eb] hover:underline">Open new version (preview build) ↗</a>}
-      <a href={control} target="_blank" rel="noreferrer" className="text-[#2563eb] hover:underline">Open current version ↗</a>
+      {treatment && <a href={treatment} target="_blank" rel="noreferrer" className="text-brand hover:underline">Open new version (preview build) ↗</a>}
+      <a href={control} target="_blank" rel="noreferrer" className="text-brand hover:underline">Open current version ↗</a>
       <span className="w-full text-xs text-[#6b7280]">{treatment ? "Preview builds can ask you to sign in." : "The preview build is not available yet."}</span>
     </div>
   );
@@ -397,7 +397,7 @@ function PreviewSwitcher({ control, treatment, when, addedText, sample = false }
           {option("control", "Current")}
           {option("treatment", "New version")}
         </div>
-        {fullPage && <a href={fullPage} target="_blank" rel="noreferrer" className="text-[#2563eb] hover:underline">Open full page ↗</a>}
+        {fullPage && <a href={fullPage} target="_blank" rel="noreferrer" className="text-brand hover:underline">Open full page ↗</a>}
       </div>
       {hasNewText && (
         <p className="mb-2 rounded border border-[#f59e0b] bg-[#fffbeb] px-3 py-2 text-xs text-[#92400e]">

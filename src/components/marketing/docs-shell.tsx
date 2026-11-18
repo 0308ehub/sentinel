@@ -116,7 +116,7 @@ export function DocCard({
       href={href}
       className="block rounded-xl border border-[#e6e8eb] bg-white p-4 transition hover:border-[#cfd3d8] hover:shadow-[0_8px_24px_rgba(17,17,17,0.04)]"
     >
-      <span className="text-[#0571d3]">{icon}</span>
+      <span className="text-brand">{icon}</span>
       <span className="mt-3 block text-[15px] font-semibold text-[#111]">{title}</span>
       <span className="mt-1 block text-[13px] leading-relaxed text-[#5c6570]">{detail}</span>
     </Link>

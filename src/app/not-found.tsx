@@ -16,7 +16,7 @@ export default function NotFound() {
         <p className="mt-3 text-[15px] leading-relaxed text-[#3c4250]">The link may be old, or the page may have moved.</p>
         <Link
           href="/"
-          className="mt-6 inline-flex h-10 items-center rounded-full bg-[#0571d3] px-4 text-sm font-medium text-white hover:bg-[#0460b5]"
+          className="mt-6 inline-flex h-10 items-center rounded-full bg-[#111] px-4 text-sm font-medium text-white hover:bg-[#2a2a2a]"
         >
           Back home
         </Link>

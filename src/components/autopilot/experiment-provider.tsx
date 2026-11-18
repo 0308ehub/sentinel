@@ -150,7 +150,7 @@ export function ExperimentProvider({ children }: { children: React.ReactNode }) 
           <span aria-hidden="true">·</span>
           <button
             type="button"
-            className="text-[#2563eb] hover:underline"
+            className="text-brand hover:underline"
             onClick={() => {
               try { sessionStorage.removeItem(PREVIEW_KEY); } catch {}
               const url = new URL(window.location.href);

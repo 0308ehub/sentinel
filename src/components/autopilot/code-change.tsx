@@ -74,7 +74,7 @@ function ChangeLoader({ experimentId, cleanup }: { experimentId: string; cleanup
 
 function SwitchButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
-    <button type="button" onClick={onClick} className={`rounded px-2 py-1 ${active ? "bg-[#eef4ff] text-[#2563eb]" : "text-[#6b7280]"}`}>
+    <button type="button" onClick={onClick} className={`rounded px-2 py-1 ${active ? "bg-[#eef4ff] text-brand" : "text-[#6b7280]"}`}>
       {children}
     </button>
   );
@@ -99,7 +99,7 @@ function ChangeHeader({ changes, files }: { changes: Exclude<Changes, { source: 
     return (
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <span className="font-medium text-[#111827]">{pull.title}</span>
-        <a href={pull.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[#2563eb] hover:underline">
+        <a href={pull.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-brand hover:underline">
           #{pull.url.split("/").at(-1)} <ExternalLink className="h-3 w-3" />
         </a>
         <Badge tone={pull.state === "open" ? "green" : pull.state === "merged" ? "purple" : "gray"}>{capitalize(pull.state)}</Badge>
@@ -141,7 +141,7 @@ function FileDiff({ file, initiallyOpen, pullUrl }: { file: ChangeFile; initiall
         </div>
       ) : (
         <p className="px-3 py-4 text-xs text-[#6b7280]">
-          GitHub doesn&apos;t show this diff here. {pullUrl && <a href={pullUrl} target="_blank" rel="noreferrer" className="text-[#2563eb] hover:underline">View it on GitHub →</a>}
+          GitHub doesn&apos;t show this diff here. {pullUrl && <a href={pullUrl} target="_blank" rel="noreferrer" className="text-brand hover:underline">View it on GitHub →</a>}
         </p>
       ))}
     </section>

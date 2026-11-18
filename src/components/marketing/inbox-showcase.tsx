@@ -205,7 +205,7 @@ export function InboxShowcase({ compact = false }: { compact?: boolean }) {
                   </>
                 )}
                 {live.map((text, index) => (
-                  <p key={`${text.body}-${index}`} className={text.mine ? "ml-auto max-w-[78%] rounded-2xl rounded-br-md bg-[#2f6bff] px-3 py-2 text-sm leading-5 text-white" : "max-w-[78%] rounded-2xl rounded-bl-md bg-[#f4f5f7] px-3 py-2 text-sm leading-5"}>
+                  <p key={`${text.body}-${index}`} className={text.mine ? "ml-auto max-w-[78%] rounded-2xl rounded-br-md bg-[#111] px-3 py-2 text-sm leading-5 text-white" : "max-w-[78%] rounded-2xl rounded-bl-md bg-[#f4f5f7] px-3 py-2 text-sm leading-5"}>
                     {text.body}
                   </p>
                 ))}
@@ -219,7 +219,7 @@ export function InboxShowcase({ compact = false }: { compact?: boolean }) {
                   aria-label="Message"
                   className="h-9 min-w-0 flex-1 rounded-2xl border border-[#e6e6e6] px-3 text-sm outline-none"
                 />
-                <button type="submit" disabled={!draft.trim() || !activeShown} className="h-9 rounded-full bg-[#2f6bff] px-3 text-sm text-white disabled:opacity-40">
+                <button type="submit" disabled={!draft.trim() || !activeShown} className="h-9 rounded-full bg-[#111] px-3 text-sm text-white disabled:opacity-40">
                   Send
                 </button>
               </form>
@@ -248,7 +248,7 @@ export function InboxShowcase({ compact = false }: { compact?: boolean }) {
                 <div className="mt-1 flex items-center justify-between gap-2">
                   <span className="text-[10px] text-[#6b7280]">{status} · {row.tier === "LOG" ? "Log" : row.tier[0] + row.tier.slice(1).toLowerCase()}</span>
                   {status === "Texted" && (
-                    <button type="button" onClick={() => dismiss(row.candidate.type)} className="text-[10px] text-[#2f6bff]">
+                    <button type="button" onClick={() => dismiss(row.candidate.type)} className="text-[10px] text-[#111]">
                       Not now
                     </button>
                   )}

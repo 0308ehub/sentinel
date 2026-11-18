@@ -68,9 +68,9 @@ export function TopoField({ id = "kismet-topo", ink = false }: { id?: string; in
       {ink ? null : (
         <defs>
           <linearGradient id={id} x1="0%" y1="100%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#0571d3" />
-            <stop offset="46%" stopColor="#1aa0b8" />
-            <stop offset="100%" stopColor="#8ee0b0" />
+            <stop offset="0%" stopColor="#111111" />
+            <stop offset="55%" stopColor="#6a717c" />
+            <stop offset="100%" stopColor="#c5c9cf" />
           </linearGradient>
         </defs>
       )}

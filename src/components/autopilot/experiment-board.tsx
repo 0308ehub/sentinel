@@ -172,7 +172,7 @@ export function ExperimentBoard({
             </p>
             <div className="mt-2 text-xs text-[#6b7280]">
               {goals.length ? <>Goals: {goals.map((goal, index) => <span key={goal.id} title={goal.spec.kind === "click" ? `Visitors who click ${goal.spec.text}` : `Visitors who reach ${goal.spec.path}`}>{index > 0 && " · "}{goal.name} ({(goal.baselineRate * 100).toFixed(1)}%)</span>)}</> : <>Kismet will propose goals once it has seen enough visitors. </>}
-              <button type="button" className="ml-1 text-[#2563eb] hover:underline" onClick={() => setEditingGoals((value) => !value)}>{goals.length ? "Edit" : "Add one"}</button>
+              <button type="button" className="ml-1 text-brand hover:underline" onClick={() => setEditingGoals((value) => !value)}>{goals.length ? "Edit" : "Add one"}</button>
             </div>
             {editingGoals && (
               <div className="mt-2 max-w-2xl rounded border border-[#e1e4e8] p-2 text-xs">
@@ -192,14 +192,14 @@ export function ExperimentBoard({
               </p>
             )}
           </div>
-          <Button className="bg-[#2563eb] text-white hover:bg-[#1d4ed8]" onClick={onRun} disabled={running || !state.configured}>
+          <Button className="bg-[#111] text-white hover:bg-[#2a2a2a]" onClick={onRun} disabled={running || !state.configured}>
             {running ? <Loader2 className="animate-spin" /> : <Play />}
             Create New Experiment
           </Button>
         </div>
         <div className="mt-4 flex gap-6 border-b border-[#e6e8ec] text-sm">
-          <button type="button" onClick={() => setTab("overview")} className={tab === "overview" ? "border-b-2 border-[#2563eb] pb-2 font-medium text-[#2563eb]" : "pb-2 text-[#6b7280]"}>Overview</button>
-          <button type="button" onClick={() => setTab("learnings")} className={tab === "learnings" ? "border-b-2 border-[#2563eb] pb-2 font-medium text-[#2563eb]" : "pb-2 text-[#6b7280]"}>Learnings</button>
+          <button type="button" onClick={() => setTab("overview")} className={tab === "overview" ? "border-b-2 border-brand pb-2 font-medium text-brand" : "pb-2 text-[#6b7280]"}>Overview</button>
+          <button type="button" onClick={() => setTab("learnings")} className={tab === "learnings" ? "border-b-2 border-brand pb-2 font-medium text-brand" : "pb-2 text-[#6b7280]"}>Learnings</button>
         </div>
         {(!state.configured || state.error) && (
           <p className="mt-4 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
@@ -223,7 +223,7 @@ export function ExperimentBoard({
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Filter by name, key, or description"
-            className="h-9 w-72 rounded border border-[#e1e4e8] px-3 text-sm outline-none focus:border-[#2563eb]"
+            className="h-9 w-72 rounded border border-[#e1e4e8] px-3 text-sm outline-none focus:border-brand"
             aria-label="Filter experiments"
           />
           <label className="relative">
@@ -279,9 +279,9 @@ export function ExperimentBoard({
                   >
                     <td className="py-3">
                       <div className="flex items-center gap-2">
-                        <span className={row.suggested ? "font-medium text-[#111827]" : "font-medium text-[#2563eb]"}>{row.name}</span>
+                        <span className={row.suggested ? "font-medium text-[#111827]" : "font-medium text-brand"}>{row.name}</span>
                         {row.suggested && (
-                          <span className="rounded border border-[#c7d7fe] bg-[#eef4ff] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[#2563eb]">
+                          <span className="rounded border border-[#c7d7fe] bg-[#eef4ff] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-brand">
                             Suggested
                           </span>
                         )}
@@ -299,7 +299,7 @@ export function ExperimentBoard({
                     <td className="text-right">
                       <span
                         className={`inline-flex items-center rounded border px-2 py-1 text-xs ${
-                          row.suggested ? "border-[#d5d8de] text-[#374151]" : "border-[#2563eb] text-[#2563eb]"
+                          row.suggested ? "border-[#d5d8de] text-[#374151]" : "border-brand text-brand"
                         }`}
                       >
                         {row.suggested ? "Review" : "Results"}
@@ -328,7 +328,7 @@ function LearningsTable({ learnings, onOpen }: { learnings: Learning[]; onOpen: 
       <tbody>{learnings.length === 0 ? <tr><td colSpan={5} className="px-3 py-8 text-sm text-[#6b7280]">Kismet writes down what each finished experiment taught it. Nothing has finished yet.</td></tr> : learnings.map((learning) => (
         <tr key={learning.id} className="border-b border-[#eef0f3] text-[#374151] hover:bg-[#f8fafc] [&>td]:px-3">
           <td className="whitespace-nowrap py-3">{formatDay(learning.createdAt)}</td>
-          <td><button type="button" className="text-left font-medium text-[#2563eb] hover:underline" onClick={() => onOpen(learning.experimentId)}>{learning.title}</button></td>
+          <td><button type="button" className="text-left font-medium text-brand hover:underline" onClick={() => onOpen(learning.experimentId)}>{learning.title}</button></td>
           <td><LearningBadge outcome={learning.outcome} /></td>
           <td className="whitespace-nowrap">{learning.lift == null ? "—" : `${learning.lift > 0 ? "+" : ""}${(learning.lift * 100).toFixed(1)}%`}</td>
           <td className="max-w-xl py-3 leading-5">{learning.learning}</td>

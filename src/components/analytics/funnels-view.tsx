@@ -9,7 +9,7 @@ import { blankFilter, filterLabel, type Audience, type SavedSegment } from "@/li
 import { formatCount, formatDuration } from "@/lib/analytics/present";
 import { useAnalyticsLibrary } from "@/stores/analytics-store";
 
-const PRIMARY = "#0571d3";
+const PRIMARY = "#111111";
 const COMPARE = "#16803c";
 
 export function FunnelsView() {

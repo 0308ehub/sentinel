@@ -19,7 +19,7 @@ import type { ExploreMeasure, ExploreResult } from "@/lib/analytics/explore-type
 import { changeLabel, formatAxis, formatCount, formatDuration, formatValue } from "@/lib/analytics/present";
 import { cn } from "@/lib/utils";
 
-const COLORS = ["#0571d3", "#16803c", "#7c3aed", "#d97706", "#db2777", "#0f766e", "#111111", "#ca8a04"];
+const COLORS = ["#0a4f8c", "#16803c", "#7c3aed", "#d97706", "#db2777", "#0f766e", "#111111", "#ca8a04"];
 
 export function ChartCanvas({
   result,
@@ -128,7 +128,7 @@ function BarResult({ result, measure, compact }: { result: ExploreResult; measur
             <XAxis type="number" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(value: number) => formatAxis(measure, value)} />
             <YAxis type="category" dataKey="label" width={120} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
             <Tooltip formatter={(value) => formatValue(measure, Number(value ?? 0))} />
-            <Bar dataKey="value" fill="#0571d3" radius={[0, 4, 4, 0]} barSize={16} />
+            <Bar dataKey="value" fill="#111111" radius={[0, 4, 4, 0]} barSize={16} />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -172,7 +172,7 @@ function FunnelResult({ result, compact }: { result: ExploreResult; compact: boo
             return (
               <div key={`${step.name}-${index}`} className="flex h-full min-w-0 flex-1 flex-col justify-end">
                 <p className="mb-1 text-center text-sm font-semibold">{formatCount(step.users)}</p>
-                <div className="rounded-sm bg-[#0571d3]" style={{ height: `${height}%` }} />
+                <div className="rounded-sm bg-[#111111]" style={{ height: `${height}%` }} />
                 <p className="mt-2 truncate text-center text-[11px] text-muted-foreground">{step.name}</p>
               </div>
             );

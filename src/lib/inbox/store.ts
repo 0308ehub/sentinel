@@ -56,7 +56,7 @@ function agentFrom(row: Row): InboxAgent {
     slug: String(row.slug),
     name: String(row.name),
     icon: String(row.icon ?? ""),
-    color: String(row.color ?? "#0571d3"),
+    color: String(row.color ?? "#0a4f8c"),
     instructions: String(row.instructions ?? ""),
     spec: String(row.spec ?? ""),
     boost: Number(row.boost ?? 1) || 1,

@@ -259,7 +259,7 @@ create table if not exists kismet.inbox_agents (
   slug text not null,
   name text not null,
   icon text not null default '',
-  color text not null default '#0571d3',
+  color text not null default '#0a4f8c',
   instructions text not null default '',
   pinned boolean not null default false,
   muted boolean not null default false,

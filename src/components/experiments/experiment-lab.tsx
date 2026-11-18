@@ -20,7 +20,7 @@ import { useAnalyticsLibrary } from "@/stores/analytics-store";
 import type { GraphNode, NodeStatus } from "@/types/graph";
 
 const COLORS: Record<string, string> = {
-  a: "#0571d3",
+  a: "#111111",
   b: "#2f8f6b",
   c: "#c47b2b",
   control: "#d4d4d4",

@@ -184,7 +184,7 @@ export function DatabricksView() {
               )}
               {catalogs?.map((catalog) => (
                 <div key={catalog.name}>
-                  <p className="font-mono text-xs text-[#0571d3]">{catalog.name}</p>
+                  <p className="font-mono text-xs text-brand">{catalog.name}</p>
                   <ul className="mt-1 space-y-1">
                     {catalog.schemas.map((schema) => (
                       <li key={schema.name} className="text-xs text-muted-foreground">

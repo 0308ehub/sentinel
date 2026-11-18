@@ -4,7 +4,7 @@ import { MarketingFrame } from "@/components/marketing/marketing-frame";
 function calendlyUrl(): string {
   const raw = process.env.NEXT_PUBLIC_CALENDLY_URL?.trim() ?? "";
   if (!raw) return "";
-  const color = "background_color=ffffff&text_color=111111&primary_color=0571d3";
+  const color = "background_color=ffffff&text_color=111111&primary_color=111111";
   return `${raw}${raw.includes("?") ? "&" : "?"}${color}`;
 }
 

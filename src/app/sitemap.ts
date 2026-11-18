@@ -8,15 +8,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
   const paths = [
     "/",
-    "/connectors",
-    "/learn",
+    "/integrations",
     "/docs",
     "/contact",
-    "/benchmark",
-    "/blog",
     "/compare",
-    "/enterprise",
-    "/pricing",
     "/privacy",
     "/terms",
     ...PRODUCT_DOCS.map((doc) => `/docs/${doc.slug}`),

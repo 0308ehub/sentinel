@@ -52,8 +52,8 @@ export const metadata: Metadata = {
     card: "summary_large_image",
   },
   icons: {
-    icon: [{ url: "/favicon.ico" }, { url: "/kismetmark.png", type: "image/png" }],
-    apple: "/kismetmark.png",
+    icon: [{ url: "/favicon.ico" }, { url: "/kismet-mark.png", type: "image/png" }],
+    apple: "/apple-touch-icon.png",
   },
 };
 

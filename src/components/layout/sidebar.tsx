@@ -198,9 +198,9 @@ export function Sidebar() {
       <div className={cn("flex items-center gap-1 px-2 py-2", sidebarCollapsed ? "flex-col" : "h-12 justify-between")}>
         <Link href="/ai" className="min-w-0" aria-label="Kismet">
           {sidebarCollapsed ? (
-            <BrandLogo mark priority className="h-7" />
+            <BrandLogo mark surface="app" priority className="h-7" />
           ) : (
-            <BrandLogo tone="auto" priority className="h-7" />
+            <BrandLogo surface="app" tone="auto" priority className="h-7" />
           )}
         </Link>
         <button

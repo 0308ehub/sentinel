@@ -121,7 +121,7 @@ export function ExperimentDetail({
   return (
     <div className="flex h-full min-h-0 bg-white text-[#1c1c1c]">
       <aside className="flex shrink-0 flex-col gap-4 overflow-auto px-4 py-4" style={{ width: panelWidth }}>
-        <button type="button" onClick={onBack} className="text-left text-xs text-[#2563eb] hover:underline">
+        <button type="button" onClick={onBack} className="text-left text-xs text-brand hover:underline">
           ‹ Experiments
         </button>
         <div>
@@ -130,7 +130,7 @@ export function ExperimentDetail({
             A/B Test · <span className={status === "Running" ? "text-[#1f9d55]" : "text-[#374151]"}>{status}</span>
           </p>
           {suggested && (
-            <p className="mt-2 inline-flex rounded border border-[#c7d7fe] bg-[#eef4ff] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[#2563eb]">
+            <p className="mt-2 inline-flex rounded border border-[#c7d7fe] bg-[#eef4ff] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-brand">
               Suggested
             </p>
           )}
@@ -168,7 +168,7 @@ export function ExperimentDetail({
         }}
         className="group relative w-1.5 shrink-0 cursor-col-resize border-x border-transparent outline-none hover:bg-[#dbe7ff] focus:bg-[#dbe7ff]"
       >
-        <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-[#e6e8ec] group-hover:bg-[#2563eb] group-focus:bg-[#2563eb]" />
+        <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-[#e6e8ec] group-hover:bg-brand group-focus:bg-brand" />
       </div>
       <div className="min-w-0 flex-1 overflow-auto">
         <MainPanel
@@ -334,7 +334,7 @@ function Decisions({
     <div className="flex flex-wrap items-center gap-2 empty:hidden">
         {!experiment && signal && (
           <>
-            <Button size="sm" className="bg-[#2563eb] text-white hover:bg-[#1d4ed8]" onClick={onStart} disabled={busy !== null}>
+            <Button size="sm" className="bg-[#111] text-white hover:bg-[#2a2a2a]" onClick={onStart} disabled={busy !== null}>
               {busy === signal.id && <Loader2 className="animate-spin" />}
               Approve suggestion
             </Button>
@@ -345,7 +345,7 @@ function Decisions({
         )}
         {experiment?.status === "awaiting_approval" && (
           <>
-            <Button size="sm" className="bg-[#2563eb] text-white hover:bg-[#1d4ed8]" onClick={onApprove} disabled={busy !== null}>
+            <Button size="sm" className="bg-[#111] text-white hover:bg-[#2a2a2a]" onClick={onApprove} disabled={busy !== null}>
               {busy === id + "approve" && <Loader2 className="animate-spin" />}
               Approve & ship
             </Button>
@@ -361,7 +361,7 @@ function Decisions({
         )}
         {experiment?.status === "awaiting_rollout" && (
           <>
-            <Button size="sm" className="bg-[#2563eb] text-white hover:bg-[#1d4ed8]" onClick={onRollout} disabled={busy !== null}>
+            <Button size="sm" className="bg-[#111] text-white hover:bg-[#2a2a2a]" onClick={onRollout} disabled={busy !== null}>
               Roll out to everyone
             </Button>
             <Button size="sm" variant="outline" onClick={onStop} disabled={busy !== null}>
@@ -392,7 +392,7 @@ function Links({ experiment }: { experiment: Experiment | null }) {
   if (!experiment) return null;
   const cleanup = experiment.cleanup;
   return (
-    <div className="space-y-1 text-[#2563eb]">
+    <div className="space-y-1 text-brand">
       {experiment.buildUrl && (
         <a className="flex items-center gap-1 hover:underline" href={experiment.buildUrl} target="_blank" rel="noreferrer">
           Watch the build <ExternalLink className="h-3 w-3" />
@@ -572,7 +572,7 @@ function VisitorChart({
 
   return (
     <section className="border-t border-[#e6e8ec] px-4 py-3">
-      <button type="button" className="mb-3 text-xs text-[#2563eb]" onClick={() => setOpen((value) => !value)}>
+      <button type="button" className="mb-3 text-xs text-brand" onClick={() => setOpen((value) => !value)}>
         {open ? "Hide graph" : "Show graph"}
       </button>
       {open && (

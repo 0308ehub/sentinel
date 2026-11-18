@@ -12,7 +12,7 @@ import {
 import type { NodeStatus } from "@/types/graph";
 
 const COLORS: Record<string, string> = {
-  control: "#0571d3",
+  control: "#111111",
   a: "#2f8f6b",
   b: "#e07a3d",
   c: "#c47b2b",

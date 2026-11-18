@@ -77,7 +77,7 @@ export function ThreadRow({
       </div>
       <div className="absolute inset-y-0 right-0 flex">
         {direct && <Action color="#8e8e93" label={agent?.muted ? "Unmute" : "Mute"} onClick={onMute} />}
-        {direct && <Action color="#2f6bff" label="Talk more" onClick={onTalk} />}
+        {direct && <Action color="#111111" label="Talk more" onClick={onTalk} />}
         <Action color="#ff3b30" label="Delete" onClick={onDelete} />
       </div>
       <div

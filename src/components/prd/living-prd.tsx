@@ -109,7 +109,7 @@ export function LivingPrd({ featureId }: { featureId: string }) {
           {
             id: crypto.randomUUID(),
             author: "Kismet",
-            color: "#0571d3",
+            color: "#0a4f8c",
             section: "document",
             body: "Graph context is off in AI settings, so this draft was left as written.",
             at: new Date().toISOString(),
@@ -160,7 +160,7 @@ export function LivingPrd({ featureId }: { featureId: string }) {
       const message = error instanceof Error ? error.message : "The document could not be written.";
       commit({
         ...doc,
-        comments: [...doc.comments, { id: crypto.randomUUID(), author: "Kismet", color: "#0571d3", section: "document", body: message, at: new Date().toISOString() }],
+        comments: [...doc.comments, { id: crypto.randomUUID(), author: "Kismet", color: "#0a4f8c", section: "document", body: message, at: new Date().toISOString() }],
       });
     } finally {
       setWriting(false);
@@ -191,7 +191,7 @@ export function LivingPrd({ featureId }: { featureId: string }) {
         ...doc,
         comments: [
           ...doc.comments,
-          { id: crypto.randomUUID(), author: "Kismet", color: "#0571d3", section: "document", body: text.trim(), at: new Date().toISOString() },
+          { id: crypto.randomUUID(), author: "Kismet", color: "#0a4f8c", section: "document", body: text.trim(), at: new Date().toISOString() },
         ],
       });
     } catch {
@@ -199,7 +199,7 @@ export function LivingPrd({ featureId }: { featureId: string }) {
         ...doc,
         comments: [
           ...doc.comments,
-          { id: crypto.randomUUID(), author: "Kismet", color: "#0571d3", section: "document", body: "Kismet could not comment.", at: new Date().toISOString() },
+          { id: crypto.randomUUID(), author: "Kismet", color: "#0a4f8c", section: "document", body: "Kismet could not comment.", at: new Date().toISOString() },
         ],
       });
     } finally {

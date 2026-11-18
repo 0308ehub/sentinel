@@ -64,7 +64,6 @@ export const CONNECTOR_CATEGORIES = [
   "Warehouse",
   "Pipelines",
   "Product analytics",
-  "Experiments",
   "Research",
   "Marketing",
   "Ads",
@@ -272,14 +271,6 @@ const RAW_CONNECTORS: ConnectorDefinition[] = [
     description: "Incidents and on-call.",
     filesAs: "incidents",
     fields: [secret("token", "API key", "API key")],
-  },
-  {
-    id: "launchdarkly",
-    name: "LaunchDarkly",
-    category: "Engineering",
-    description: "Flags used to ship experiments.",
-    filesAs: "experiments",
-    fields: [secret("token", "Access token", "api-…"), text("project", "Project key", "default")],
   },
   {
     id: "databricks",
@@ -634,46 +625,6 @@ const RAW_CONNECTORS: ConnectorDefinition[] = [
     fields: [text("account", "Storage account", "account name"), text("container", "Container", "events"), secret("connection", "Connection string", "DefaultEndpointsProtocol=…")],
   },
   {
-    id: "optimizely",
-    name: "Optimizely",
-    category: "Experiments",
-    description: "Feature flags and web experiments.",
-    filesAs: "experiments",
-    fields: [secret("token", "API token", "API token")],
-  },
-  {
-    id: "statsig",
-    name: "Statsig",
-    category: "Experiments",
-    description: "Flags, experiments, and metric lifts.",
-    filesAs: "experiments",
-    fields: [secret("key", "Console API key", "console-…")],
-  },
-  {
-    id: "split",
-    name: "Split",
-    category: "Experiments",
-    description: "Feature flags and experiment results.",
-    filesAs: "experiments",
-    fields: [secret("key", "Admin API key", "API key")],
-  },
-  {
-    id: "vwo",
-    name: "VWO",
-    category: "Experiments",
-    description: "A/B tests and personalization.",
-    filesAs: "experiments",
-    fields: [secret("token", "API token", "API token")],
-  },
-  {
-    id: "apptimize",
-    name: "Apptimize",
-    category: "Experiments",
-    description: "Mobile and product experiments.",
-    filesAs: "experiments",
-    fields: [secret("token", "API token", "API token")],
-  },
-  {
     id: "sprig",
     name: "Sprig",
     category: "Research",
@@ -925,7 +876,6 @@ const RAW_CONNECTORS: ConnectorDefinition[] = [
 /** Brands whose mark is a site icon, not a vector logo. */
 const SITE_LOGOS = new Set([
   "monday",
-  "launchdarkly",
   "amplitude",
   "heap",
   "fullstory",
@@ -937,11 +887,6 @@ const SITE_LOGOS = new Set([
   "census",
   "mparticle",
   "tealium",
-  "optimizely",
-  "statsig",
-  "split",
-  "vwo",
-  "apptimize",
   "sprig",
   "productboard",
   "chameleon",
@@ -969,7 +914,6 @@ function flowFor(connector: ConnectorDefinition): string {
   if (connector.category === "Marketing") return "Pulls audiences in";
   if (connector.category === "Pipelines") return "Pulls synced tables and events in";
   if (connector.category === "Ads") return "Pulls campaign metrics in";
-  if (connector.category === "Experiments") return "Pulls experiment results in";
   if (connector.category === "Warehouse") return "Pulls query results in";
   if (connector.category === "Product analytics" || connector.category === "Events") return "Pulls product events in";
   return "Pulls into the graph";

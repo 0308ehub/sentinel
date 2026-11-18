@@ -34,14 +34,14 @@ export function OnboardingShell({
       <header className="px-6 pt-6 md:px-10">
         <div className="flex items-center justify-between">
           <Link href="/" className="inline-flex">
-            <BrandLogo className="h-7" />
+            <BrandLogo surface="app" className="h-7" />
           </Link>
           <span className="text-sm text-[#8b939e]">
             {index + 1} of {ONBOARDING_STEPS.length}
           </span>
         </div>
         <div className="mt-4 h-0.5 w-full bg-[#eef0f3]">
-          <div className="h-full bg-[#0571d3] transition-all duration-300" style={{ width: `${progress}%` }} />
+          <div className="h-full bg-[#111] transition-all duration-300" style={{ width: `${progress}%` }} />
         </div>
       </header>
 

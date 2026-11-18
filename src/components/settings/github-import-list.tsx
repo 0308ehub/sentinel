@@ -91,7 +91,7 @@ export function GitHubImportList({
         )}
       </ul>
       {onAdjust && (
-        <button type="button" className="text-sm text-[#0571d3] hover:underline focus-visible:outline focus-visible:outline-2" onClick={onAdjust}>
+        <button type="button" className="text-sm text-brand hover:underline focus-visible:outline focus-visible:outline-2" onClick={onAdjust}>
           Missing a repository? Adjust GitHub App permissions →
         </button>
       )}

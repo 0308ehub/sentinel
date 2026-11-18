@@ -39,7 +39,7 @@ interface FleetState {
 
 const KEY = "kismet-agents";
 const EMPTY: FleetState = { agents: [] };
-const COLORS = ["#0f9d8a", "#e07a2f", "#7c5cdb", "#3b82f6", "#db4d6d", "#b45309"];
+const COLORS = ["#0f9d8a", "#e07a2f", "#7c5cdb", "#0a4f8c", "#db4d6d", "#b45309"];
 const VERBS = ["Reading", "Checking what connects to", "Comparing", "Drafting a note on"];
 
 const listeners = new Set<() => void>();
