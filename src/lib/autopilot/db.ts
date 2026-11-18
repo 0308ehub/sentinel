@@ -100,6 +100,19 @@ alter table kismet.experiments add column if not exists builder text;
 alter table kismet.experiments add column if not exists build_ref text;
 alter table kismet.experiments add column if not exists build_url text;
 alter table kismet.experiments add column if not exists build_started_at timestamptz;
+alter table kismet.experiments add column if not exists estimate jsonb;
+alter table kismet.signals add column if not exists snoozed_until timestamptz;
+
+create table if not exists kismet.autopilot_goals (
+  id text primary key,
+  user_id text not null,
+  name text not null,
+  spec jsonb not null,
+  source text not null,
+  archived boolean not null default false,
+  created_at timestamptz not null default now()
+);
+create index if not exists autopilot_goals_user_idx on kismet.autopilot_goals (user_id, archived, created_at);
 
 create table if not exists kismet.flags (
   key text primary key,

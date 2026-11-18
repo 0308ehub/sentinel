@@ -14,6 +14,7 @@ export function otherFreshDays(env: NodeJS.ProcessEnv = process.env): number {
 }
 
 export function freshDays(source: EvidenceSource, env: NodeJS.ProcessEnv = process.env): number {
+  if (source === "interview") return Infinity;
   return source === "analytics" ? ANALYTICS_FRESH_DAYS : otherFreshDays(env);
 }
 

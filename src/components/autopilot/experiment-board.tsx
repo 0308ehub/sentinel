@@ -6,7 +6,7 @@ import { ExperimentDetail } from "@/components/autopilot/experiment-detail";
 import { Button } from "@/components/ui/button";
 import { RelativeTime } from "@/components/shared/relative-time";
 import { useVariant } from "@/lib/autopilot/variant";
-import type { AutopilotState, Experiment, Signal } from "@/lib/autopilot/types";
+import type { AutopilotState, Experiment, Goal, Signal } from "@/lib/autopilot/types";
 
 const ENDED = new Set<Experiment["status"]>(["rolled_out", "stopped", "rejected", "failed"]);
 const SUGGESTED_STATUS = new Set<Experiment["status"]>(["building", "awaiting_approval"]);
@@ -48,6 +48,11 @@ export function ExperimentBoard({
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<StatusFilter>("active");
   const [selected, setSelected] = useState<Selection | null>(null);
+  const [goals, setGoals] = useState<Goal[]>(state.goals);
+  const [editingGoals, setEditingGoals] = useState(false);
+  const [goalName, setGoalName] = useState("");
+  const [goalKind, setGoalKind] = useState<"click" | "visit">("click");
+  const [goalValue, setGoalValue] = useState("");
   const variant = useVariant("ap-add-first-experiment-guidance-to-the-exp-v1");
 
   const taken = useMemo(
@@ -57,6 +62,19 @@ export function ExperimentBoard({
   const suggestions = state.signals.filter(
     (signal) => signal.status !== "dismissed" && signal.status !== "stale" && signal.status !== "resolved" && !taken.has(signal.id),
   );
+
+  async function addGoal() {
+    const metric = goalKind === "click" ? { kind: "click", text: goalValue } : { kind: "visit", path: goalValue };
+    const response = await fetch("/api/autopilot/goals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: goalName, metric }) });
+    if (!response.ok) return;
+    const latest = await fetch("/api/autopilot/goals", { cache: "no-store" }).then((r) => r.json()) as { goals: Goal[] };
+    setGoals(latest.goals); setGoalName(""); setGoalValue("");
+  }
+
+  async function removeGoal(id: string) {
+    const response = await fetch("/api/autopilot/goals", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+    if (response.ok) setGoals((items) => items.filter((goal) => goal.id !== id));
+  }
 
   const rows = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -147,6 +165,21 @@ export function ExperimentBoard({
                 "Kismet has not run yet."
               )}
             </p>
+            <div className="mt-2 text-xs text-[#6b7280]">
+              {goals.length ? <>Goals: {goals.map((goal, index) => <span key={goal.id} title={goal.spec.kind === "click" ? `Visitors who click ${goal.spec.text}` : `Visitors who reach ${goal.spec.path}`}>{index > 0 && " · "}{goal.name} ({(goal.baselineRate * 100).toFixed(1)}%)</span>)}</> : <>Kismet will propose goals once it has seen enough visitors. </>}
+              <button type="button" className="ml-1 text-[#2563eb] hover:underline" onClick={() => setEditingGoals((value) => !value)}>{goals.length ? "Edit" : "Add one"}</button>
+            </div>
+            {editingGoals && (
+              <div className="mt-2 max-w-2xl rounded border border-[#e1e4e8] p-2 text-xs">
+                {goals.map((goal) => <div key={goal.id} className="flex items-center justify-between py-1"><span>{goal.name}</span><button type="button" aria-label={`Remove ${goal.name}`} className="text-[#6b7280] hover:text-red-600" onClick={() => void removeGoal(goal.id)}>Remove</button></div>)}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <input aria-label="Goal name" value={goalName} onChange={(e) => setGoalName(e.target.value)} maxLength={60} placeholder="Goal name" className="h-8 rounded border px-2" />
+                  <select aria-label="Goal metric kind" value={goalKind} onChange={(e) => setGoalKind(e.target.value as "click" | "visit")} className="h-8 rounded border px-2"><option value="click">Click</option><option value="visit">Visit</option></select>
+                  <input aria-label={goalKind === "click" ? "Click label" : "Visit path"} value={goalValue} onChange={(e) => setGoalValue(e.target.value)} placeholder={goalKind === "click" ? "Button label" : "/path"} className="h-8 rounded border px-2" />
+                  <button type="button" disabled={!goalName.trim() || !goalValue.trim() || goals.length >= 5} className="h-8 rounded border px-3 disabled:opacity-50" onClick={() => void addGoal()}>Add</button>
+                </div>
+              </div>
+            )}
             {variant === "treatment" && state.experiments.length === 0 && (
               <p data-track="ap-add-first-experiment-guidance-to-the-exp-v1" className="mt-2 max-w-xl text-sm text-[#374151]">
                 Experiments help you compare product changes and measure outcomes. Start by letting Kismet suggest a safe first
@@ -243,6 +276,7 @@ export function ExperimentBoard({
                             Suggested
                           </span>
                         )}
+                        {row.kind === "signal" && row.signal.snoozedUntil && <span className="text-xs text-[#9aa0a8]">Waiting for more traffic</span>}
                       </div>
                       <div className="text-xs text-[#9aa0a8]">{row.key}</div>
                     </td>

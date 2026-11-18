@@ -137,6 +137,14 @@ export function ExperimentDetail({
           <Fact label="Days running" value={daysRunning(experiment)} />
           <Fact label="Audiences" value="Everyone" />
           <Fact label="Experiment visitors" value={visitors ? visitors.toLocaleString("en-US") : "—"} />
+          {experiment?.estimate && (
+            <div>
+              <Fact label="Expected result" value={`~${experiment.estimate.days} days`} />
+              <p className="mt-1 text-[11px] leading-4 text-[#9aa0a8]">
+                {Math.round(experiment.estimate.weeklyVisitors).toLocaleString("en-US")} visitors a week, {(experiment.estimate.baselineRate * 100).toFixed(1)}% do this today, detects a {(experiment.estimate.relativeMde * 100).toFixed(0)}% change
+              </p>
+            </div>
+          )}
         </dl>
         <Autonomous experiment={experiment} signal={signal} suggested={suggested} />
       </aside>
@@ -440,7 +448,7 @@ function ResultsCanvas({
               improvement={compare?.lift ?? readout?.lift ?? null}
               interval={compare}
               significance={significanceLabel(readout?.pValue ?? null)}
-              remaining={treatment ? Math.max(0, DECISION_VISITORS - treatment.visitors) : null}
+              remaining={treatment ? Math.max(0, (experiment?.estimate?.perArm ?? DECISION_VISITORS) - treatment.visitors) : null}
             />
           </tbody>
         </table>

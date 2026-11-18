@@ -135,6 +135,7 @@ export function AutopilotView() {
 
   return (
     <ExperimentBoard
+      key={state.goals.map((goal) => goal.id).join(":")}
       state={state}
       running={running}
       busy={busy}

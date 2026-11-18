@@ -5,6 +5,7 @@ import { autopilotUser } from "@/lib/autopilot/scope";
 import { parseMetricSpec, type Arm, type FlagState, type MetricSpec } from "@/lib/autopilot/assign";
 import { isOutsideBuilder, type OutsideBuilder } from "@/lib/autopilot/builders";
 import { ANALYTICS_FRESH_DAYS, ELEMENT_GONE_DAYS, otherFreshDays } from "@/lib/autopilot/freshness";
+import type { ResultEstimate } from "@/lib/autopilot/power";
 import {
   READY_MIN_EVIDENCE,
   READY_MIN_SOURCES,
@@ -14,6 +15,7 @@ import {
   type EvidenceSource,
   type Experiment,
   type ExperimentStatus,
+  type Goal,
   type Readout,
   type Signal,
   type SignalStatus,
@@ -77,6 +79,7 @@ function toExperiment(row: Row): Experiment {
     prNumber: row.pr_number == null ? null : Number(row.pr_number),
     note: (row.note as string | null) ?? null,
     readout: (row.readout as Readout | null) ?? null,
+    estimate: (row.estimate as ResultEstimate | null) ?? null,
     draftPath: (row.draft_path as string | null) ?? null,
     coderSessionId: (row.coder_session_id as string | null) ?? null,
     agentFailed: Boolean(row.agent_failed),
@@ -134,7 +137,7 @@ export async function unassignedEvidence(limit: number): Promise<Evidence[]> {
   const rows = await sql`
     select * from kismet.evidence
     where user_id = ${scopeUser()} and signal_id is null
-      and occurred_at >= now() - make_interval(days => case when source = 'analytics' then ${ANALYTICS_FRESH_DAYS}::int else ${otherDays}::int end)
+      and (source = 'interview' or occurred_at >= now() - make_interval(days => case when source = 'analytics' then ${ANALYTICS_FRESH_DAYS}::int else ${otherDays}::int end))
     order by occurred_at asc limit ${limit}
   `;
   return rows.map(toEvidence);
@@ -166,10 +169,11 @@ export async function setSignalStatus(id: string, status: SignalStatus): Promise
 export async function listSignals(): Promise<Signal[]> {
   const sql = await db();
   const userId = scopeUser();
-  const signals = await sql`select * from kismet.signals where user_id = ${userId} order by updated_at desc limit 200`;
+  const signals = await sql`select *, case when snoozed_until > now() then snoozed_until end as active_snoozed_until
+    from kismet.signals where user_id = ${userId} order by updated_at desc limit 200`;
   const otherDays = otherFreshDays();
   const evidence = await sql`
-    select *, occurred_at >= now() - make_interval(days => case when source = 'analytics' then ${ANALYTICS_FRESH_DAYS}::int else ${otherDays}::int end) as fresh
+    select *, source = 'interview' or occurred_at >= now() - make_interval(days => case when source = 'analytics' then ${ANALYTICS_FRESH_DAYS}::int else ${otherDays}::int end) as fresh
     from kismet.evidence where user_id = ${userId} and signal_id is not null order by occurred_at desc limit 5000
   `;
   const bySignal = new Map<string, Evidence[]>();
@@ -202,6 +206,7 @@ export async function listSignals(): Promise<Signal[]> {
         staleEvidence: staleBySignal.get(String(row.id)) ?? 0,
         sources,
         ready: distinctEvidence >= READY_MIN_EVIDENCE && sources.length >= READY_MIN_SOURCES,
+        snoozedUntil: isoOrNull(row.active_snoozed_until),
       };
     })
     .sort((a, b) => b.evidence.length - a.evidence.length);
@@ -223,7 +228,7 @@ export async function retireStaleSignals(): Promise<string | null> {
     where s.user_id = ${userId} and s.status = 'open' and not exists (
       select 1 from kismet.evidence e
       where e.user_id = ${userId} and e.signal_id = s.id
-        and e.occurred_at >= now() - make_interval(days => case when e.source = 'analytics' then ${ANALYTICS_FRESH_DAYS}::int else ${otherDays}::int end)
+        and (e.source = 'interview' or e.occurred_at >= now() - make_interval(days => case when e.source = 'analytics' then ${ANALYTICS_FRESH_DAYS}::int else ${otherDays}::int end))
     )
     returning s.id, s.title
   `;
@@ -232,7 +237,7 @@ export async function retireStaleSignals(): Promise<string | null> {
     where s.user_id = ${userId} and s.status = 'stale' and exists (
       select 1 from kismet.evidence e
       where e.user_id = ${userId} and e.signal_id = s.id
-        and e.occurred_at >= now() - make_interval(days => case when e.source = 'analytics' then ${ANALYTICS_FRESH_DAYS}::int else ${otherDays}::int end)
+        and (e.source = 'interview' or e.occurred_at >= now() - make_interval(days => case when e.source = 'analytics' then ${ANALYTICS_FRESH_DAYS}::int else ${otherDays}::int end))
     )
     returning s.id
   `;
@@ -282,16 +287,17 @@ export async function createExperiment(input: {
   control: string;
   treatment: string;
   flag: string;
+  estimate: ResultEstimate;
 }): Promise<string> {
   const sql = await db();
   const id = newId("exp");
   await sql`
     insert into kismet.experiments
-      (id, user_id, signal_id, version, title, hypothesis, metric, metric_spec, page, guardrail, control, treatment, flag, status)
+      (id, user_id, signal_id, version, title, hypothesis, metric, metric_spec, page, guardrail, control, treatment, flag, estimate, status)
     values
       (${id}, ${scopeUser()}, ${input.signalId}, ${input.version}, ${input.title.slice(0, 200)}, ${input.hypothesis.slice(0, 1000)},
        ${input.metric.slice(0, 120)}, ${sql.json(input.metricSpec)}, ${input.page.slice(0, 200)}, ${input.guardrail.slice(0, 300)}, ${input.control.slice(0, 500)},
-       ${input.treatment.slice(0, 500)}, ${input.flag}, 'building')
+       ${input.treatment.slice(0, 500)}, ${input.flag}, ${sql.json(input.estimate as never)}, 'building')
   `;
   return id;
 }
@@ -531,6 +537,137 @@ export async function countArms(flag: string, since: string, spec: MetricSpec): 
       syntheticVisitors: Number(row?.synthetic_visitors ?? 0),
     };
   });
+}
+
+export interface MetricBaseline {
+  visitors: number;
+  conversions: number;
+  weeklyVisitors: number;
+}
+
+/** Account-wide baseline using the same visitor/conversion semantics as experiment measurement. */
+export async function metricBaseline(spec: MetricSpec, days = 14): Promise<MetricBaseline> {
+  const sql = await db();
+  const userId = scopeUser();
+  const safeDays = Math.max(1, Math.min(90, Math.floor(days)));
+  const converts = spec.kind === "click"
+    ? sql`e.name = 'click' and e.element ilike ${"%" + spec.text + "%"}`
+    : sql`e.name = 'view' and e.page like ${spec.path.replace(/[%_]/g, "") + "%"}`;
+  const [row] = await sql`
+    with mode as (
+      select not exists (
+        select 1 from kismet.events where user_id = ${userId}
+          and at >= now() - make_interval(days => ${safeDays}::int) and synthetic = false
+      ) as include_synthetic
+    ), active as (
+      select distinct visitor from kismet.events, mode
+      where user_id = ${userId} and at >= now() - make_interval(days => ${safeDays}::int)
+        and (not synthetic or mode.include_synthetic)
+    ), converted as (
+      select distinct e.visitor from kismet.events e, mode
+      where e.user_id = ${userId} and e.at >= now() - make_interval(days => ${safeDays}::int)
+        and (not e.synthetic or mode.include_synthetic) and ${converts}
+    )
+    select count(*)::int as visitors, count(c.visitor)::int as conversions
+    from active a left join converted c on c.visitor = a.visitor
+  `;
+  const visitors = Number(row?.visitors ?? 0);
+  return { visitors, conversions: Number(row?.conversions ?? 0), weeklyVisitors: visitors * 7 / safeDays };
+}
+
+export async function snoozeSignal(id: string): Promise<void> {
+  const sql = await db();
+  await sql`update kismet.signals set snoozed_until = now() + interval '7 days', updated_at = now()
+    where user_id = ${scopeUser()} and id = ${id}`;
+}
+
+function toGoal(row: Row, baseline: MetricBaseline): Goal {
+  return {
+    id: String(row.id), name: String(row.name), spec: parseMetricSpec(row.spec)!,
+    source: row.source as Goal["source"], createdAt: iso(row.created_at),
+    baselineRate: baseline.visitors ? baseline.conversions / baseline.visitors : 0,
+    weeklyVisitors: baseline.weeklyVisitors,
+  };
+}
+
+export async function listGoals(): Promise<Goal[]> {
+  const sql = await db();
+  const rows = await sql`select * from kismet.autopilot_goals where user_id = ${scopeUser()} and archived = false order by created_at asc`;
+  return Promise.all(rows.map(async (row) => toGoal(row, await metricBaseline(parseMetricSpec(row.spec)!))));
+}
+
+export async function addGoal(input: { name: string; spec: MetricSpec; source: Goal["source"] }): Promise<string | null> {
+  const sql = await db();
+  const userId = scopeUser();
+  const [{ count }] = await sql<{ count: number }[]>`select count(*)::int as count from kismet.autopilot_goals
+    where user_id = ${userId} and archived = false`;
+  if (Number(count) >= 5) return null;
+  const id = newId("goal");
+  await sql`insert into kismet.autopilot_goals (id, user_id, name, spec, source)
+    values (${id}, ${userId}, ${input.name.slice(0, 60)}, ${sql.json(input.spec)}, ${input.source})`;
+  return id;
+}
+
+export async function archiveGoal(id: string): Promise<boolean> {
+  const sql = await db();
+  const rows = await sql`update kismet.autopilot_goals set archived = true where user_id = ${scopeUser()} and id = ${id} returning id`;
+  return rows.length > 0;
+}
+
+export async function interviewContext(): Promise<Evidence[]> {
+  const sql = await db();
+  const rows = await sql`select * from kismet.evidence where user_id = ${scopeUser()} and source = 'interview'
+    order by occurred_at desc limit 12`;
+  return rows.map(toEvidence);
+}
+
+export interface PopularEvent { label: string; visitors: number }
+export async function popularUsage(): Promise<{ visitors: number; pages: PopularEvent[]; clicks: PopularEvent[] }> {
+  const sql = await db();
+  const userId = scopeUser();
+  const [total, pages, clicks] = await Promise.all([
+    sql`select count(distinct visitor)::int as visitors from kismet.events where user_id = ${userId} and at >= now() - interval '14 days'`,
+    sql`select page as label, count(distinct visitor)::int as visitors from kismet.events where user_id = ${userId}
+      and at >= now() - interval '14 days' and name = 'view' group by page order by visitors desc limit 30`,
+    sql`select element as label, count(distinct visitor)::int as visitors from kismet.events where user_id = ${userId}
+      and at >= now() - interval '14 days' and name = 'click' and element <> '' group by element order by visitors desc limit 40`,
+  ]);
+  return { visitors: Number(total[0]?.visitors ?? 0), pages: pages.map((r) => ({ label: String(r.label), visitors: Number(r.visitors) })),
+    clicks: clicks.map((r) => ({ label: String(r.label), visitors: Number(r.visitors) })) };
+}
+
+export interface GoalVisitorRow { visitor: string; firstAt: string; pages: string[]; converted: boolean }
+export async function goalVisitorRows(spec: MetricSpec): Promise<GoalVisitorRow[]> {
+  const sql = await db();
+  const userId = scopeUser();
+  const converts = spec.kind === "click"
+    ? sql`r.name = 'click' and r.element ilike ${"%" + spec.text + "%"}`
+    : sql`r.name = 'view' and r.page like ${spec.path.replace(/[%_]/g, "") + "%"}`;
+  const rows = await sql`
+    with mode as (select not exists (select 1 from kismet.events where user_id = ${userId} and at >= now() - interval '14 days' and synthetic = false) as all_synthetic),
+    firsts as (select visitor, min(at) as first_at from kismet.events where user_id = ${userId} group by visitor),
+    recent as (select e.* from kismet.events e, mode where e.user_id = ${userId} and e.at >= now() - interval '14 days' and (not e.synthetic or mode.all_synthetic))
+    select r.visitor, f.first_at, array_agg(distinct r.page) filter (where r.name = 'view') as pages,
+      bool_or(${converts}) as converted
+    from recent r join firsts f on f.visitor = r.visitor group by r.visitor, f.first_at
+  `;
+  return rows.map((r) => ({ visitor: String(r.visitor), firstAt: iso(r.first_at), pages: (r.pages as string[] | null) ?? [], converted: Boolean(r.converted) }));
+}
+
+export async function retentionCohort(): Promise<{ eligible: number; returned: number }> {
+  const sql = await db();
+  const userId = scopeUser();
+  const [row] = await sql`
+    with mode as (select not exists (select 1 from kismet.events where user_id = ${userId} and at >= now() - interval '14 days' and synthetic = false) as all_synthetic),
+    eligible_events as (select e.* from kismet.events e, mode where e.user_id = ${userId} and (not e.synthetic or mode.all_synthetic)),
+    firsts as (select visitor, min(at)::date as first_day from eligible_events group by visitor),
+    cohort as (select * from firsts where first_day between current_date - 14 and current_date - 8)
+    select count(*)::int as eligible, count(*) filter (where exists (
+      select 1 from eligible_events e where e.user_id = ${userId} and e.visitor = c.visitor
+        and e.at::date > c.first_day and e.at::date <= c.first_day + 7
+    ))::int as returned from cohort c
+  `;
+  return { eligible: Number(row?.eligible ?? 0), returned: Number(row?.returned ?? 0) };
 }
 
 export interface DailyVisitors {

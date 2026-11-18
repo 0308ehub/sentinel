@@ -13,6 +13,8 @@ import { clusterEvidence } from "@/lib/autopilot/cluster";
 import { designNext } from "@/lib/autopilot/design";
 import { workspaceEvidence } from "@/lib/autopilot/filed";
 import { analyticsFindings } from "@/lib/autopilot/findings";
+import { inferGoals } from "@/lib/autopilot/goals";
+import { goalFindings } from "@/lib/autopilot/goal-findings";
 import { startExperiment, startQueued } from "@/lib/autopilot/lifecycle";
 import { measureRunning } from "@/lib/autopilot/measure";
 import { sampleEvidenceCount } from "@/lib/autopilot/sample-data";
@@ -23,6 +25,7 @@ import {
   lastRunAt,
   listActivity,
   listExperiments,
+  listGoals,
   listSignals,
   log,
   addEvidence,
@@ -72,6 +75,8 @@ async function runScopedTick(): Promise<TickResult> {
     await step("analytics", result, analyticsFindings);
     await step("filed", result, workspaceEvidence);
     await step("freshness", result, retireStaleSignals);
+    await step("goals", result, inferGoals);
+    await step("goal-findings", result, goalFindings);
 
     // Notice: group evidence into problems.
     await step("notice", result, async () => {
@@ -121,6 +126,7 @@ export async function autopilotState(): Promise<AutopilotState> {
     configured: autopilotConfigured(),
     signals: [],
     experiments: [],
+    goals: [],
     activity: [],
     lastRunAt: null,
     synthetic: syntheticEnabled(),
@@ -149,9 +155,10 @@ export async function autopilotState(): Promise<AutopilotState> {
           await log("error", `dispatch-build failed: ${message}`).catch(() => {});
         });
       }
-      const [signals, experiments, activity, last, counts, repo, sampleEvidence] = await Promise.all([
+      const [signals, experiments, goals, activity, last, counts, repo, sampleEvidence] = await Promise.all([
         listSignals(),
         listExperiments(),
+        listGoals(),
         listActivity(),
         lastRunAt(),
         evidenceCounts(7),
@@ -164,6 +171,7 @@ export async function autopilotState(): Promise<AutopilotState> {
         sampleEvidence,
         signals,
         experiments,
+        goals,
         activity,
         lastRunAt: last,
         summary: {

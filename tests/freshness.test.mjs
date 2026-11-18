@@ -25,11 +25,15 @@ test("other evidence stays fresh through its thirty-day boundary", () => {
 test("the other-source freshness window accepts a positive integer override", () => {
   const env = { AUTOPILOT_EVIDENCE_FRESH_DAYS: "7" };
   assert.equal(otherFreshDays(env), 7);
-  assert.equal(isFresh({ source: "interview", occurredAt: daysAgo(7) }, now, env), true);
-  assert.equal(isFresh({ source: "interview", occurredAt: daysAgo(8) }, now, env), false);
+  assert.equal(isFresh({ source: "ticket", occurredAt: daysAgo(7) }, now, env), true);
+  assert.equal(isFresh({ source: "ticket", occurredAt: daysAgo(8) }, now, env), false);
   for (const value of ["", "0", "-1", "2.5", " 7 ", "many"]) {
     assert.equal(otherFreshDays({ AUTOPILOT_EVIDENCE_FRESH_DAYS: value }), OTHER_FRESH_DAYS);
   }
+});
+
+test("typed interview context never expires", () => {
+  assert.equal(isFresh({ source: "interview", occurredAt: daysAgo(10_000) }, now, {}), true);
 });
 
 test("elements disappear after three days without a click", () => {

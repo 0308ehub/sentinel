@@ -2,7 +2,9 @@ import "server-only";
 
 import { askForJson, readJson } from "@/lib/ai/respond";
 import { describeMetric, parseMetricSpec } from "@/lib/autopilot/assign";
-import { createExperiment, listExperiments, listSignals, log, setSignalStatus } from "@/lib/autopilot/store";
+import { createExperiment, interviewContext, listExperiments, listGoals, listSignals, log, metricBaseline, setSignalStatus, snoozeSignal } from "@/lib/autopilot/store";
+import { daysToResult, type ResultEstimate } from "@/lib/autopilot/power";
+import { maxExperimentDays, relativeMde } from "@/lib/autopilot/thresholds";
 import type { Experiment, Signal } from "@/lib/autopilot/types";
 
 /** After this many attempts on one problem, Autopilot stops and leaves it to a person. */
@@ -10,8 +12,8 @@ export const MAX_VERSIONS = 3;
 
 const ACTIVE = new Set(["building", "awaiting_approval", "queued", "running", "awaiting_rollout"]);
 
-function productContext(): string {
-  return (
+async function productContext(): Promise<string> {
+  const base = (
     process.env.AUTOPILOT_PRODUCT_CONTEXT?.trim() ||
     [
       "Kismet is a Next.js web app for product managers.",
@@ -24,6 +26,8 @@ function productContext(): string {
       "Creating a feature happens through the command palette item Propose feature…, whose submit button is Propose & open workspace.",
     ].join(" ")
   );
+  const context = await interviewContext();
+  return context.length ? `${base}\n\nWHAT THIS ACCOUNT TOLD KISMET\n${context.map((e) => `${e.title}: ${e.body}`).join("\n")}` : base;
 }
 
 function slug(text: string): string {
@@ -56,7 +60,11 @@ function attemptsSummary(previous: Experiment[]): string {
 }
 
 /** Designs one experiment for a problem. Returns null once the problem has used its attempts. */
-async function designCandidate(candidate: Signal, experiments: Experiment[]): Promise<string | null> {
+/**
+ * personApproved: a person asked for this test. Kismet still tries once to make it conclude faster,
+ * but builds it anyway with its estimate instead of snoozing it.
+ */
+async function designCandidate(candidate: Signal, experiments: Experiment[], personApproved = false): Promise<string | null> {
   const previous = experiments.filter((e) => e.signalId === candidate.id).sort((a, b) => a.version - b.version);
   if (previous.length >= MAX_VERSIONS) {
     await setSignalStatus(candidate.id, "dismissed");
@@ -64,8 +72,9 @@ async function designCandidate(candidate: Signal, experiments: Experiment[]): Pr
     return null;
   }
 
-  const text = await askForJson(
-    [
+  const goals = await listGoals();
+  const goalsText = goals.length ? goals.map((g) => `- ${g.name}: ${describeMetric(g.spec)} (${(g.baselineRate * 100).toFixed(1)}%, ${Math.round(g.weeklyVisitors)} visitors/week)`).join("\n") : "No goals yet.";
+  const system = [
       "You are an autonomous product manager. Design one small, shippable A/B experiment that addresses the problem.",
       "The change must be a UI change to one existing React component, safe to show to half of visitors.",
       "Pick the metric as the outcome the user is trying to reach, which must be possible in BOTH versions,",
@@ -76,22 +85,43 @@ async function designCandidate(candidate: Signal, experiments: Experiment[]): Pr
       "page is the route the change appears on, like /features or /settings/connectors.",
       "Return JSON: {title, hypothesis, control, treatment, metric, page, guardrail}. Keep each field to one or two sentences.",
       "If earlier attempts failed or were rejected, try a meaningfully different idea.",
-    ].join(" "),
-    [
-      `PRODUCT\n${productContext()}`,
+      "Prefer one of the GOALS as the metric when the change can plausibly move it; otherwise use the closest outcome both versions share.",
+    ].join(" ");
+  const user = [
+      `PRODUCT\n${await productContext()}`,
+      `GOALS\n${goalsText}`,
       `PROBLEM\n${candidate.title}: ${candidate.problem} (area: ${candidate.area || "unknown"})`,
       `EVIDENCE (${candidate.evidence.length})`,
       ...candidate.evidence.slice(0, 15).map((e) => `- [${e.source}] ${e.title}${e.body && e.source !== "slack" ? ` — ${e.body}` : ""}`),
       `EARLIER ATTEMPTS\n${attemptsSummary(previous)}`,
-    ].join("\n"),
-    false,
-    undefined,
-    "experiment"
-  );
-
-  const answer = readJson<DesignAnswer>(text);
-  const spec = parseMetricSpec(answer.metric);
+    ].join("\n");
+  async function request(message: string): Promise<{ answer: DesignAnswer; spec: NonNullable<ReturnType<typeof parseMetricSpec>>; estimate: ResultEstimate }> {
+    const text = await askForJson(system, message, false, undefined, "experiment");
+    const answer = readJson<DesignAnswer>(text);
+    const spec = parseMetricSpec(answer.metric);
+    if (!answer.title || !answer.treatment || !spec) throw new Error("The experiment design was missing a title, change or metric.");
+    const baseline = await metricBaseline(spec);
+    const baselineRate = baseline.visitors ? baseline.conversions / baseline.visitors : 0;
+    const relative = relativeMde();
+    const result = daysToResult({ weeklyVisitors: baseline.weeklyVisitors, baselineRate, relativeMde: relative });
+    return { answer, spec, estimate: { baselineRate, weeklyVisitors: baseline.weeklyVisitors, relativeMde: relative, ...result, at: new Date().toISOString() } };
+  }
+  let proposed = await request(user);
+  const maxDays = maxExperimentDays();
+  if (proposed.estimate.days > maxDays) {
+    const days = Number.isFinite(proposed.estimate.days) ? proposed.estimate.days : "infinite";
+    const feedback = `That test would need about ${days} days (${Math.round(proposed.estimate.weeklyVisitors)} visitors/week, ${(proposed.estimate.baselineRate * 100).toFixed(1)}% currently do ${describeMetric(proposed.spec)}). Redesign so it can conclude within ${maxDays} days: use a more common outcome (see GOALS and their baselines), a busier page, or a bolder change.`;
+    proposed = await request(`${user}\n\nFEEDBACK\n${feedback}`);
+  }
+  const { answer, spec, estimate } = proposed;
   if (!answer.title || !answer.treatment || !spec) throw new Error("The experiment design was missing a title, change or metric.");
+  if (estimate.days > maxDays && !personApproved) {
+    await snoozeSignal(candidate.id);
+    const days = Number.isFinite(estimate.days) ? estimate.days : "infinite";
+    const message = `“${answer.title}” needs about ${days} days of traffic to show a result; Kismet will look again next week.`;
+    await log("design", message, candidate.id);
+    return message;
+  }
 
   const version = previous.length + 1;
   const flag = `ap-${slug(answer.title)}-v${version}`;
@@ -107,6 +137,7 @@ async function designCandidate(candidate: Signal, experiments: Experiment[]): Pr
     control: answer.control ?? "",
     treatment: answer.treatment,
     flag,
+    estimate,
   });
   await setSignalStatus(candidate.id, "experimenting");
   await log("design", `Designed “${answer.title}” for “${candidate.title}”.`, candidate.id);
@@ -119,7 +150,8 @@ export async function designNext(): Promise<string | null> {
   // One change in the build pipeline at a time, so a blocked build doesn't pile up drafts.
   if (experiments.some((e) => e.status === "building")) return null;
   const busy = new Set(experiments.filter((e) => ACTIVE.has(e.status)).map((e) => e.signalId));
-  const candidate = signals.find((s) => s.ready && s.status === "open" && !busy.has(s.id));
+  const now = Date.now();
+  const candidate = signals.find((s) => s.ready && s.status === "open" && (!s.snoozedUntil || Date.parse(s.snoozedUntil) <= now) && !busy.has(s.id));
   if (!candidate) return null;
   return designCandidate(candidate, experiments);
 }
@@ -135,7 +167,7 @@ export async function designSignal(signalId: string): Promise<string> {
   if (experiments.some((e) => e.signalId === candidate.id && ACTIVE.has(e.status))) {
     throw new Error("Kismet is already testing this problem.");
   }
-  const message = await designCandidate(candidate, experiments);
+  const message = await designCandidate(candidate, experiments, true);
   if (!message) throw new Error(`“${candidate.title}” needs a person after ${MAX_VERSIONS} attempts.`);
   return message;
 }

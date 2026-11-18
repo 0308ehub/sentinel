@@ -1,5 +1,6 @@
 import type { MetricSpec } from "@/lib/autopilot/assign";
 import type { OutsideBuilder } from "@/lib/autopilot/builders";
+import type { ResultEstimate } from "@/lib/autopilot/power";
 
 export type EvidenceSource = "slack" | "ticket" | "analytics" | "interview";
 
@@ -32,6 +33,17 @@ export interface Signal {
   staleEvidence: number;
   sources: EvidenceSource[];
   ready: boolean;
+  snoozedUntil: string | null;
+}
+
+export interface Goal {
+  id: string;
+  name: string;
+  spec: MetricSpec;
+  source: "inferred" | "person";
+  createdAt: string;
+  baselineRate: number;
+  weeklyVisitors: number;
 }
 
 export type ExperimentStatus =
@@ -99,6 +111,7 @@ export interface Experiment {
   prNumber: number | null;
   note: string | null;
   readout: Readout | null;
+  estimate: ResultEstimate | null;
   /** The file the change edits. In dry-run mode the change is stored, not pushed. */
   draftPath: string | null;
   coderSessionId: string | null;
@@ -127,6 +140,7 @@ export interface AutopilotState {
   error?: string;
   signals: Signal[];
   experiments: Experiment[];
+  goals: Goal[];
   activity: Activity[];
   lastRunAt: string | null;
   synthetic: boolean;
