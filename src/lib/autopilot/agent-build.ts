@@ -6,6 +6,7 @@ import { autopilotDryRun, autopilotRepo, defaultAutopilotRepo } from "@/lib/auto
 import { autopilotUser } from "@/lib/autopilot/scope";
 import { listExperiments, listSignals, log, setSignalStatus, updateExperiment } from "@/lib/autopilot/store";
 import { isLocalSource } from "@/lib/autopilot/source";
+import { startSnapshot } from "@/lib/autopilot/snapshots";
 import type { Experiment, Signal } from "@/lib/autopilot/types";
 import { client, coderConfigured, managedSessionView, SESSION_BUDGET_CENTS } from "@/lib/coder/sessions";
 import { githubTokenFor } from "@/lib/github/app";
@@ -92,6 +93,12 @@ export async function finishBuild(
     note: `Built by ${by}. Waiting for the preview build.`,
   });
   await log("build", `Opened PR #${pull.number} for “${experiment.title}”.`, experiment.id);
+  if (experiment.changeSummary?.kind === "ui") {
+    await startSnapshot(
+      { ...experiment, status: "awaiting_approval", prUrl: pull.url, prNumber: pull.number, branch },
+      experiment.changeSummary,
+    ).catch((error) => console.error("[autopilot] could not start sample preview", error));
+  }
   return `Opened a pull request for “${experiment.title}”.`;
 }
 

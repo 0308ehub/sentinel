@@ -49,7 +49,10 @@ export function ExperimentBoard({
   const [tab, setTab] = useState<"overview" | "learnings">("overview");
   const [filter, setFilter] = useState<StatusFilter>("active");
   const [selected, setSelected] = useState<Selection | null>(null);
-  const [goals, setGoals] = useState<Goal[]>(state.goals);
+  // Goals come from the server; a local copy only holds the result of an edit made here. (Keying the
+  // whole board on goals instead remounted it and closed whatever experiment was open.)
+  const [editedGoals, setGoals] = useState<Goal[] | null>(null);
+  const goals = editedGoals ?? state.goals;
   const [editingGoals, setEditingGoals] = useState(false);
   const [goalName, setGoalName] = useState("");
   const [goalKind, setGoalKind] = useState<"click" | "visit">("click");
@@ -74,7 +77,7 @@ export function ExperimentBoard({
 
   async function removeGoal(id: string) {
     const response = await fetch("/api/autopilot/goals", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
-    if (response.ok) setGoals((items) => items.filter((goal) => goal.id !== id));
+    if (response.ok) setGoals(goals.filter((goal) => goal.id !== id));
   }
 
   const rows = useMemo(() => {

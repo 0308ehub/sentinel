@@ -7,6 +7,7 @@ import { currentUserId } from "@/lib/connections/current";
 import { isLocalSource, sourceLabel } from "@/lib/autopilot/source";
 import { buildNext, followPulls } from "@/lib/autopilot/build";
 import { followAgentBuilds } from "@/lib/autopilot/agent-build";
+import { followSnapshots } from "@/lib/autopilot/snapshots";
 import { followDispatchBuilds } from "@/lib/autopilot/dispatch-build";
 import { buildCleanup, followCleanups } from "@/lib/autopilot/cleanup";
 import { clusterEvidence } from "@/lib/autopilot/cluster";
@@ -104,6 +105,7 @@ async function runScopedTick(): Promise<TickResult> {
       // Before the gate: design the next experiment and build its PR.
       await step("design", result, designNext);
       await step("agent-build", result, followAgentBuilds);
+      await step("snapshots", result, followSnapshots);
       await step("dispatch-build", result, followDispatchBuilds);
       await step("build", result, buildNext);
     }

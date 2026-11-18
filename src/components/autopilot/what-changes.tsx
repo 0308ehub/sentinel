@@ -18,6 +18,13 @@ type Changes = {
 };
 
 type SummaryResponse = { summary?: ChangeSummary; pending?: boolean; siteUrl?: string | null; error?: string };
+type SnapshotResponse = {
+  status: "none" | "rendering" | "ready" | "failed";
+  scenario?: string | null;
+  error?: string | null;
+  controlHtml?: string | null;
+  treatmentHtml?: string | null;
+};
 
 function previewHref(origin: string, page: string, flag: string, arm: "control" | "treatment", embed: boolean) {
   const url = new URL(page || "/", `${origin}/`);
@@ -105,17 +112,125 @@ function VisualPreview({ experiment, changes, siteUrl, when, addedText }: {
   when: string;
   addedText: string[];
 }) {
+  const [snapshot, setSnapshot] = useState<SnapshotResponse | null>(null);
+  const [snapshotMessage, setSnapshotMessage] = useState("");
+  const startAttempted = useRef(false);
   const ownOrigin = changes.ownRepo && typeof window !== "undefined" ? window.location.origin : null;
   const liveOrigin = ownOrigin ?? siteUrl;
   const isLive = ["running", "awaiting_rollout", "rolled_out", "stopped"].includes(experiment.status)
     || changes.pull?.state === "merged";
-  if (when) return (
+  const hasSource = changes.source === "pull" || changes.source === "branch";
+
+  useEffect(() => {
+    let active = true;
+    let timer: number | undefined;
+    const load = async () => {
+      const response = await fetch(`/api/autopilot/experiments/${experiment.id}/snapshot`, { cache: "no-store" });
+      const body = (await response.json().catch(() => ({}))) as SnapshotResponse & { error?: string };
+      if (!active) return;
+      if (!response.ok) {
+        setSnapshotMessage(body.error || "Could not load the sample preview.");
+        return;
+      }
+      setSnapshot(body);
+      if (body.status === "none" && hasSource && !startAttempted.current) {
+        startAttempted.current = true;
+        const started = await fetch(`/api/autopilot/experiments/${experiment.id}/snapshot`, { method: "POST" });
+        if (!active) return;
+        if (!started.ok) {
+          setSnapshotMessage((await started.text()) || "Could not start the sample preview.");
+          return;
+        }
+        setSnapshot((await started.json()) as SnapshotResponse);
+        timer = window.setTimeout(load, 10_000);
+      } else if (body.status === "rendering") {
+        timer = window.setTimeout(load, 10_000);
+      }
+    };
+    load().catch((reason: unknown) => {
+      if (active) setSnapshotMessage(reason instanceof Error ? reason.message : "Could not load the sample preview.");
+    });
+    return () => {
+      active = false;
+      if (timer) window.clearTimeout(timer);
+    };
+  }, [experiment.id, hasSource]);
+
+  return (
     <div className="mt-4">
-      <p className="mb-2 text-xs text-[#6b7280]">The new version only appears {normalizePreviewCondition(when)}.</p>
-      <PreviewBody experiment={experiment} changes={changes} liveOrigin={liveOrigin} isLive={isLive} when={when} addedText={addedText} />
+      {when && <p className="mb-2 text-xs text-[#6b7280]">The new version only appears {normalizePreviewCondition(when)}.</p>}
+      <SnapshotChoice
+        experiment={experiment}
+        changes={changes}
+        liveOrigin={liveOrigin}
+        isLive={isLive}
+        when={when}
+        addedText={addedText}
+        snapshot={snapshot}
+      />
+      {snapshot?.status === "rendering" && (
+        <p className="mt-2 text-xs text-[#6b7280]">Rendering both versions with sample data… (usually a few minutes)</p>
+      )}
+      {(snapshot?.status === "failed" || snapshotMessage) && (
+        <p className="mt-2 text-xs text-[#6b7280]">{snapshotMessage || snapshot?.error || "The sample preview could not be rendered."}</p>
+      )}
     </div>
   );
-  return <div className="mt-4"><PreviewBody experiment={experiment} changes={changes} liveOrigin={liveOrigin} isLive={isLive} when={when} addedText={addedText} /></div>;
+}
+
+function SnapshotChoice({ experiment, changes, liveOrigin, isLive, when, addedText, snapshot }: {
+  experiment: Experiment;
+  changes: Changes;
+  liveOrigin: string | null;
+  isLive: boolean;
+  when: string;
+  addedText: string[];
+  snapshot: SnapshotResponse | null;
+}) {
+  const ready = snapshot?.status === "ready" && Boolean(snapshot.controlHtml && snapshot.treatmentHtml);
+  const [shownAs, setShownAs] = useState<"sample" | "account">("account");
+  const chosen = useRef(false);
+  useEffect(() => {
+    if (!chosen.current && ready && (Boolean(when.trim()) || !isLive)) setShownAs("sample");
+  }, [ready, when, isLive]);
+  const live = (
+    <PreviewBody experiment={experiment} changes={changes} liveOrigin={liveOrigin} isLive={isLive} when={when} addedText={addedText} />
+  );
+  if (!ready) return live;
+  return (
+    <div>
+      <div className="mb-2 flex items-center gap-2 text-xs text-[#6b7280]">
+        <span>Shown as</span>
+        <div className="inline-flex rounded-md bg-[#f1f3f5] p-0.5" role="group" aria-label="Which data to show">
+          <button
+            type="button"
+            aria-pressed={shownAs === "sample"}
+            onClick={() => { chosen.current = true; setShownAs("sample"); }}
+            className={`rounded px-2.5 py-1 ${shownAs === "sample" ? "bg-white font-medium text-[#111827] shadow-sm" : "hover:text-[#374151]"}`}
+          >
+            Sample: {snapshot.scenario || "Sample data"}
+          </button>
+          {isLive && (
+            <button
+              type="button"
+              aria-pressed={shownAs === "account"}
+              onClick={() => { chosen.current = true; setShownAs("account"); }}
+              className={`rounded px-2.5 py-1 ${shownAs === "account" ? "bg-white font-medium text-[#111827] shadow-sm" : "hover:text-[#374151]"}`}
+            >
+              Your account
+            </button>
+          )}
+        </div>
+      </div>
+      {shownAs === "sample" ? (
+        <>
+          <PreviewSwitcher control={snapshot.controlHtml!} treatment={snapshot.treatmentHtml!} when={when} addedText={[]} sample />
+          <p className="mt-2 text-xs text-[#6b7280]">Sample data · rendered by Kismet&apos;s coding agent</p>
+          {!isLive && <div className="mt-3">{live}</div>}
+        </>
+      ) : live}
+    </div>
+  );
 }
 
 function PreviewBody({ experiment, changes, liveOrigin, isLive, when, addedText }: {
@@ -145,7 +260,7 @@ function PreviewBody({ experiment, changes, liveOrigin, isLive, when, addedText 
   return <PreviewSwitcher control={control} treatment={treatment} when={when} addedText={addedText} />;
 }
 
-const FRAME_WIDTH = 1200;
+const FRAME_WIDTH = 1280;
 const FRAME_HEIGHT = 760;
 
 /**
@@ -185,11 +300,12 @@ function highlightTreatment(document: Document, blocks: FrameText[], texts: stri
   document.head.appendChild(style);
 }
 
-function PreviewSwitcher({ control, treatment, when, addedText }: {
+function PreviewSwitcher({ control, treatment, when, addedText, sample = false }: {
   control: string;
   treatment: string;
   when: string;
   addedText: string[];
+  sample?: boolean;
 }) {
   const [showing, setShowing] = useState<"control" | "treatment">("treatment");
   const box = useRef<HTMLDivElement>(null);
@@ -230,10 +346,11 @@ function PreviewSwitcher({ control, treatment, when, addedText }: {
   }, [loads]);
   const src = showing === "control" ? control : treatment;
   const fullPage = useMemo(() => {
+    if (sample) return null;
     const url = new URL(src);
     url.searchParams.delete("kismet_embed");
     return url.toString();
-  }, [src]);
+  }, [sample, src]);
   const option = (value: "control" | "treatment", label: string) => (
     <button
       type="button"
@@ -255,7 +372,7 @@ function PreviewSwitcher({ control, treatment, when, addedText }: {
           {option("control", "Current")}
           {option("treatment", "New version")}
         </div>
-        <a href={fullPage} target="_blank" rel="noreferrer" className="text-[#2563eb] hover:underline">Open full page ↗</a>
+        {fullPage && <a href={fullPage} target="_blank" rel="noreferrer" className="text-[#2563eb] hover:underline">Open full page ↗</a>}
       </div>
       {hasNewText && (
         <p className="mb-2 rounded border border-[#f59e0b] bg-[#fffbeb] px-3 py-2 text-xs text-[#92400e]">
@@ -284,7 +401,7 @@ function PreviewSwitcher({ control, treatment, when, addedText }: {
           <iframe
             key={value}
             title={value === "control" ? "Current version" : "New version"}
-            src={url}
+            {...(sample ? { srcDoc: url, sandbox: "allow-same-origin" } : { src: url })}
             ref={value === "control" ? controlFrame : treatmentFrame}
             onLoad={() => {
               setComparison(null);

@@ -60,7 +60,7 @@ export interface GitHubPullChanges {
   files: GitHubPullChangeFile[];
 }
 
-export async function pullChanges(fullName: string, number: number): Promise<GitHubPullChanges> {
+export async function pullChanges(fullName: string, number: number, candidateToken?: string): Promise<GitHubPullChanges> {
   const parsed = repoName(fullName);
   if (!parsed) throw new GitHubApiError("bad_repo", "Use a repository like owner/name.", 400);
   const pull = await github<{
@@ -72,11 +72,13 @@ export async function pullChanges(fullName: string, number: number): Promise<Git
     additions?: number;
     deletions?: number;
     changed_files?: number;
-  }>(`/repos/${parsed.owner}/${parsed.repo}/pulls/${number}`);
+  }>(`/repos/${parsed.owner}/${parsed.repo}/pulls/${number}`, undefined, candidateToken);
   const files: GitHubPullChangeFile[] = [];
   for (let page = 1; page <= 3; page += 1) {
     const rows = await github<GitHubPullChangeFile[]>(
       `/repos/${parsed.owner}/${parsed.repo}/pulls/${number}/files?per_page=100&page=${page}`,
+      undefined,
+      candidateToken,
     );
     files.push(...rows);
     if (rows.length < 100) break;
@@ -91,6 +93,19 @@ export async function pullChanges(fullName: string, number: number): Promise<Git
     changedFiles: pull.changed_files ?? files.length,
     files,
   };
+}
+
+export async function branchHeadSha(fullName: string, branch: string, candidateToken?: string): Promise<string> {
+  const parsed = repoName(fullName);
+  if (!parsed) throw new GitHubApiError("bad_repo", "Use a repository like owner/name.", 400);
+  const result = await github<{ commit?: { sha?: string } }>(
+    `/repos/${parsed.owner}/${parsed.repo}/branches/${encodeURIComponent(branch)}`,
+    undefined,
+    candidateToken,
+  );
+  const sha = result.commit?.sha;
+  if (!sha) throw new GitHubApiError("github_error", "GitHub did not return the branch commit.", 502);
+  return sha;
 }
 
 export async function createPullFromBranch(
