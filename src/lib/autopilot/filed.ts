@@ -43,32 +43,39 @@ function slackTime(ts: string): string {
   return Number.isFinite(seconds) ? new Date(seconds * 1000).toISOString() : new Date().toISOString();
 }
 
+function slackReadFailure(error: unknown): string | null {
+  if (error instanceof SlackApiError) {
+    // Not connected is normal; a rate limit just means this channel waits for the next tick.
+    if (error.code === "not_connected" || error.code === "ratelimited") return null;
+    return error.hint || error.code;
+  }
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Slack lets apps outside its Marketplace read channel history about once a minute, 15 messages at a
+ * time. So each tick reads one channel, taking the bot's channels in turn hour by hour.
+ */
 async function slackEvidence(): Promise<FiledEvidence[]> {
   try {
-    const channels = (await listBotChannels()).slice(0, 3);
-    const found: FiledEvidence[] = [];
-    for (const channel of channels) {
-      const messages = await listRecentMessages(channel.id);
-      for (const message of messages) {
-        const text = message.text.replace(/\s+/g, " ").trim();
-        if (text.length < 12 || !message.ts) continue;
-        found.push({
-          source: "slack",
-          title: text.slice(0, 180),
-          body: `#${channel.name}: ${text}`.slice(0, 500),
-          author: message.userId || "Slack",
-          url: `slack://${channel.id}/${message.ts}`,
-          occurredAt: slackTime(message.ts),
-        });
-      }
-    }
-    return found;
+    const channels = [...(await listBotChannels())].sort((a, b) => a.id.localeCompare(b.id));
+    if (!channels.length) return [];
+    const channel = channels[Math.floor(Date.now() / 3_600_000) % channels.length];
+    const messages = await listRecentMessages(channel.id);
+    return messages
+      .map((message) => ({ message, text: message.text.replace(/\s+/g, " ").trim() }))
+      .filter(({ message, text }) => text.length >= 12 && Boolean(message.ts))
+      .map(({ message, text }) => ({
+        source: "slack" as const,
+        title: text.slice(0, 180),
+        body: `#${channel.name}: ${text}`.slice(0, 500),
+        author: message.userId || "Slack",
+        url: `slack://${channel.id}/${message.ts}`,
+        occurredAt: slackTime(message.ts),
+      }));
   } catch (error) {
-    // An account without Slack connected is normal; anything else should show in the activity log.
-    if (!(error instanceof SlackApiError && error.code === "not_connected")) {
-      const reason = error instanceof SlackApiError ? error.hint || error.code : error instanceof Error ? error.message : String(error);
-      await log("error", `Could not read Slack: ${reason}`).catch(() => {});
-    }
+    const reason = slackReadFailure(error);
+    if (reason) await log("error", `Could not read Slack: ${reason}`).catch(() => {});
     return [];
   }
 }

@@ -196,7 +196,8 @@ export interface SlackHistoryItem {
 export async function listRecentMessages(channelId: string, oldest?: string): Promise<SlackHistoryItem[]> {
   const res = await callSlack<SlackResponse & { messages?: RawSlackMessage[] }>("conversations.history", {
     channel: channelId,
-    limit: 25,
+    // Slack's cap for apps outside its Marketplace; asking for more returns the same 15.
+    limit: 15,
     oldest,
   });
   return (res.messages ?? []).map((message) => ({
