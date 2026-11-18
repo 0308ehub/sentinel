@@ -21,6 +21,33 @@ export async function siteKeyFor(userId: string): Promise<string> {
   return rows[0].site_key;
 }
 
+export async function siteDetailsFor(userId: string): Promise<{ key: string; siteUrl: string | null }> {
+  const key = await siteKeyFor(userId);
+  const sql = await db();
+  const rows = await sql<{ site_url: string | null }[]>`
+    select site_url from kismet.autopilot_sites where user_id = ${userId} limit 1
+  `;
+  return { key, siteUrl: rows[0]?.site_url ?? null };
+}
+
+export async function siteUrlFor(userId: string): Promise<string | null> {
+  const sql = await db();
+  const rows = await sql<{ site_url: string | null }[]>`
+    select site_url from kismet.autopilot_sites where user_id = ${userId} limit 1
+  `;
+  return rows[0]?.site_url ?? null;
+}
+
+export async function setSiteUrl(userId: string, siteUrl: string): Promise<void> {
+  const sql = await db();
+  const key = newSiteKey();
+  await sql`
+    insert into kismet.autopilot_sites (user_id, site_key, site_url)
+    values (${userId}, ${key}, ${siteUrl})
+    on conflict (user_id) do update set site_url = excluded.site_url
+  `;
+}
+
 export async function rotateSiteKey(userId: string): Promise<string> {
   const sql = await db();
   const key = newSiteKey();

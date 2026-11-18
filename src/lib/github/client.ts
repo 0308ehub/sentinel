@@ -543,6 +543,62 @@ export async function commitChecks(fullName: string, sha: string): Promise<"pend
   return "success";
 }
 
+function vercelUrl(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && url.hostname.endsWith(".vercel.app") ? url.origin : null;
+  } catch {
+    return null;
+  }
+}
+
+function httpsUrl(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" ? url.origin : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Finds the browser URL for a pull request's preview deployment, when GitHub knows one. */
+export async function deploymentPreviewUrl(fullName: string, sha: string): Promise<string | null> {
+  const parsed = repoName(fullName);
+  if (!parsed || !sha) return null;
+  const deployments = await github<{ id?: number }[]>(
+    `/repos/${parsed.owner}/${parsed.repo}/deployments?sha=${encodeURIComponent(sha)}&per_page=10`,
+  );
+  for (const deployment of deployments) {
+    if (typeof deployment.id !== "number") continue;
+    const statuses = await github<{ environment_url?: string | null; target_url?: string | null }[]>(
+      `/repos/${parsed.owner}/${parsed.repo}/deployments/${deployment.id}/statuses?per_page=10`,
+    );
+    for (const status of statuses) {
+      const found = httpsUrl(status.environment_url) ?? httpsUrl(status.target_url);
+      if (found) return found;
+    }
+  }
+  const [status, runs] = await Promise.all([
+    github<{ statuses?: { target_url?: string | null }[] }>(
+      `/repos/${parsed.owner}/${parsed.repo}/commits/${sha}/status`,
+    ),
+    github<{ check_runs?: { details_url?: string | null; html_url?: string | null }[] }>(
+      `/repos/${parsed.owner}/${parsed.repo}/commits/${sha}/check-runs`,
+    ),
+  ]);
+  for (const item of status.statuses ?? []) {
+    const found = vercelUrl(item.target_url);
+    if (found) return found;
+  }
+  for (const run of runs.check_runs ?? []) {
+    const found = vercelUrl(run.details_url) ?? vercelUrl(run.html_url);
+    if (found) return found;
+  }
+  return null;
+}
+
 let repoNotesAt = 0;
 let repoNotes = "";
 

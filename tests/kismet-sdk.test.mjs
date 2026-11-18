@@ -8,6 +8,7 @@ const source = await readFile(new URL("../public/kismet.js", import.meta.url), "
 const context = { __KISMET_TEST__: true };
 runInNewContext(source, context);
 const sdkArmFor = context.__kismetArmFor;
+const sdkParsePreview = context.__kismetParsePreview;
 
 const flags = [
   { key: "plain-10", status: "running", treatmentPct: 10, layer: null, slotStart: 0, slotEnd: 100 },
@@ -24,4 +25,11 @@ test("browser SDK assignment exactly matches the application assignment", () => 
     const visitor = `visitor-${index}-${(index * 2654435761) >>> 0}`;
     for (const flag of flags) assert.equal(sdkArmFor(visitor, flag), armFor(visitor, flag));
   }
+});
+
+test("browser SDK parses preview overrides", () => {
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(sdkParsePreview("one:control,two:treatment,bad:other"))),
+    { one: "control", two: "treatment" },
+  );
 });

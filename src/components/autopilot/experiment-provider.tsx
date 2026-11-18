@@ -4,10 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { armFor, type Arm, type FlagState } from "@/lib/autopilot/assign";
+import { hasPreviewOverrides, parsePreviewOverrides, type PreviewOverrides } from "@/lib/autopilot/preview";
 import { ExperimentContext } from "@/lib/autopilot/variant";
 
 const VISITOR_COOKIE = "kismet_vid";
 const FLUSH_MS = 4000;
+const PREVIEW_KEY = "kismet-preview";
 
 interface TrackedEvent {
   name: "view" | "click";
@@ -37,6 +39,35 @@ export function ExperimentProvider({ children }: { children: React.ReactNode }) 
   const pathname = usePathname();
   const [visitor] = useState(() => (typeof document === "undefined" ? "" : readVisitor()));
   const queue = useRef<TrackedEvent[]>([]);
+  const [overrides, setOverrides] = useState<PreviewOverrides>({});
+  const [embedded, setEmbedded] = useState(false);
+  const [previewReady, setPreviewReady] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requested = params.get("kismet_preview");
+    let next: PreviewOverrides = {};
+    try {
+      next = parsePreviewOverrides(sessionStorage.getItem(PREVIEW_KEY));
+    } catch {
+      // Storage may be blocked.
+    }
+    if (requested === "off") {
+      next = {};
+      try { sessionStorage.removeItem(PREVIEW_KEY); } catch {}
+    } else if (requested) {
+      next = { ...next, ...parsePreviewOverrides(requested) };
+      try { sessionStorage.setItem(PREVIEW_KEY, Object.entries(next).map(([flag, arm]) => `${flag}:${arm}`).join(",")); } catch {}
+    }
+    const timer = window.setTimeout(() => {
+      setOverrides(next);
+      setEmbedded(params.get("kismet_embed") === "1");
+      setPreviewReady(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  const previewing = hasPreviewOverrides(overrides);
 
   const flags = useQuery({
     queryKey: ["autopilot-flags"],
@@ -55,8 +86,9 @@ export function ExperimentProvider({ children }: { children: React.ReactNode }) 
       const arm = armFor(visitor, flag);
       if (arm) result[flag.key] = arm;
     }
+    Object.assign(result, overrides);
     return result;
-  }, [flags.data, visitor]);
+  }, [flags.data, overrides, visitor]);
 
   const armsRef = useRef(arms);
   useEffect(() => {
@@ -66,12 +98,15 @@ export function ExperimentProvider({ children }: { children: React.ReactNode }) 
   // Wait for the flags so each view is tagged with the experiments this visitor is in.
   const flagsReady = flags.isFetched;
   useEffect(() => {
-    if (!visitor || !pathname || !flagsReady) return;
+    if (!visitor || !pathname || !flagsReady || !previewReady || previewing) return;
     queue.current.push({ name: "view", page: pathname, element: "", arms: armsRef.current });
-  }, [pathname, visitor, flagsReady]);
+  }, [pathname, visitor, flagsReady, previewReady, previewing]);
 
   useEffect(() => {
-    if (!visitor) return;
+    if (!visitor || !previewReady || previewing) {
+      queue.current = [];
+      return;
+    }
     const onClick = (event: MouseEvent) => {
       if (!(event.target instanceof Element)) return;
       const label = labelFor(event.target);
@@ -101,8 +136,31 @@ export function ExperimentProvider({ children }: { children: React.ReactNode }) 
       clearInterval(timer);
       flush();
     };
-  }, [visitor]);
+  }, [previewReady, previewing, visitor]);
 
   const value = useMemo(() => ({ visitor, arms }), [visitor, arms]);
-  return <ExperimentContext.Provider value={value}>{children}</ExperimentContext.Provider>;
+  const previewArm = Object.values(overrides)[0];
+  return (
+    <ExperimentContext.Provider value={value}>
+      {children}
+      {previewing && !embedded && previewArm && (
+        <div className="fixed bottom-4 left-4 z-[100] flex items-center gap-2 rounded-full border border-[#c7d7fe] bg-white px-3 py-1.5 text-xs text-[#374151] shadow-md">
+          <span>Previewing: {previewArm} version</span>
+          <span aria-hidden="true">·</span>
+          <button
+            type="button"
+            className="text-[#2563eb] hover:underline"
+            onClick={() => {
+              try { sessionStorage.removeItem(PREVIEW_KEY); } catch {}
+              const url = new URL(window.location.href);
+              url.searchParams.delete("kismet_preview");
+              window.location.replace(url.toString());
+            }}
+          >
+            Exit
+          </button>
+        </div>
+      )}
+    </ExperimentContext.Provider>
+  );
 }

@@ -1,0 +1,65 @@
+import { askForJson, readJson } from "@/lib/ai/respond";
+import { fallbackSummary, patchDigest, type ChangeFile, type ChangeSummary } from "@/lib/autopilot/change-summary";
+import { unifiedDiff } from "@/lib/autopilot/diff";
+import { chosenAutopilotRepo, defaultAutopilotRepo } from "@/lib/autopilot/repo";
+import { withAutopilotUser } from "@/lib/autopilot/scope";
+import { siteUrlFor } from "@/lib/autopilot/sites";
+import { experimentDraft, getExperiment, setExperimentChangeSummary } from "@/lib/autopilot/store";
+import { currentUserId } from "@/lib/connections/current";
+import { compareFiles, pullChanges, repoDefaultBranch } from "@/lib/github/client";
+
+export const dynamic = "force-dynamic";
+
+type ModelSummary = Pick<ChangeSummary, "kind" | "before" | "after" | "where" | "when">;
+
+function validSummary(value: ModelSummary): boolean {
+  return (value.kind === "ui" || value.kind === "behavior")
+    && [value.before, value.after, value.where, value.when].every((item) => typeof item === "string");
+}
+
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const userId = await currentUserId();
+  if (!userId) return Response.json({ error: "Sign in required." }, { status: 401 });
+  const { id } = await params;
+  return withAutopilotUser(userId, async () => {
+    const experiment = await getExperiment(id);
+    if (!experiment) return Response.json({ error: "Experiment not found." }, { status: 404 });
+    const repo = await chosenAutopilotRepo();
+    const siteUrl = repo === defaultAutopilotRepo() ? null : await siteUrlFor(userId);
+    if (experiment.changeSummary) return Response.json({ summary: experiment.changeSummary, siteUrl });
+
+    let files: ChangeFile[] = [];
+    if (experiment.prNumber && repo) {
+      files = (await pullChanges(repo, experiment.prNumber)).files;
+    } else if (experiment.branch && repo) {
+      files = await compareFiles(repo, await repoDefaultBranch(repo), experiment.branch);
+    } else {
+      const draft = await experimentDraft(id);
+      if (draft) files = [{ filename: draft.path, patch: unifiedDiff(draft.path, draft.original ?? "", draft.content) }];
+    }
+    if (files.length === 0) return Response.json({ pending: true, siteUrl });
+
+    let summary = fallbackSummary(experiment, files);
+    try {
+      const answer = readJson<ModelSummary>(await askForJson(
+        [
+          "Explain a product code change in plain language a product manager understands.",
+          "Describe what people SEE for UI changes, or what they GET or EXPERIENCE for behavior changes.",
+          "Return JSON only: {kind, before, after, where, when}.",
+          "kind is ui or behavior. before and after are one or two sentences each.",
+          "where is the route, path, or product place. when is any extra condition for it to appear beyond being in the new version of the experiment (for example only when a list is empty, or only for new accounts); use an empty string when there is none. Never mention variants, treatment, or the experiment split.",
+        ].join(" "),
+        `EXPERIMENT\nTitle: ${experiment.title}\nControl: ${experiment.control}\nTreatment: ${experiment.treatment}\nPage: ${experiment.page}\n\nPATCHES\n${patchDigest(files, 12_000)}`,
+        false,
+        undefined,
+        "experiment",
+      ));
+      if (!validSummary(answer)) throw new Error("Invalid summary response.");
+      summary = { ...answer, at: new Date().toISOString() };
+    } catch (error) {
+      console.error("[autopilot] change summary fallback", error);
+    }
+    await setExperimentChangeSummary(id, summary);
+    return Response.json({ summary, siteUrl });
+  });
+}

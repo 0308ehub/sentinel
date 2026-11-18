@@ -20,8 +20,22 @@
     return hash(flag.key + ":" + visitor) % 100 < flag.treatmentPct ? "treatment" : "control";
   }
 
+  function parsePreview(value) {
+    var result = {};
+    if (!value || value === "off") return result;
+    value.split(",").forEach(function (item) {
+      var separator = item.lastIndexOf(":");
+      if (separator <= 0) return;
+      var flag = item.slice(0, separator).trim();
+      var arm = item.slice(separator + 1).trim();
+      if (flag && (arm === "control" || arm === "treatment")) result[flag] = arm;
+    });
+    return result;
+  }
+
   if (root.__KISMET_TEST__) {
     root.__kismetArmFor = armFor;
+    root.__kismetParsePreview = parsePreview;
     return;
   }
   if (typeof document === "undefined" || typeof window === "undefined") return;
@@ -33,6 +47,23 @@
 
   var origin = new URL(script.src, window.location.href).origin;
   if (!origin) return;
+
+  var previewValue = new URL(window.location.href).searchParams.get("kismet_preview");
+  var preview = {};
+  try { preview = parsePreview(window.sessionStorage.getItem("kismet-preview")); } catch (e) {}
+  if (previewValue === "off") {
+    preview = {};
+    try { window.sessionStorage.removeItem("kismet-preview"); } catch (e) {}
+  } else if (previewValue) {
+    var requestedPreview = parsePreview(previewValue);
+    Object.keys(requestedPreview).forEach(function (key) { preview[key] = requestedPreview[key]; });
+    try {
+      window.sessionStorage.setItem("kismet-preview", Object.keys(preview).map(function (key) {
+        return key + ":" + preview[key];
+      }).join(","));
+    } catch (e) {}
+  }
+  var previewing = Object.keys(preview).length > 0;
 
   function visitorId() {
     var match = document.cookie.match(/(?:^|; )kismet_vid=([^;]+)/);
@@ -57,11 +88,12 @@
   var api = {
     visitor: visitor,
     ready: ready,
-    variant: function (flag) { return arms[flag] || "control"; }
+    variant: function (flag) { return preview[flag] || arms[flag] || "control"; }
   };
   window.kismet = api;
 
   function record(name, page, element) {
+    if (previewing) return;
     var snapshot = {};
     Object.keys(arms).forEach(function (key) { snapshot[key] = arms[key]; });
     queue.push({ name: name, page: page, element: element, arms: snapshot });
@@ -110,6 +142,7 @@
         var arm = armFor(visitor, flag);
         if (arm) arms[flag.key] = arm;
       });
+      Object.keys(preview).forEach(function (key) { arms[key] = preview[key]; });
     })
     .catch(function () {})
     .then(function () {

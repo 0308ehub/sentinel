@@ -6,6 +6,7 @@ import { parseMetricSpec, type Arm, type FlagState, type MetricSpec } from "@/li
 import { isOutsideBuilder, type OutsideBuilder } from "@/lib/autopilot/builders";
 import { ANALYTICS_FRESH_DAYS, ELEMENT_GONE_DAYS, otherFreshDays } from "@/lib/autopilot/freshness";
 import type { ResultEstimate } from "@/lib/autopilot/power";
+import type { ChangeSummary } from "@/lib/autopilot/change-summary";
 import {
   READY_MIN_EVIDENCE,
   READY_MIN_SOURCES,
@@ -74,6 +75,7 @@ function toExperiment(row: Row): Experiment {
     guardrail: String(row.guardrail ?? ""),
     control: String(row.control ?? ""),
     treatment: String(row.treatment ?? ""),
+    changeSummary: (row.change_summary as ChangeSummary | null) ?? null,
     flag: String(row.flag),
     status: row.status as ExperimentStatus,
     rejectedBy: row.rejected_by === "person" || row.rejected_by === "kismet" ? row.rejected_by : null,
@@ -341,6 +343,14 @@ export async function getExperiment(id: string): Promise<Experiment | null> {
   const sql = await db();
   const rows = await sql`select * from kismet.experiments where user_id = ${scopeUser()} and id = ${id}`;
   return rows[0] ? toExperiment(rows[0]) : null;
+}
+
+export async function setExperimentChangeSummary(id: string, summary: ChangeSummary): Promise<void> {
+  const sql = await db();
+  await sql`
+    update kismet.experiments set change_summary = ${sql.json({ ...summary })}
+    where user_id = ${scopeUser()} and id = ${id}
+  `;
 }
 
 export async function experimentOwnerBySession(sessionId: string): Promise<string | null> {

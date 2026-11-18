@@ -8,6 +8,7 @@ interface SiteDetails {
   key: string;
   snippet: string;
   eventsLast24h: number;
+  siteUrl: string | null;
 }
 
 export function InstallSite() {
@@ -15,6 +16,9 @@ export function InstallSite() {
   const [copied, setCopied] = useState(false);
   const [rotating, setRotating] = useState(false);
   const [error, setError] = useState("");
+  const [siteUrl, setSiteUrl] = useState("");
+  const [savingUrl, setSavingUrl] = useState(false);
+  const [urlSaved, setUrlSaved] = useState(false);
 
   useEffect(() => {
     fetch("/api/autopilot/site", { cache: "no-store" })
@@ -22,6 +26,7 @@ export function InstallSite() {
         const body = (await response.json()) as SiteDetails & { error?: string };
         if (!response.ok) throw new Error(body.error || "Could not load the site SDK.");
         setDetails(body);
+        setSiteUrl(body.siteUrl ?? "");
       })
       .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "Could not load the site SDK."));
   }, []);
@@ -31,6 +36,30 @@ export function InstallSite() {
     await navigator.clipboard.writeText(details.snippet);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1500);
+  }
+
+  async function saveSiteUrl() {
+    setSavingUrl(true);
+    setUrlSaved(false);
+    setError("");
+    try {
+      const parsed = new URL(siteUrl.trim());
+      if (parsed.protocol !== "https:") throw new Error("Enter a valid HTTPS URL.");
+      const response = await fetch("/api/autopilot/site", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "site_url", siteUrl: parsed.toString() }),
+      });
+      const body = (await response.json()) as { siteUrl?: string; error?: string };
+      if (!response.ok || !body.siteUrl) throw new Error(body.error || "Could not save the site URL.");
+      setSiteUrl(body.siteUrl);
+      setDetails((current) => current ? { ...current, siteUrl: body.siteUrl ?? null } : current);
+      setUrlSaved(true);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not save the site URL.");
+    } finally {
+      setSavingUrl(false);
+    }
   }
 
   async function rotate() {
@@ -45,7 +74,7 @@ export function InstallSite() {
       });
       const body = (await response.json()) as Pick<SiteDetails, "key" | "snippet"> & { error?: string };
       if (!response.ok) throw new Error(body.error || "Could not rotate the site key.");
-      setDetails((current) => ({ ...body, eventsLast24h: current?.eventsLast24h ?? 0 }));
+      setDetails((current) => ({ ...body, eventsLast24h: current?.eventsLast24h ?? 0, siteUrl: current?.siteUrl ?? null }));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not rotate the site key.");
     } finally {
@@ -68,6 +97,24 @@ export function InstallSite() {
         !error && <p className="flex items-center text-sm text-muted-foreground"><Loader2 className="mr-2 animate-spin" /> Loading…</p>
       ) : (
         <section className="space-y-4 rounded-xl border border-border bg-card p-5">
+          <div className="space-y-2 border-b border-border pb-4">
+            <label htmlFor="site-url" className="text-sm font-medium">Your site&apos;s URL</label>
+            <p className="text-xs text-muted-foreground">Kismet uses this HTTPS address to show both experiment versions side by side.</p>
+            <div className="flex gap-2">
+              <input
+                id="site-url"
+                type="url"
+                inputMode="url"
+                placeholder="https://example.com"
+                value={siteUrl}
+                onChange={(event) => { setSiteUrl(event.target.value); setUrlSaved(false); }}
+                className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-ring"
+              />
+              <Button size="sm" variant="outline" disabled={savingUrl} onClick={() => void saveSiteUrl()}>
+                {savingUrl ? "Saving…" : urlSaved ? "Saved" : "Save"}
+              </Button>
+            </div>
+          </div>
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-sm font-medium">Site script</h2>
             <Button size="sm" variant="outline" onClick={() => void copy()}>

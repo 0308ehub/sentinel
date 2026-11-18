@@ -1,5 +1,7 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
+
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { CommandPalette } from "@/components/search/command-palette";
@@ -19,11 +21,16 @@ export function AppShell({
   children: React.ReactNode;
   header?: boolean;
 }) {
+  const embedded = useSyncExternalStore(
+    () => () => {},
+    () => new URLSearchParams(window.location.search).get("kismet_embed") === "1",
+    () => false,
+  );
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      <Sidebar />
+      {!embedded && <Sidebar />}
       <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
-        {header && <Header />}
+        {header && !embedded && <Header />}
         <PendingPrd />
         <main className="flex-1 overflow-hidden">{children}</main>
       </div>

@@ -1,6 +1,7 @@
 import type { MetricSpec } from "@/lib/autopilot/assign";
 import type { OutsideBuilder } from "@/lib/autopilot/builders";
 import type { ResultEstimate } from "@/lib/autopilot/power";
+import type { ChangeSummary } from "@/lib/autopilot/change-summary";
 
 export type EvidenceSource = "slack" | "ticket" | "analytics" | "interview";
 
@@ -104,6 +105,7 @@ export interface Experiment {
   guardrail: string;
   control: string;
   treatment: string;
+  changeSummary: ChangeSummary | null;
   flag: string;
   status: ExperimentStatus;
   rejectedBy: "person" | "kismet" | null;

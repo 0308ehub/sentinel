@@ -1,5 +1,5 @@
 import { withAutopilotUser } from "@/lib/autopilot/scope";
-import { rotateSiteKey, siteKeyFor } from "@/lib/autopilot/sites";
+import { rotateSiteKey, setSiteUrl, siteDetailsFor } from "@/lib/autopilot/sites";
 import { eventsSince } from "@/lib/autopilot/store";
 import { currentUserId } from "@/lib/connections/current";
 
@@ -15,10 +15,10 @@ export async function GET(request: Request) {
   if (!userId) return Response.json({ error: "Sign in required." }, { status: 401 });
   try {
     const [key, recentEvents] = await Promise.all([
-      siteKeyFor(userId),
+      siteDetailsFor(userId),
       withAutopilotUser(userId, () => eventsSince(24)),
     ]);
-    return Response.json({ key, snippet: snippetFor(key, new URL(request.url).origin), eventsLast24h: recentEvents });
+    return Response.json({ key: key.key, siteUrl: key.siteUrl, snippet: snippetFor(key.key, new URL(request.url).origin), eventsLast24h: recentEvents });
   } catch (error) {
     console.error("[autopilot] site", error);
     return Response.json({ error: "Could not load the site SDK." }, { status: 500 });
@@ -28,7 +28,19 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const userId = await currentUserId();
   if (!userId) return Response.json({ error: "Sign in required." }, { status: 401 });
-  const body = (await request.json().catch(() => null)) as { action?: unknown } | null;
+  const body = (await request.json().catch(() => null)) as { action?: unknown; siteUrl?: unknown } | null;
+  if (body?.action === "site_url") {
+    if (typeof body.siteUrl !== "string") return Response.json({ error: "Enter a valid HTTPS URL." }, { status: 400 });
+    try {
+      const url = new URL(body.siteUrl.trim());
+      if (url.protocol !== "https:") throw new Error("protocol");
+      const siteUrl = url.toString().replace(/\/$/, "");
+      await setSiteUrl(userId, siteUrl);
+      return Response.json({ siteUrl });
+    } catch {
+      return Response.json({ error: "Enter a valid HTTPS URL." }, { status: 400 });
+    }
+  }
   if (body?.action !== "rotate") return Response.json({ error: "Unknown action." }, { status: 400 });
   try {
     const key = await rotateSiteKey(userId);

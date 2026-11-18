@@ -4,6 +4,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { ExternalLink, Loader2 } from "lucide-react";
 import { BuildLive } from "@/components/autopilot/build-live";
 import { CodeChange } from "@/components/autopilot/code-change";
+import { WhatChanges } from "@/components/autopilot/what-changes";
 import { Button } from "@/components/ui/button";
 import type { ArmResult, Experiment, Learning, Readout, Signal } from "@/lib/autopilot/types";
 
@@ -214,6 +215,7 @@ function MainPanel(props: {
   );
   const change = experiment && hasChange ? (
     <section>
+      <WhatChanges key={`summary-${experiment.id}`} experiment={experiment} />
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e6e8ec] px-4 py-3">
         <h2 className="text-sm font-medium text-[#111827]">Code change</h2>
         {decisions}
