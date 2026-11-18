@@ -10,7 +10,6 @@ import { useAnalyticsLibrary } from "@/stores/analytics-store";
 import { useNotificationStore } from "@/stores/notification-store";
 import { useQueryEditorStore } from "@/stores/query-editor-store";
 import { WorkspaceNotes } from "@/components/workspace/notes-panel";
-import { useVariant } from "@/lib/autopilot/variant";
 import type { GraphNode, NodeStatus, NodeType, Priority } from "@/types/graph";
 
 const OPEN: NodeStatus[] = ["DRAFT", "ACTIVE", "IN_PROGRESS", "AT_RISK", "STALE"];
@@ -29,7 +28,6 @@ export function DashboardView() {
   const notifications = useNotificationStore((state) => state.items);
   const markAsRead = useNotificationStore((state) => state.markAsRead);
   const notebooks = useQueryEditorStore((state) => state.savedNotebooks);
-  const variant = useVariant("ap-add-a-dashboard-autopilot-review-card-v2");
 
   const tickets = nodes
     .filter((node) => isTicket(node) && node.ownerId === CURRENT_USER.id && OPEN.includes(node.status))
@@ -114,18 +112,6 @@ export function DashboardView() {
           </div>
 
           <div className="space-y-10">
-            {variant === "treatment" ? (
-              <section
-                data-track="ap-add-a-dashboard-autopilot-review-card-v2"
-                className="rounded-md border border-border px-4 py-3"
-              >
-                <h2 className="text-sm font-medium">Let Autopilot review your product signals</h2>
-                <p className="mt-0.5 text-xs text-muted-foreground">Get suggested next steps from your latest activity</p>
-                <Link href="/ai" className="mt-2 inline-block text-xs text-brand hover:underline">
-                  Open Autopilot
-                </Link>
-              </section>
-            ) : null}
             <Section title="Analytics library" href="/analytics" hrefLabel="Open">
               {!libraryReady || !notebooksReady ? null : dashboards.length === 0 && metrics.length === 0 && notebooks.length === 0 ? (
                 <Empty>The library is empty.</Empty>
