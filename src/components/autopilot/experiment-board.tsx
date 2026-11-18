@@ -200,19 +200,19 @@ export function ExperimentBoard({
         <table className="w-full border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-[#e6e8ec] text-xs text-[#6b7280]">
-              <th className="py-2 font-medium">Experiment</th>
-              <th className="py-2 font-medium">Type</th>
-              <th className="py-2 font-medium">Feature</th>
-              <th className="py-2 font-medium">Environments</th>
-              <th className="py-2 font-medium">Modified</th>
-              <th className="py-2 font-medium">Created</th>
-              <th className="py-2 text-right font-medium">Results</th>
+              <th className="px-3 py-2 font-medium">Experiment</th>
+              <th className="px-3 py-2 font-medium">Type</th>
+              <th className="px-3 py-2 font-medium">Feature</th>
+              <th className="px-3 py-2 font-medium">Environments</th>
+              <th className="px-3 py-2 font-medium">Modified</th>
+              <th className="px-3 py-2 font-medium">Created</th>
+              <th className="px-3 py-2 text-right font-medium">Results</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-8 text-sm text-[#6b7280]">
+                <td colSpan={7} className="px-3 py-8 text-sm text-[#6b7280]">
                   {state.experiments.length === 0 && suggestions.length === 0
                     ? "Kismet will suggest experiments here after it reads your evidence."
                     : "No experiments match this filter."}
@@ -224,21 +224,21 @@ export function ExperimentBoard({
                 return (
                   <tr
                     key={`${row.kind}-${id}`}
-                    className={`cursor-pointer border-b border-[#eef0f3] ${row.suggested ? "bg-[#f7f8fa] text-[#9aa0a8]" : "hover:bg-[#f8fafc]"}`}
+                    className="cursor-pointer border-b border-[#eef0f3] text-[#374151] hover:bg-[#f8fafc] [&>td]:px-3"
                     onClick={() => setSelected(row.kind === "experiment" ? { kind: "experiment", id } : { kind: "signal", id })}
                   >
-                    <td className="py-3 pr-3">
+                    <td className="py-3">
                       <div className="flex items-center gap-2">
-                        <span className={row.suggested ? "font-medium" : "font-medium text-[#2563eb]"}>{row.name}</span>
+                        <span className={row.suggested ? "font-medium text-[#111827]" : "font-medium text-[#2563eb]"}>{row.name}</span>
                         {row.suggested && (
-                          <span className="rounded border border-[#d5d8de] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide">
+                          <span className="rounded border border-[#c7d7fe] bg-[#eef4ff] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[#2563eb]">
                             Suggested
                           </span>
                         )}
                       </div>
                       <div className="text-xs text-[#9aa0a8]">{row.key}</div>
                     </td>
-                    <td className={row.suggested ? "" : "text-[#374151]"}>A/B Test</td>
+                    <td className="whitespace-nowrap">A/B Test</td>
                     <td>{row.feature}</td>
                     <td>
                       <Env live={row.live} muted={row.suggested} />
@@ -248,10 +248,10 @@ export function ExperimentBoard({
                     <td className="text-right">
                       <span
                         className={`inline-flex items-center rounded border px-2 py-1 text-xs ${
-                          row.suggested ? "border-[#d5d8de] text-[#b0b6be]" : "border-[#2563eb] text-[#2563eb]"
+                          row.suggested ? "border-[#d5d8de] text-[#374151]" : "border-[#2563eb] text-[#2563eb]"
                         }`}
                       >
-                        Results
+                        {row.suggested ? "Review" : "Results"}
                       </span>
                     </td>
                   </tr>
@@ -267,7 +267,7 @@ export function ExperimentBoard({
 
 function Env({ live, muted }: { live: boolean; muted: boolean }) {
   return (
-    <div className="space-y-1 text-xs">
+    <div className="space-y-1 whitespace-nowrap text-xs">
       <div className="flex items-center gap-1.5">
         <span className={`h-2 w-2 rounded-full ${live && !muted ? "bg-[#1f9d55]" : "bg-[#c5c9d0]"}`} />
         Production
