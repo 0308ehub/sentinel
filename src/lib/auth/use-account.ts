@@ -7,6 +7,7 @@ export interface Account {
   name: string;
   email: string;
   imageUrl: string;
+  createdAt: Date | null;
   signOut: () => Promise<void>;
 }
 
@@ -21,6 +22,7 @@ function useClerkAccount(): Account | null {
       name: user.fullName ?? "",
       email: user.primaryEmailAddress?.emailAddress ?? "",
       imageUrl: user.imageUrl,
+      createdAt: user.createdAt,
       signOut: () => signOut({ redirectUrl: "/" }),
     };
   }, [isLoaded, signOut, user]);

@@ -12,6 +12,7 @@ import {
   type OnboardingDraft,
   type OnboardingStep,
 } from "@/lib/onboarding";
+import { SIGN_IN_DESTINATION, isExistingAccount } from "@/lib/auth/destinations";
 import { useAccount } from "@/lib/auth/use-account";
 import { cn } from "@/lib/utils";
 import { openGitHubInstall, type GitHubInstallStatus } from "@/components/settings/github-connect";
@@ -36,6 +37,11 @@ export function OnboardingFlow({ step }: { step: string }) {
   const [draft, setDraft] = useState<OnboardingDraft>(readOnboarding);
 
   useEffect(() => {
+    // Sign-up lands here while the account is new. An older account goes to the workspace.
+    if (account && isExistingAccount(account.createdAt)) {
+      router.replace(SIGN_IN_DESTINATION);
+      return;
+    }
     const saved = readOnboarding();
     if (account && (!saved.name || !saved.email)) {
       void Promise.resolve().then(() => {

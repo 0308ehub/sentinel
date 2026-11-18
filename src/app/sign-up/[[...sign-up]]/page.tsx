@@ -1,8 +1,9 @@
 import { SignUp } from "@clerk/nextjs";
+import { AuthFrame, KeylessAuth, authAppearance } from "@/components/auth/auth-frame";
+import { SIGN_UP_DESTINATION } from "@/lib/auth/destinations";
 import { privatePage } from "@/lib/page-meta";
 
 export const metadata = privatePage("Sign up", "Create a Kismet account.");
-import { AuthFrame, KeylessAuth, authAppearance } from "@/components/auth/auth-frame";
 
 export default function SignUpPage() {
   return (
@@ -12,8 +13,8 @@ export default function SignUpPage() {
           routing="path"
           path="/sign-up"
           signInUrl="/sign-in"
-          forceRedirectUrl="/onboarding/you"
-          fallbackRedirectUrl="/onboarding/you"
+          forceRedirectUrl={SIGN_UP_DESTINATION}
+          fallbackRedirectUrl={SIGN_UP_DESTINATION}
           appearance={authAppearance}
         />
       ) : (

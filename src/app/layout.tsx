@@ -6,6 +6,7 @@ import localFont from "next/font/local";
 import { cookies } from "next/headers";
 import "./globals.css";
 import { Providers } from "@/components/providers";
+import { SIGN_IN_DESTINATION, SIGN_UP_DESTINATION } from "@/lib/auth/destinations";
 import { siteUrl } from "@/lib/site";
 import { THEME_KEY } from "@/lib/theme";
 
@@ -73,9 +74,10 @@ export default async function RootLayout({
           <ClerkProvider
             signInUrl="/sign-in"
             signUpUrl="/sign-up"
-            signInFallbackRedirectUrl="/enter"
-            signUpFallbackRedirectUrl="/onboarding/you"
-            signUpForceRedirectUrl="/onboarding/you"
+            signInFallbackRedirectUrl={SIGN_IN_DESTINATION}
+            signInForceRedirectUrl={SIGN_IN_DESTINATION}
+            signUpFallbackRedirectUrl={SIGN_UP_DESTINATION}
+            signUpForceRedirectUrl={SIGN_UP_DESTINATION}
           >
             {content}
           </ClerkProvider>

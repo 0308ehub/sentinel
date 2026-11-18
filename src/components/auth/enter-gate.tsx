@@ -2,13 +2,13 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { destinationAfterSignIn } from "@/lib/onboarding";
+import { SIGN_IN_DESTINATION } from "@/lib/auth/destinations";
 
 export function EnterGate() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace(destinationAfterSignIn());
+    router.replace(SIGN_IN_DESTINATION);
   }, [router]);
 
   return (

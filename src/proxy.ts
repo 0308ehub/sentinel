@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server";
+import { SIGN_IN_DESTINATION, SIGN_UP_DESTINATION } from "@/lib/auth/destinations";
 
 const isPublicRoute = createRouteMatcher([
   "/",
@@ -48,7 +49,8 @@ const clerkProxy = clerkMiddleware(
     );
     const path = request.nextUrl.pathname;
     if (userId && !handshake && (path === "/" || path.startsWith("/sign-in") || path.startsWith("/sign-up"))) {
-      const next = path.startsWith("/sign-up") ? "/onboarding/you" : "/enter";
+      // Sign-up starts onboarding. Sign-in, and a signed-in visit, open the workspace.
+      const next = path.startsWith("/sign-up") ? SIGN_UP_DESTINATION : SIGN_IN_DESTINATION;
       return NextResponse.redirect(new URL(next, request.url));
     }
 

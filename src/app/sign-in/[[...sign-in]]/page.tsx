@@ -1,8 +1,9 @@
 import { SignIn } from "@clerk/nextjs";
+import { AuthFrame, KeylessAuth, authAppearance } from "@/components/auth/auth-frame";
+import { SIGN_IN_DESTINATION } from "@/lib/auth/destinations";
 import { privatePage } from "@/lib/page-meta";
 
 export const metadata = privatePage("Sign in", "Sign in to Kismet.");
-import { AuthFrame, KeylessAuth, authAppearance } from "@/components/auth/auth-frame";
 
 export default function SignInPage() {
   return (
@@ -12,8 +13,8 @@ export default function SignInPage() {
           routing="path"
           path="/sign-in"
           signUpUrl="/sign-up"
-          forceRedirectUrl="/enter"
-          fallbackRedirectUrl="/enter"
+          forceRedirectUrl={SIGN_IN_DESTINATION}
+          fallbackRedirectUrl={SIGN_IN_DESTINATION}
           appearance={authAppearance}
         />
       ) : (
