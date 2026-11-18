@@ -23,6 +23,7 @@ import {
   Plus,
   Boxes,
   CircleAlert,
+  Home,
 } from "lucide-react";
 import type { NodeType } from "@/types/graph";
 import { ReportProblem } from "@/components/feedback/report-problem";
@@ -31,6 +32,7 @@ const NAV_ITEMS = [
   { label: "Chat", href: "/ai", icon: MessageSquare },
   { label: "Experiments", href: "/experiments", icon: FlaskConical },
   { label: "Connections", href: "/settings/connectors", icon: Boxes },
+  { label: "Kismet home", href: "/", icon: Home },
   { label: "Agents", href: "/agents", icon: Boxes },
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Explorer", href: "/explorer", icon: FolderTree },
@@ -69,6 +71,9 @@ export function CommandPalette() {
 
   useGraphStore((s) => s.nodes.length);
   const results = searchGraph(query);
+  // Pages hidden from the sidebar stay findable: typing a page name matches it.
+  const needle = query.trim().toLowerCase();
+  const matchingPages = needle ? NAV_ITEMS.filter((item) => item.label.toLowerCase().includes(needle)) : [];
 
   const navigate = (href: string) => {
     setCommandPaletteOpen(false);
@@ -118,6 +123,16 @@ export function CommandPalette() {
                 ))}
               </CommandGroup>
               </>
+            )}
+            {query && matchingPages.length > 0 && (
+              <CommandGroup heading="Pages">
+                {matchingPages.map((item) => (
+                  <CommandItem key={item.href} onSelect={() => navigate(item.href)}>
+                    <item.icon className="mr-2 h-4 w-4 text-muted-foreground" />
+                    {item.label}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
             )}
             {query && results.length > 0 && (
               <CommandGroup heading="Graph Nodes">

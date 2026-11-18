@@ -25,6 +25,7 @@ import {
   Boxes,
   CircleAlert,
   ChevronRight,
+  Home,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui-store";
@@ -339,6 +340,12 @@ export function Sidebar() {
               <Link href="/settings">
                 <Settings className="h-4 w-4" />
                 Settings
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/">
+                <Home className="h-4 w-4" />
+                Kismet home
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />

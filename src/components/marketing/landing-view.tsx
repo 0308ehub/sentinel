@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { SignedInRedirect } from "@/components/auth/signed-in-redirect";
 import { ExperimentDemo } from "@/components/marketing/experiment-demo";
 import { MarketingFrame } from "@/components/marketing/marketing-frame";
 import { SafariFrame } from "@/components/marketing/safari-frame";
@@ -30,7 +29,6 @@ const CARDS = [
 export function LandingView() {
   return (
     <MarketingFrame footer={false} tone="white">
-      <SignedInRedirect />
       <main>
         <section className="mx-auto max-w-[1100px] px-6 pb-2 pt-16 md:px-8 md:pt-24">
           <h1 className="max-w-[16em] text-[clamp(2.1rem,4.4vw,3.5rem)] font-medium leading-[1.05] tracking-[-0.045em] text-[#111]">
