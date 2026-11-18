@@ -134,7 +134,7 @@
   --color-warning: var(--warning);
   --color-brand: var(--brand);
   --font-sans: var(--font-satoshi);
-  --font-mono: var(--font-plex-mono);
+  --font-mono: var(--font-plex-mono, ui-monospace), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --radius-sm: calc(var(--radius) - 2px);
   --radius-md: var(--radius);
   --radius-lg: calc(var(--radius) + 2px);

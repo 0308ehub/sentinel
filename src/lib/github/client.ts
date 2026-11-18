@@ -41,6 +41,58 @@ export interface GitHubPull {
   branch: string;
 }
 
+export interface GitHubPullChangeFile {
+  filename: string;
+  status: string;
+  additions: number;
+  deletions: number;
+  patch?: string;
+}
+
+export interface GitHubPullChanges {
+  title: string;
+  state: "open" | "closed" | "merged";
+  url: string;
+  headSha: string;
+  additions: number;
+  deletions: number;
+  changedFiles: number;
+  files: GitHubPullChangeFile[];
+}
+
+export async function pullChanges(fullName: string, number: number): Promise<GitHubPullChanges> {
+  const parsed = repoName(fullName);
+  if (!parsed) throw new GitHubApiError("bad_repo", "Use a repository like owner/name.", 400);
+  const pull = await github<{
+    title?: string;
+    state?: string;
+    merged?: boolean;
+    html_url?: string;
+    head?: { sha?: string };
+    additions?: number;
+    deletions?: number;
+    changed_files?: number;
+  }>(`/repos/${parsed.owner}/${parsed.repo}/pulls/${number}`);
+  const files: GitHubPullChangeFile[] = [];
+  for (let page = 1; page <= 3; page += 1) {
+    const rows = await github<GitHubPullChangeFile[]>(
+      `/repos/${parsed.owner}/${parsed.repo}/pulls/${number}/files?per_page=100&page=${page}`,
+    );
+    files.push(...rows);
+    if (rows.length < 100) break;
+  }
+  return {
+    title: pull.title ?? `Pull request #${number}`,
+    state: pull.merged ? "merged" : pull.state === "closed" ? "closed" : "open",
+    url: pull.html_url ?? `https://github.com/${fullName}/pull/${number}`,
+    headSha: pull.head?.sha ?? "",
+    additions: pull.additions ?? files.reduce((sum, file) => sum + file.additions, 0),
+    deletions: pull.deletions ?? files.reduce((sum, file) => sum + file.deletions, 0),
+    changedFiles: pull.changed_files ?? files.length,
+    files,
+  };
+}
+
 export async function createPullFromBranch(
   fullName: string,
   head: string,
@@ -68,6 +120,8 @@ export async function createPullFromBranch(
 export interface GitHubCompareFile {
   filename: string;
   status: string;
+  additions: number;
+  deletions: number;
   patch?: string;
 }
 

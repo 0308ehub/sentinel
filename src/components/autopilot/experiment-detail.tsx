@@ -1,12 +1,43 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { ChevronDown, ExternalLink, Loader2 } from "lucide-react";
 import { BuildLive } from "@/components/autopilot/build-live";
+import { CodeChange } from "@/components/autopilot/code-change";
 import { Button } from "@/components/ui/button";
 import type { ArmResult, Experiment, Readout, Signal } from "@/lib/autopilot/types";
 
 const DECISION_VISITORS = 200;
+const PANEL_KEY = "kismet-experiment-panel-width";
+const DEFAULT_PANEL_WIDTH = 360;
+const panelListeners = new Set<() => void>();
+
+function clampPanelWidth(width: number) {
+  return Math.min(600, Math.max(280, Math.round(width)));
+}
+
+function readPanelWidth() {
+  try {
+    const width = Number(localStorage.getItem(PANEL_KEY));
+    return Number.isFinite(width) && width > 0 ? clampPanelWidth(width) : DEFAULT_PANEL_WIDTH;
+  } catch {
+    return DEFAULT_PANEL_WIDTH;
+  }
+}
+
+function writePanelWidth(width: number) {
+  try {
+    localStorage.setItem(PANEL_KEY, String(clampPanelWidth(width)));
+  } catch {
+    // Storage can be blocked; resizing still works for the current pointer interaction.
+  }
+  panelListeners.forEach((listener) => listener());
+}
+
+function subscribePanelWidth(listener: () => void) {
+  panelListeners.add(listener);
+  return () => panelListeners.delete(listener);
+}
 
 interface DailyVisitors {
   day: string;
@@ -53,10 +84,40 @@ export function ExperimentDetail({
   const status = experiment ? statusLabel(experiment.status) : "Suggested";
   const runningLook = !suggested && experiment != null;
   const names = armNames(experiment, signal);
+  const decisions = (
+    <Decisions
+      experiment={experiment}
+      signal={signal}
+      busy={busy}
+      onApprove={onApprove}
+      onReject={onReject}
+      onCancel={onCancel}
+      onRollout={onRollout}
+      onStop={onStop}
+      onApproveCleanup={onApproveCleanup}
+      onDismissCleanup={onDismissCleanup}
+      onStart={onStart}
+      onDismissSignal={onDismissSignal}
+    />
+  );
+  const panelWidth = useSyncExternalStore(subscribePanelWidth, readPanelWidth, () => DEFAULT_PANEL_WIDTH);
+
+  function startResize(event: React.PointerEvent<HTMLDivElement>) {
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const startX = event.clientX;
+    const startWidth = panelWidth;
+    const move = (moveEvent: PointerEvent) => writePanelWidth(startWidth + moveEvent.clientX - startX);
+    const finish = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", finish);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", finish);
+  }
 
   return (
     <div className="flex h-full min-h-0 bg-white text-[#1c1c1c]">
-      <aside className="flex w-60 shrink-0 flex-col gap-4 overflow-auto border-r border-[#e6e8ec] px-4 py-4">
+      <aside className="flex shrink-0 flex-col gap-4 overflow-auto px-4 py-4" style={{ width: panelWidth }}>
         <button type="button" onClick={onBack} className="text-left text-xs text-[#2563eb] hover:underline">
           ‹ Experiments
         </button>
@@ -77,24 +138,29 @@ export function ExperimentDetail({
           <Fact label="Audiences" value="Everyone" />
           <Fact label="Experiment visitors" value={visitors ? visitors.toLocaleString("en-US") : "—"} />
         </dl>
-        <Autonomous
-          experiment={experiment}
-          signal={signal}
-          suggested={suggested}
-          busy={busy}
-          onApprove={onApprove}
-          onReject={onReject}
-          onCancel={onCancel}
-          onRollout={onRollout}
-          onStop={onStop}
-          onApproveCleanup={onApproveCleanup}
-          onDismissCleanup={onDismissCleanup}
-          onStart={onStart}
-          onDismissSignal={onDismissSignal}
-        />
+        <Autonomous experiment={experiment} signal={signal} suggested={suggested} />
       </aside>
+      <div
+        role="separator"
+        aria-label="Resize details panel"
+        aria-orientation="vertical"
+        aria-valuemin={280}
+        aria-valuemax={600}
+        aria-valuenow={panelWidth}
+        tabIndex={0}
+        onPointerDown={startResize}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+            event.preventDefault();
+            writePanelWidth(panelWidth + (event.key === "ArrowLeft" ? -24 : 24));
+          }
+        }}
+        className="group relative w-1.5 shrink-0 cursor-col-resize border-x border-transparent outline-none hover:bg-[#dbe7ff] focus:bg-[#dbe7ff]"
+      >
+        <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-[#e6e8ec] group-hover:bg-[#2563eb] group-focus:bg-[#2563eb]" />
+      </div>
       <div className="min-w-0 flex-1 overflow-auto">
-        <ResultsCanvas
+        <MainPanel
           experiment={experiment}
           signal={signal}
           readout={readout}
@@ -103,8 +169,64 @@ export function ExperimentDetail({
           names={names}
           muted={!runningLook}
           showChart={runningLook}
+          decisions={decisions}
         />
       </div>
+    </div>
+  );
+}
+
+/** True when there is code to look at: a pull request, a pushed branch, or a stored draft. */
+function hasCodeChange(experiment: Experiment | null): boolean {
+  return Boolean(experiment && (experiment.prNumber || experiment.branch || experiment.draftPath));
+}
+
+/**
+ * The results and the code change on one page, never in tabs. Before there are results the change
+ * leads, because that is what the person is deciding on; once the experiment runs, results lead.
+ * The decision buttons sit right above the code they act on.
+ */
+function MainPanel(props: {
+  experiment: Experiment | null;
+  signal: Signal | null;
+  readout: Readout | null;
+  control: ArmResult | null;
+  treatment: ArmResult | null;
+  names: { control: string; treatment: string };
+  muted: boolean;
+  showChart: boolean;
+  decisions: React.ReactNode;
+}) {
+  const { experiment, decisions, ...results } = props;
+  const hasChange = hasCodeChange(experiment);
+  const hasResults = Boolean(
+    props.readout || experiment?.status === "running" || experiment?.status === "awaiting_rollout" || experiment?.endedAt,
+  );
+  const change = experiment && hasChange ? (
+    <section>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e6e8ec] px-4 py-3">
+        <h2 className="text-sm font-medium text-[#111827]">Code change</h2>
+        {decisions}
+      </div>
+      <CodeChange key={experiment.id} experiment={experiment} />
+    </section>
+  ) : null;
+
+  if (change && !hasResults) {
+    return (
+      <div>
+        {change}
+        <p className="border-t border-[#e6e8ec] px-4 py-3 text-xs text-[#6b7280]">
+          Results appear here once the experiment is live and counting visitors.
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div>
+      {!change && decisions && <div className="flex justify-end border-b border-[#e6e8ec] px-4 py-3">{decisions}</div>}
+      <ResultsCanvas experiment={experiment} {...results} />
+      {change && <div className="border-t border-[#e6e8ec]">{change}</div>}
     </div>
   );
 }
@@ -113,6 +235,45 @@ function Autonomous({
   experiment,
   signal,
   suggested,
+}: {
+  experiment: Experiment | null;
+  signal: Signal | null;
+  suggested: boolean;
+}) {
+  return (
+    <div className="space-y-3 border-t border-[#e6e8ec] pt-3 text-xs">
+      <p className="font-medium text-[#374151]">Kismet</p>
+      {signal && (
+        <div className="text-[#374151]">
+          <p>
+            {`Suggested from ${signal.evidence.length} ${signal.evidence.length === 1 ? "piece" : "pieces"} of evidence${signal.area ? ` in ${signal.area}` : ""}. ${signal.problem}`}
+          </p>
+          {signal.staleEvidence > 0 && <p className="mt-1">{signal.staleEvidence} older items not counted</p>}
+        </div>
+      )}
+      {experiment?.hypothesis && <p>{experiment.hypothesis}</p>}
+      {experiment && <p className="text-[#374151]">{experiment.metric}</p>}
+      {experiment?.guardrail && <p className="text-[#374151]">Guardrail: {experiment.guardrail}</p>}
+      {suggested && !experiment && (
+        <p className="text-[#374151]">Approving this lets Kismet design the change, the metric, and the guardrail.</p>
+      )}
+      {experiment?.status === "building" && (
+        <p className="text-[#374151]">Kismet is writing the change. Approval waits until that pull request is ready.</p>
+      )}
+      {experiment?.overlap && <p className="text-[#374151]">{experiment.overlap}</p>}
+      {experiment?.note && <p className="text-[#374151]">{experiment.note}</p>}
+      {experiment?.readout?.verdict && experiment.readout.verdict !== "collecting" && (
+        <p>Kismet calls this {experiment.readout.verdict}.</p>
+      )}
+      {experiment?.status === "building" && experiment.coderSessionId && <BuildLive experimentId={experiment.id} />}
+      <Links experiment={experiment} />
+    </div>
+  );
+}
+
+function Decisions({
+  experiment,
+  signal,
   busy,
   onApprove,
   onReject,
@@ -126,7 +287,6 @@ function Autonomous({
 }: {
   experiment: Experiment | null;
   signal: Signal | null;
-  suggested: boolean;
   busy: string | null;
   onApprove: () => void;
   onReject: () => void;
@@ -140,31 +300,7 @@ function Autonomous({
 }) {
   const id = experiment?.id ?? signal?.id ?? "";
   return (
-    <div className="space-y-3 border-t border-[#e6e8ec] pt-3 text-xs">
-      <p className="font-medium text-[#374151]">Kismet</p>
-      {signal && (
-        <div className="text-[#6b7280]">
-          <p>
-            {`Suggested from ${signal.evidence.length} ${signal.evidence.length === 1 ? "piece" : "pieces"} of evidence${signal.area ? ` in ${signal.area}` : ""}. ${signal.problem}`}
-          </p>
-          {signal.staleEvidence > 0 && <p className="mt-1">{signal.staleEvidence} older items not counted</p>}
-        </div>
-      )}
-      {experiment?.hypothesis && <p>{experiment.hypothesis}</p>}
-      {experiment && <p className="text-[#6b7280]">{experiment.metric}</p>}
-      {experiment?.guardrail && <p className="text-[#6b7280]">Guardrail: {experiment.guardrail}</p>}
-      {suggested && !experiment && (
-        <p className="text-[#6b7280]">Approving this lets Kismet design the change, the metric, and the guardrail.</p>
-      )}
-      {experiment?.status === "building" && (
-        <p className="text-[#6b7280]">Kismet is writing the change. Approval waits until that pull request is ready.</p>
-      )}
-      {experiment?.overlap && <p className="text-[#6b7280]">{experiment.overlap}</p>}
-      {experiment?.note && <p className="text-[#6b7280]">{experiment.note}</p>}
-      {experiment?.readout?.verdict && experiment.readout.verdict !== "collecting" && (
-        <p>Kismet calls this {experiment.readout.verdict}.</p>
-      )}
-      <div className="flex flex-col items-start gap-2">
+    <div className="flex flex-wrap items-center gap-2 empty:hidden">
         {!experiment && signal && (
           <>
             <Button size="sm" className="bg-[#2563eb] text-white hover:bg-[#1d4ed8]" onClick={onStart} disabled={busy !== null}>
@@ -217,9 +353,6 @@ function Autonomous({
             </Button>
           </>
         )}
-      </div>
-      {experiment?.status === "building" && experiment.coderSessionId && <BuildLive experimentId={experiment.id} />}
-      <Links experiment={experiment} />
     </div>
   );
 }
@@ -237,11 +370,6 @@ function Links({ experiment }: { experiment: Experiment | null }) {
       {experiment.prUrl && (
         <a className="flex items-center gap-1 hover:underline" href={experiment.prUrl} target="_blank" rel="noreferrer">
           Pull request #{experiment.prNumber} <ExternalLink className="h-3 w-3" />
-        </a>
-      )}
-      {experiment.draftPath && !experiment.prUrl && (
-        <a className="hover:underline" href={`/api/autopilot/experiments/${experiment.id}/draft`} target="_blank" rel="noreferrer">
-          View the change
         </a>
       )}
       {cleanup?.status === "awaiting" && cleanup.prUrl && (
