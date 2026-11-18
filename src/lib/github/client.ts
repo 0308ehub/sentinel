@@ -222,7 +222,9 @@ export async function listWritableRepos(): Promise<{ repos: GitHubRepoSummary[];
     );
   }
   const repos = rows
-    .filter((row) => row.full_name && row.permissions?.push !== false)
+    // An installation token's repo rows describe a person's access, not the app's; the app's own
+    // Contents/Pull requests write permission is what counts, so only filter personal-token rows.
+    .filter((row) => row.full_name && (kind === "app" || row.permissions?.push !== false))
     .map((row) => ({
       fullName: row.full_name as string,
       private: Boolean(row.private),
@@ -242,7 +244,10 @@ export async function repoDefaultBranch(fullName: string): Promise<string> {
   const parsed = repoName(fullName);
   if (!parsed) throw new GitHubApiError("bad_repo", "Use a repository like owner/name.", 400);
   const repo = await github<RepoPayload>(`/repos/${parsed.owner}/${parsed.repo}`);
-  if (repo.permissions?.push === false) {
+  // Same as listWritableRepos: the permissions field only means something for a personal token.
+  const userId = await actingUserId();
+  const viaApp = userId ? (await githubConnectionKind(userId)) === "app" : false;
+  if (!viaApp && repo.permissions?.push === false) {
     throw new GitHubApiError("forbidden", "This token can see the repository, but it cannot push a branch.", 403);
   }
   return repo.default_branch || "main";

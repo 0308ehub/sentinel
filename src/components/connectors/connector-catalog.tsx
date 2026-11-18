@@ -1,8 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { openGitHubInstall } from "@/components/settings/github-connect";
 import { CONNECTOR_CATEGORIES, CONNECTORS, type ConnectorDefinition, type ConnectorField } from "@/lib/connectors/catalog";
 import { readSavedConnectors, removeConnector, savedConnector, writeConnector } from "@/lib/connectors/saved";
 import { graphStore } from "@/lib/graph/graph-store";
@@ -304,6 +306,47 @@ function ConnectorForm({
   const existing = savedConnector(connector.id);
   const [values, setValues] = useState<Record<string, string>>(() => ({ ...(existing?.values ?? {}) }));
   const [error, setError] = useState("");
+  const router = useRouter();
+  const isGitHub = connector.live === "github";
+  // When the Kismet GitHub App is set up, installing it is the main way in; a token is the fallback.
+  const [appAvailable, setAppAvailable] = useState(false);
+  const [tokenOpen, setTokenOpen] = useState(false);
+  const [waiting, setWaiting] = useState(false);
+  const popupCleanup = useRef<(() => void) | null>(null);
+  const appFirst = isGitHub && appAvailable && !live?.connected;
+  const showFields = !appFirst || tokenOpen;
+
+  useEffect(() => {
+    if (!isGitHub) return;
+    let active = true;
+    fetch("/api/github/app/available", { cache: "no-store" })
+      .then((response) => response.json() as Promise<{ available?: boolean }>)
+      .then((body) => active && setAppAvailable(Boolean(body.available)))
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [isGitHub]);
+
+  useEffect(() => () => popupCleanup.current?.(), []);
+
+  function installGitHubApp() {
+    setError("");
+    setWaiting(true);
+    popupCleanup.current = openGitHubInstall("/settings/connectors/github", (status, code) => {
+      popupCleanup.current = null;
+      setWaiting(false);
+      if (status === "connected") {
+        void onRefreshLive("github");
+        onClose();
+        router.push("/settings/connectors/github");
+      } else if (status === "pending") {
+        setError("An organization owner needs to approve Kismet on GitHub.");
+      } else if (code !== "popup_closed") {
+        setError("GitHub could not connect. Try again.");
+      }
+    });
+  }
 
   async function save() {
     const next: Record<string, string> = { ...(existing?.values ?? {}) };
@@ -365,7 +408,22 @@ function ConnectorForm({
       {live?.connected && (
         <p className="text-xs text-muted-foreground">The workspace is already connected{live.label ? ` · ${live.label}` : ""}.</p>
       )}
-      <div className="space-y-3">
+      {appFirst && (
+        <div className="space-y-2">
+          <Button type="button" size="sm" disabled={waiting} onClick={installGitHubApp}>
+            {waiting ? "Waiting for GitHub…" : "Install Kismet on GitHub"}
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            GitHub asks which repositories Kismet can open pull requests on. You pick one to ship to afterwards.
+          </p>
+          {!tokenOpen && (
+            <button type="button" className="text-xs text-muted-foreground underline" onClick={() => setTokenOpen(true)}>
+              Use a personal access token instead
+            </button>
+          )}
+        </div>
+      )}
+      <div className={cn("space-y-3", !showFields && "hidden")}>
         {connector.fields.map((field) => (
           <Field
             key={field.key}
@@ -393,7 +451,7 @@ function ConnectorForm({
               </Link>
             </Button>
           )}
-          {connector.fields.length > 0 && (
+          {connector.fields.length > 0 && showFields && (
             <Button type="button" size="sm" onClick={() => void save()}>
               Save
             </Button>
