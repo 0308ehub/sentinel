@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { ChevronDown, ExternalLink, Loader2 } from "lucide-react";
+import { ExternalLink, Loader2 } from "lucide-react";
 import { BuildLive } from "@/components/autopilot/build-live";
 import { CodeChange } from "@/components/autopilot/code-change";
 import { Button } from "@/components/ui/button";
@@ -404,7 +404,7 @@ function ResultsCanvas({
   const start = experiment?.startedAt ?? experiment?.createdAt ?? signal?.createdAt ?? null;
   return (
     <div className="text-[#374151]">
-      <div className="flex flex-wrap items-center gap-3 border-b border-[#e6e8ec] px-4 py-3 text-xs text-[#6b7280]">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-1 border-b border-[#e6e8ec] px-4 py-3 text-xs text-[#6b7280]">
         <ToolbarLabel label="Date range" value={rangeLabel(start)} />
         <ToolbarLabel label="Segment" value="All visitors" />
         <ToolbarLabel label="Baseline" value={names.control} />
@@ -548,7 +548,7 @@ function VisitorChart({
         <>
           <div className="mb-2 flex items-center justify-between text-sm">
             <span className="inline-flex items-center gap-1 font-medium">
-              Visitors over time <ChevronDown className="h-3.5 w-3.5 text-[#6b7280]" />
+              Visitors over time
             </span>
             <span className="flex items-center gap-4 text-xs text-[#6b7280]">
               <Legend color="#5c6570" label={names.control} />
@@ -612,12 +612,12 @@ function VisitorLines({ points }: { points: DailyVisitors[] }) {
   );
 }
 
+/** A fact about how results are counted. Not a menu: each has one value today, so it reads as plain text. */
 function ToolbarLabel({ label, value }: { label: string; value: string }) {
   return (
-    <span className="inline-flex max-w-full items-center gap-1 rounded border border-[#e6e8ec] bg-white px-2 py-1">
+    <span className="inline-flex max-w-full items-center gap-1" title={`${label}: ${value}`}>
       <span>{label}</span>
-      <span className="max-w-40 truncate text-[#1c1c1c]">{value}</span>
-      <ChevronDown className="h-3 w-3" />
+      <span className="max-w-56 truncate text-[#1c1c1c]">{value}</span>
     </span>
   );
 }
