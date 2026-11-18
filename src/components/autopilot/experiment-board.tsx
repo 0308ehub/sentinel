@@ -8,6 +8,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { RelativeTime } from "@/components/shared/relative-time";
 import type { RolloutPhase } from "@/lib/autopilot/rollout-plan";
 import { useVariant } from "@/lib/autopilot/variant";
+import { formatRelativeTime } from "@/lib/utils";
 import type { AutopilotState, Experiment, Goal, Learning, Signal, SuggestionRating } from "@/lib/autopilot/types";
 
 const ENDED = new Set<Experiment["status"]>(["rolled_out", "stopped", "rejected", "failed"]);
@@ -55,7 +56,7 @@ export function ExperimentBoard({
   onCreate: (input: { title: string; change: string; page: string }) => Promise<void>;
 }) {
   const [query, setQuery] = useState("");
-  const [tab, setTab] = useState<"overview" | "learnings" | "themes">("overview");
+  const [tab, setTab] = useState<"overview" | "learnings" | "themes" | "activity">("overview");
   const [filter, setFilter] = useState<StatusFilter>("active");
   const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState<Selection | null>(null);
@@ -225,6 +226,7 @@ export function ExperimentBoard({
           <button type="button" onClick={() => setTab("overview")} className={tab === "overview" ? "border-b-2 border-brand pb-2 font-medium text-brand" : "pb-2 text-[#6b7280]"}>Overview</button>
           <button type="button" onClick={() => setTab("learnings")} className={tab === "learnings" ? "border-b-2 border-brand pb-2 font-medium text-brand" : "pb-2 text-[#6b7280]"}>Learnings</button>
           <button type="button" onClick={() => setTab("themes")} className={tab === "themes" ? "border-b-2 border-brand pb-2 font-medium text-brand" : "pb-2 text-[#6b7280]"}>Themes</button>
+          <button type="button" onClick={() => setTab("activity")} className={tab === "activity" ? "border-b-2 border-brand pb-2 font-medium text-brand" : "pb-2 text-[#6b7280]"}>Activity</button>
         </div>
         {(!state.configured || state.error) && (
           <p className="mt-4 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
@@ -273,6 +275,13 @@ export function ExperimentBoard({
           <LearningsTable learnings={state.learnings} onOpen={(id) => setSelected({ kind: "experiment", id })} />
         ) : tab === "themes" ? (
           <ThemesTable themes={state.themes} onOpen={(id) => setSelected({ kind: "signal", id })} />
+        ) : tab === "activity" ? (
+          <ActivityTable
+            activity={state.activity}
+            experiments={state.experiments}
+            signals={state.signals}
+            onOpen={setSelected}
+          />
         ) : (
         <table className="w-full border-collapse text-left text-sm">
           <thead>
@@ -407,6 +416,65 @@ function CreateExperimentDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function ActivityTable({
+  activity,
+  experiments,
+  signals,
+  onOpen,
+}: {
+  activity: AutopilotState["activity"];
+  experiments: Experiment[];
+  signals: Signal[];
+  onOpen: (selection: Selection) => void;
+}) {
+  const experimentIds = new Set(experiments.map((experiment) => experiment.id));
+  const signalIds = new Set(signals.map((signal) => signal.id));
+  const rows = [...activity].sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+
+  return (
+    <table className="w-full border-collapse text-left text-sm">
+      <thead>
+        <tr className="border-b border-[#e6e8ec] text-xs text-[#6b7280]">
+          <th className="px-3 py-2 font-medium">When</th>
+          <th className="px-3 py-2 font-medium">Kind</th>
+          <th className="px-3 py-2 font-medium">Activity</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.length === 0 ? (
+          <tr>
+            <td colSpan={3} className="px-3 py-8 text-sm text-[#6b7280]">
+              Nothing yet. Kismet logs each step of its loop here.
+            </td>
+          </tr>
+        ) : rows.map((item) => {
+          const selection = item.ref && experimentIds.has(item.ref)
+            ? { kind: "experiment" as const, id: item.ref }
+            : item.ref && signalIds.has(item.ref)
+              ? { kind: "signal" as const, id: item.ref }
+              : null;
+          const error = item.kind === "error";
+          return (
+            <tr
+              key={item.id}
+              className={`${selection ? "cursor-pointer hover:bg-[#f8fafc]" : ""} border-b border-[#eef0f3] ${error ? "text-red-600" : "text-[#374151]"} [&>td]:px-3`}
+              onClick={() => selection && onOpen(selection)}
+            >
+              <td className="whitespace-nowrap py-3 text-xs">{formatRelativeTime(item.at)}</td>
+              <td>
+                <span className={`inline-flex rounded border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${error ? "border-red-200 bg-red-50 text-red-600" : "border-[#d5d8de] bg-[#f8fafc] text-[#6b7280]"}`}>
+                  {item.kind}
+                </span>
+              </td>
+              <td className="py-3">{item.message}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
   );
 }
 

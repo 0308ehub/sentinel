@@ -5,6 +5,7 @@ import { evidenceFromGraph, type FiledEvidence } from "@/lib/autopilot/workspace
 import { actingUserId } from "@/lib/connections/current";
 import { listRecentIssues } from "@/lib/jira/client";
 import { listBotChannels, listRecentMessages, SlackApiError } from "@/lib/slack/client";
+import { slackMessageEvidence } from "@/lib/slack/events-core";
 import { loadStates } from "@/lib/workspace/state-store";
 
 /** Most new items filed per tick, newest first; the rest arrive on later ticks. */
@@ -38,11 +39,6 @@ async function jiraEvidence(): Promise<FiledEvidence[]> {
   }
 }
 
-function slackTime(ts: string): string {
-  const seconds = Number(ts.split(".")[0]);
-  return Number.isFinite(seconds) ? new Date(seconds * 1000).toISOString() : new Date().toISOString();
-}
-
 function slackReadFailure(error: unknown): string | null {
   if (error instanceof SlackApiError) {
     // Not connected is normal; a rate limit just means this channel waits for the next tick.
@@ -63,16 +59,13 @@ async function slackEvidence(): Promise<FiledEvidence[]> {
     const channel = channels[Math.floor(Date.now() / 3_600_000) % channels.length];
     const messages = await listRecentMessages(channel.id);
     return messages
-      .map((message) => ({ message, text: message.text.replace(/\s+/g, " ").trim() }))
-      .filter(({ message, text }) => text.length >= 12 && Boolean(message.ts))
-      .map(({ message, text }) => ({
-        source: "slack" as const,
-        title: text.slice(0, 180),
-        body: `#${channel.name}: ${text}`.slice(0, 500),
-        author: message.userId || "Slack",
-        url: `slack://${channel.id}/${message.ts}`,
-        occurredAt: slackTime(message.ts),
-      }));
+      .map((message) => slackMessageEvidence({
+        channelId: channel.id,
+        ts: message.ts,
+        text: message.text,
+        userId: message.userId,
+      }, channel.name))
+      .filter((item): item is FiledEvidence => item !== null);
   } catch (error) {
     const reason = slackReadFailure(error);
     if (reason) await log("error", `Could not read Slack: ${reason}`).catch(() => {});

@@ -100,6 +100,13 @@ async function callSlack<T extends SlackResponse>(
   throw new SlackApiError("ratelimited", HINTS.ratelimited, 429);
 }
 
+export async function slackChannelName(channelId: string): Promise<string> {
+  const response = await callSlack<SlackResponse & { channel?: { name?: string } }>("conversations.info", {
+    channel: channelId,
+  });
+  return response.channel?.name?.trim() || channelId;
+}
+
 export async function validateSlackToken(token: string): Promise<SlackAuthResult> {
   const auth = await callSlack<SlackResponse & { team?: string; team_id?: string; user_id?: string }>("auth.test", {}, token);
   return { teamId: auth.team_id, teamName: auth.team, botUserId: auth.user_id };

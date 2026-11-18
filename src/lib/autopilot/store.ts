@@ -567,7 +567,7 @@ export async function log(kind: string, message: string, ref?: string): Promise<
   await sql`insert into kismet.activity (user_id, kind, message, ref) values (${scopeUser()}, ${kind}, ${message.slice(0, 500)}, ${ref ?? null})`;
 }
 
-export async function listActivity(limit = 40): Promise<Activity[]> {
+export async function listActivity(limit = 100): Promise<Activity[]> {
   const sql = await db();
   const rows = await sql`select * from kismet.activity where user_id = ${scopeUser()} order by id desc limit ${limit}`;
   return rows.map((row) => ({
