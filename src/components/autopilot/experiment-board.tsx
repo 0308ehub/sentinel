@@ -52,7 +52,9 @@ export function ExperimentBoard({
     () => new Set(state.experiments.filter((experiment) => ACTIVE_EXPERIMENT.has(experiment.status)).map((experiment) => experiment.signalId)),
     [state.experiments],
   );
-  const suggestions = state.signals.filter((signal) => signal.status !== "dismissed" && signal.status !== "resolved" && !taken.has(signal.id));
+  const suggestions = state.signals.filter(
+    (signal) => signal.status !== "dismissed" && signal.status !== "stale" && signal.status !== "resolved" && !taken.has(signal.id),
+  );
 
   const rows = useMemo(() => {
     const needle = query.trim().toLowerCase();

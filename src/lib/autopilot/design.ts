@@ -128,7 +128,7 @@ export async function designNext(): Promise<string | null> {
 export async function designSignal(signalId: string): Promise<string> {
   const [signals, experiments] = await Promise.all([listSignals(), listExperiments()]);
   const candidate = signals.find((s) => s.id === signalId);
-  if (!candidate || candidate.status === "dismissed") throw new Error("That problem is not available.");
+  if (!candidate || candidate.status === "dismissed" || candidate.status === "stale") throw new Error("That problem is not available.");
   if (experiments.some((e) => e.status === "building")) {
     throw new Error("Kismet is already building a change. This one starts when that build finishes.");
   }

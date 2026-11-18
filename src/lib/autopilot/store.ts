@@ -4,6 +4,7 @@ import { db, newId } from "@/lib/autopilot/db";
 import { autopilotUser } from "@/lib/autopilot/scope";
 import { parseMetricSpec, type Arm, type FlagState, type MetricSpec } from "@/lib/autopilot/assign";
 import { isOutsideBuilder, type OutsideBuilder } from "@/lib/autopilot/builders";
+import { ANALYTICS_FRESH_DAYS, ELEMENT_GONE_DAYS, otherFreshDays } from "@/lib/autopilot/freshness";
 import {
   READY_MIN_EVIDENCE,
   READY_MIN_SOURCES,
@@ -129,8 +130,12 @@ export async function addEvidence(items: NewEvidence[]): Promise<number> {
 
 export async function unassignedEvidence(limit: number): Promise<Evidence[]> {
   const sql = await db();
+  const otherDays = otherFreshDays();
   const rows = await sql`
-    select * from kismet.evidence where user_id = ${scopeUser()} and signal_id is null order by occurred_at asc limit ${limit}
+    select * from kismet.evidence
+    where user_id = ${scopeUser()} and signal_id is null
+      and occurred_at >= now() - make_interval(days => case when source = 'analytics' then ${ANALYTICS_FRESH_DAYS}::int else ${otherDays}::int end)
+    order by occurred_at asc limit ${limit}
   `;
   return rows.map(toEvidence);
 }
@@ -162,12 +167,19 @@ export async function listSignals(): Promise<Signal[]> {
   const sql = await db();
   const userId = scopeUser();
   const signals = await sql`select * from kismet.signals where user_id = ${userId} order by updated_at desc limit 200`;
+  const otherDays = otherFreshDays();
   const evidence = await sql`
-    select * from kismet.evidence where user_id = ${userId} and signal_id is not null order by occurred_at desc limit 2000
+    select *, occurred_at >= now() - make_interval(days => case when source = 'analytics' then ${ANALYTICS_FRESH_DAYS}::int else ${otherDays}::int end) as fresh
+    from kismet.evidence where user_id = ${userId} and signal_id is not null order by occurred_at desc limit 5000
   `;
   const bySignal = new Map<string, Evidence[]>();
+  const staleBySignal = new Map<string, number>();
   for (const row of evidence) {
     const item = toEvidence(row);
+    if (!row.fresh) {
+      staleBySignal.set(item.signalId!, (staleBySignal.get(item.signalId!) ?? 0) + 1);
+      continue;
+    }
     const list = bySignal.get(item.signalId!) ?? [];
     list.push(item);
     bySignal.set(item.signalId!, list);
@@ -187,6 +199,7 @@ export async function listSignals(): Promise<Signal[]> {
         updatedAt: iso(row.updated_at),
         evidence: items,
         distinctEvidence,
+        staleEvidence: staleBySignal.get(String(row.id)) ?? 0,
         sources,
         ready: distinctEvidence >= READY_MIN_EVIDENCE && sources.length >= READY_MIN_SOURCES,
       };
@@ -198,6 +211,49 @@ export async function listExperiments(): Promise<Experiment[]> {
   const sql = await db();
   const rows = await sql`select * from kismet.experiments where user_id = ${scopeUser()} order by created_at desc limit 100`;
   return rows.map(toExperiment);
+}
+
+/** Retires unsupported problems and revives stale ones when current evidence returns. */
+export async function retireStaleSignals(): Promise<string | null> {
+  const sql = await db();
+  const userId = scopeUser();
+  const otherDays = otherFreshDays();
+  const stale = await sql`
+    update kismet.signals s set status = 'stale', updated_at = now()
+    where s.user_id = ${userId} and s.status = 'open' and not exists (
+      select 1 from kismet.evidence e
+      where e.user_id = ${userId} and e.signal_id = s.id
+        and e.occurred_at >= now() - make_interval(days => case when e.source = 'analytics' then ${ANALYTICS_FRESH_DAYS}::int else ${otherDays}::int end)
+    )
+    returning s.id, s.title
+  `;
+  const revived = await sql`
+    update kismet.signals s set status = 'open', updated_at = now()
+    where s.user_id = ${userId} and s.status = 'stale' and exists (
+      select 1 from kismet.evidence e
+      where e.user_id = ${userId} and e.signal_id = s.id
+        and e.occurred_at >= now() - make_interval(days => case when e.source = 'analytics' then ${ANALYTICS_FRESH_DAYS}::int else ${otherDays}::int end)
+    )
+    returning s.id
+  `;
+
+  if (stale.length > 0) {
+    const ids = stale.map((row) => String(row.id));
+    await sql`
+      update kismet.experiments set status = 'rejected', note = 'Its evidence went stale before it was built.', ended_at = now()
+      where user_id = ${userId} and signal_id in ${sql(ids)} and status = 'building'
+        and pr_number is null and coder_session_id is null and build_ref is null
+    `;
+    for (const row of stale) {
+      await log("freshness", `“${String(row.title)}” went stale: its evidence is no longer current.`, String(row.id));
+    }
+  }
+
+  if (stale.length === 0 && revived.length === 0) return null;
+  const parts = [];
+  if (stale.length > 0) parts.push(`${stale.length} problem${stale.length === 1 ? "" : "s"} went stale`);
+  if (revived.length > 0) parts.push(`${revived.length} problem${revived.length === 1 ? "" : "s"} became current again`);
+  return `${parts.join("; ")}.`;
 }
 
 export async function getExperiment(id: string): Promise<Experiment | null> {
@@ -554,18 +610,20 @@ export interface ElementStat {
 export async function elementStats(sinceDays: number, minVisitors: number): Promise<ElementStat[]> {
   const sql = await db();
   const rows = await sql`
-    with views as (
-      select page, count(distinct visitor)::int as visitors, bool_and(synthetic) as synthetic
-      from kismet.events where user_id = ${scopeUser()} and name = 'view' and at > now() - make_interval(days => ${sinceDays})
-      group by page having count(distinct visitor) >= ${minVisitors}
-    ),
-    clicks as (
-      select page, element, count(distinct visitor)::int as clickers
+    with clicks as (
+      select page, element, count(distinct visitor)::int as clickers, max(at) as last_click_at
       from kismet.events where user_id = ${scopeUser()} and name = 'click' and at > now() - make_interval(days => ${sinceDays})
       group by page, element
+      having max(at) >= now() - make_interval(days => ${ELEMENT_GONE_DAYS})
+    ),
+    element_views as (
+      select c.page, c.element, c.clickers, count(distinct v.visitor)::int as visitors, bool_and(v.synthetic) as synthetic
+      from clicks c join kismet.events v on v.user_id = ${scopeUser()} and v.name = 'view' and v.page = c.page
+        and v.at > now() - make_interval(days => ${sinceDays}) and v.at <= c.last_click_at
+      group by c.page, c.element, c.clickers
+      having count(distinct v.visitor) >= ${minVisitors}
     )
-    select v.page, c.element, v.visitors, c.clickers, v.synthetic
-    from views v join clicks c on c.page = v.page
+    select page, element, visitors, clickers, synthetic from element_views
   `;
   return rows.map((row) => ({
     page: String(row.page),

@@ -143,9 +143,12 @@ function Autonomous({
     <div className="space-y-3 border-t border-[#e6e8ec] pt-3 text-xs">
       <p className="font-medium text-[#374151]">Kismet</p>
       {signal && (
-        <p className="text-[#6b7280]">
-          {`Suggested from ${signal.evidence.length} ${signal.evidence.length === 1 ? "piece" : "pieces"} of evidence${signal.area ? ` in ${signal.area}` : ""}. ${signal.problem}`}
-        </p>
+        <div className="text-[#6b7280]">
+          <p>
+            {`Suggested from ${signal.evidence.length} ${signal.evidence.length === 1 ? "piece" : "pieces"} of evidence${signal.area ? ` in ${signal.area}` : ""}. ${signal.problem}`}
+          </p>
+          {signal.staleEvidence > 0 && <p className="mt-1">{signal.staleEvidence} older items not counted</p>}
+        </div>
       )}
       {experiment?.hypothesis && <p>{experiment.hypothesis}</p>}
       {experiment && <p className="text-[#6b7280]">{experiment.metric}</p>}

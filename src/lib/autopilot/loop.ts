@@ -26,6 +26,7 @@ import {
   listSignals,
   log,
   addEvidence,
+  retireStaleSignals,
   withTickLock,
 } from "@/lib/autopilot/store";
 import { syntheticEnabled, syntheticEvidence } from "@/lib/autopilot/synthetic";
@@ -70,6 +71,7 @@ async function runScopedTick(): Promise<TickResult> {
     await step("traffic", result, async () => (synthetic ? simulateTraffic() : null));
     await step("analytics", result, analyticsFindings);
     await step("filed", result, workspaceEvidence);
+    await step("freshness", result, retireStaleSignals);
 
     // Notice: group evidence into problems.
     await step("notice", result, async () => {

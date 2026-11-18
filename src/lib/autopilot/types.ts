@@ -15,7 +15,7 @@ export interface Evidence {
   signalId: string | null;
 }
 
-export type SignalStatus = "open" | "experimenting" | "resolved" | "dismissed";
+export type SignalStatus = "open" | "experimenting" | "resolved" | "dismissed" | "stale";
 
 export interface Signal {
   id: string;
@@ -28,6 +28,8 @@ export interface Signal {
   evidence: Evidence[];
   /** Distinct observations: the same finding measured again counts once. */
   distinctEvidence: number;
+  /** Attached observations that are too old to support this problem now. */
+  staleEvidence: number;
   sources: EvidenceSource[];
   ready: boolean;
 }
