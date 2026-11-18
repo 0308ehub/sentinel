@@ -14,7 +14,6 @@ import {
   GitBranch,
   BarChart3,
   FlaskConical,
-  Scale,
   MessageSquare,
   Settings,
   User,
@@ -62,7 +61,6 @@ const PRIMARY: NavItem[] = [
 const MORE: NavItem[] = [
   { id: "dashboard", label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { id: "analytics", label: "Analytics", href: "/analytics", icon: BarChart3 },
-  { id: "decisions", label: "Decisions", href: "/decisions", icon: Scale },
   { id: "board", label: "Board", href: "/board", icon: Columns3 },
   { id: "timeline", label: "Timeline", href: "/timeline", icon: Clock },
   { id: "design", label: "Design", href: "/design", icon: Frame },
