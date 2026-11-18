@@ -33,6 +33,18 @@
     return result;
   }
 
+  function parseStoredPreview(value, now) {
+    if (!value) return null;
+    try {
+      var stored = JSON.parse(value);
+      if (!stored || typeof stored.value !== "string" || typeof stored.at !== "number") return null;
+      if (stored.at > now || now - stored.at > 30 * 60 * 1000) return null;
+      return stored;
+    } catch (e) {
+      return null;
+    }
+  }
+
   if (root.__KISMET_TEST__) {
     root.__kismetArmFor = armFor;
     root.__kismetParsePreview = parsePreview;
@@ -49,19 +61,29 @@
   if (!origin) return;
 
   var previewValue = new URL(window.location.href).searchParams.get("kismet_preview");
+  var embedded = new URL(window.location.href).searchParams.get("kismet_embed") === "1";
   var preview = {};
-  try { preview = parsePreview(window.sessionStorage.getItem("kismet-preview")); } catch (e) {}
-  if (previewValue === "off") {
-    preview = {};
+  if (!embedded) {
+    try {
+      var storedPreview = parseStoredPreview(window.sessionStorage.getItem("kismet-preview"), Date.now());
+      preview = parsePreview(storedPreview && storedPreview.value);
+    } catch (e) {}
+  }
+  if (!embedded && previewValue === "off") {
     try { window.sessionStorage.removeItem("kismet-preview"); } catch (e) {}
   } else if (previewValue) {
     var requestedPreview = parsePreview(previewValue);
-    Object.keys(requestedPreview).forEach(function (key) { preview[key] = requestedPreview[key]; });
-    try {
-      window.sessionStorage.setItem("kismet-preview", Object.keys(preview).map(function (key) {
-        return key + ":" + preview[key];
-      }).join(","));
-    } catch (e) {}
+    if (embedded) {
+      preview = requestedPreview;
+    } else {
+      Object.keys(requestedPreview).forEach(function (key) { preview[key] = requestedPreview[key]; });
+      try {
+        window.sessionStorage.setItem("kismet-preview", JSON.stringify({
+          value: Object.keys(preview).map(function (key) { return key + ":" + preview[key]; }).join(","),
+          at: Date.now()
+        }));
+      } catch (e) {}
+    }
   }
   var previewing = Object.keys(preview).length > 0;
 

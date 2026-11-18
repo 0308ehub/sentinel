@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { armFor, type Arm, type FlagState } from "@/lib/autopilot/assign";
-import { hasPreviewOverrides, parsePreviewOverrides, type PreviewOverrides } from "@/lib/autopilot/preview";
+import { hasPreviewOverrides, previewOverridesForPage, type PreviewOverrides } from "@/lib/autopilot/preview";
 import { ExperimentContext } from "@/lib/autopilot/variant";
 
 const VISITOR_COOKIE = "kismet_vid";
@@ -46,22 +46,23 @@ export function ExperimentProvider({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const requested = params.get("kismet_preview");
-    let next: PreviewOverrides = {};
+    const isEmbedded = params.get("kismet_embed") === "1";
+    let stored: string | null = null;
     try {
-      next = parsePreviewOverrides(sessionStorage.getItem(PREVIEW_KEY));
+      if (!isEmbedded) stored = sessionStorage.getItem(PREVIEW_KEY);
     } catch {
       // Storage may be blocked.
     }
-    if (requested === "off") {
-      next = {};
-      try { sessionStorage.removeItem(PREVIEW_KEY); } catch {}
-    } else if (requested) {
-      next = { ...next, ...parsePreviewOverrides(requested) };
-      try { sessionStorage.setItem(PREVIEW_KEY, Object.entries(next).map(([flag, arm]) => `${flag}:${arm}`).join(",")); } catch {}
+    const next = previewOverridesForPage(requested, isEmbedded, stored);
+    if (!isEmbedded) {
+      try {
+        if (next.stored) sessionStorage.setItem(PREVIEW_KEY, JSON.stringify(next.stored));
+        else sessionStorage.removeItem(PREVIEW_KEY);
+      } catch {}
     }
     const timer = window.setTimeout(() => {
-      setOverrides(next);
-      setEmbedded(params.get("kismet_embed") === "1");
+      setOverrides(next.overrides);
+      setEmbedded(isEmbedded);
       setPreviewReady(true);
     }, 0);
     return () => window.clearTimeout(timer);

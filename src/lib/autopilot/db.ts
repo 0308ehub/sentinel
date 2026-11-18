@@ -430,10 +430,20 @@ create table if not exists kismet.experiment_snapshots (
   updated_at timestamptz not null default now(),
   unique (user_id, experiment_id, sha)
 );
+alter table kismet.experiment_snapshots add column if not exists used_recipe boolean not null default false;
 create index if not exists experiment_snapshots_session_idx on kismet.experiment_snapshots (session_id);
 create index if not exists experiment_snapshots_user_created_idx on kismet.experiment_snapshots (user_id, created_at desc);
 create unique index if not exists experiment_snapshots_one_rendering_per_user
   on kismet.experiment_snapshots (user_id) where status = 'rendering';
+
+create table if not exists kismet.render_recipes (
+  user_id text not null,
+  repo text not null,
+  recipe text not null,
+  script text,
+  updated_at timestamptz default now(),
+  primary key (user_id, repo)
+);
 
 create table if not exists kismet.webhook_events (
   id text primary key,

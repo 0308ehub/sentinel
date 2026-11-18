@@ -42,6 +42,22 @@ const AGENT = {
   ],
 };
 
+const RENDERER_SYSTEM = `You are Kismet's static HTML renderer. The repository is mounted at /workspace/repo.
+
+Render the requested control and treatment page states faithfully and quickly using react-dom/server and the
+repository's own CSS toolchain. Never commit, push, or open pull requests. Never print, copy, or use secrets.
+Never install or use browsers, Puppeteer, Playwright, or Chromium, and never make screenshots or other images.
+Do not run a development server or production build. Write only the requested files under /mnt/session/outputs.
+Do not try to reach the internet beyond package registries.`;
+
+const RENDERER = {
+  name: "Kismet renderer",
+  description: "Renders static HTML samples of experiment control and treatment states.",
+  model: { id: "claude-sonnet-5-5", effort: "medium" },
+  system: RENDERER_SYSTEM,
+  tools: AGENT.tools,
+};
+
 const ENVIRONMENT = {
   name: "kismet-coder",
   config: { type: "cloud", networking: { type: "limited", allow_package_managers: true } },
@@ -50,6 +66,7 @@ const ENVIRONMENT = {
 async function main() {
   const client = new Anthropic();
   const agentId = process.env.KISMET_CODER_AGENT_ID?.trim();
+  const rendererId = process.env.KISMET_RENDER_AGENT_ID?.trim();
   const environmentId = process.env.KISMET_CODER_ENVIRONMENT_ID?.trim();
 
   let agent;
@@ -62,6 +79,16 @@ async function main() {
     console.log(`Created agent ${agent.id} (version ${agent.version})`);
   }
 
+  let renderer;
+  if (rendererId) {
+    const current = await client.beta.agents.retrieve(rendererId);
+    renderer = await client.beta.agents.update(rendererId, { ...RENDERER, version: current.version });
+    console.log(`Updated renderer ${renderer.id} -> version ${renderer.version}`);
+  } else {
+    renderer = await client.beta.agents.create(RENDERER);
+    console.log(`Created renderer ${renderer.id} (version ${renderer.version})`);
+  }
+
   let environment;
   if (environmentId) {
     environment = await client.beta.environments.retrieve(environmentId);
@@ -71,7 +98,7 @@ async function main() {
     console.log(`Created environment ${environment.id}`);
   }
 
-  console.log(`\nKISMET_CODER_AGENT_ID=${agent.id}\nKISMET_CODER_ENVIRONMENT_ID=${environment.id}`);
+  console.log(`\nKISMET_CODER_AGENT_ID=${agent.id}\nKISMET_RENDER_AGENT_ID=${renderer.id}\nKISMET_CODER_ENVIRONMENT_ID=${environment.id}`);
 }
 
 main().catch((error) => {

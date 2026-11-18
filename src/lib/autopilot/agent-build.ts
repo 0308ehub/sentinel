@@ -93,10 +93,12 @@ export async function finishBuild(
     note: `Built by ${by}. Waiting for the preview build.`,
   });
   await log("build", `Opened PR #${pull.number} for “${experiment.title}”.`, experiment.id);
-  if (experiment.changeSummary?.kind === "ui") {
+  const summary = experiment.changeSummary;
+  const codeIsLive = false;
+  if (summary?.kind === "ui" && (Boolean(summary.when.trim()) || !codeIsLive)) {
     await startSnapshot(
       { ...experiment, status: "awaiting_approval", prUrl: pull.url, prNumber: pull.number, branch },
-      experiment.changeSummary,
+      summary,
     ).catch((error) => console.error("[autopilot] could not start sample preview", error));
   }
   return `Opened a pull request for “${experiment.title}”.`;

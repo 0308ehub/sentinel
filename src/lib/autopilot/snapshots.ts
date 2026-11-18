@@ -6,11 +6,12 @@ import { chosenAutopilotRepo } from "@/lib/autopilot/repo";
 import { sanitizeSnapshotHtml } from "@/lib/autopilot/snapshot-html";
 import { autopilotUser } from "@/lib/autopilot/scope";
 import type { Experiment } from "@/lib/autopilot/types";
-import { client, coderConfigured, managedSessionView } from "@/lib/coder/sessions";
+import { client, managedSessionView } from "@/lib/coder/sessions";
 import { githubTokenFor } from "@/lib/github/app";
 import { branchHeadSha, pullChanges } from "@/lib/github/client";
 
-const SNAPSHOT_BUDGET_CENTS = "300";
+const SNAPSHOT_BUDGET_CENTS = "150";
+const MAX_RENDER_SCRIPT_BYTES = 40 * 1024;
 const DAILY_LIMIT = 10;
 const MAX_AGE_MINUTES = 20;
 const MANAGED_AGENTS_BETA = "managed-agents-2026-04-01" as const;
@@ -29,6 +30,7 @@ export interface SnapshotRow {
   error: string | null;
   createdAt: string;
   updatedAt: string;
+  usedRecipe: boolean;
 }
 
 type SnapshotDbRow = {
@@ -43,7 +45,11 @@ type SnapshotDbRow = {
   error: string | null;
   created_at: Date | string;
   updated_at: Date | string;
+  used_recipe: boolean;
 };
+
+type RenderRecipeRow = { recipe: string; script: string | null };
+type RecipeAttemptRow = { status: SnapshotStatus; used_recipe: boolean };
 
 export class SnapshotError extends Error {
   constructor(message: string, public status = 409) {
@@ -64,6 +70,7 @@ function toSnapshot(row: SnapshotDbRow): SnapshotRow {
     error: row.error,
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
+    usedRecipe: row.used_recipe,
   };
 }
 
@@ -96,18 +103,29 @@ export async function snapshotFor(experimentId: string, sha: string): Promise<Sn
   return rows[0] ? toSnapshot(rows[0]) : null;
 }
 
-function renderMessage(experiment: Experiment, summary: ChangeSummary): string {
+function renderMessage(experiment: Experiment, summary: ChangeSummary, recipe: RenderRecipeRow | null): string {
+  const previous = recipe ? `
+WHAT WORKED LAST TIME IN THIS REPO
+${recipe.recipe}
+${recipe.script ? `\nReusable script:\n\`\`\`js\n${recipe.script}\n\`\`\`` : ""}
+Start from this. Adapt only what this change needs (sample data, the component, the flag). Update recipe.md/render.mjs if you change the approach.
+` : "";
   return `Render two static snapshots of a page from this repository so a product person can see what an A/B experiment changes. Do not commit, push, open pull requests, or change anything outside this sandbox. No secrets.
 Page: ${experiment.page}. Experiment flag: "${experiment.flag}". The change: ${experiment.treatment}. Before: ${summary.before}. After: ${summary.after}.
 Situation to show: ${summary.when || "the page's normal state"}. Use realistic sample data that puts the page in exactly that situation (for example, an account with no experiments if the change only appears when the list is empty).
 Produce the page twice: once as the current version (flag "control") and once as the new version (flag "treatment"). In this codebase the flag is read with useVariant("${experiment.flag}") from src/lib/autopilot/variant.ts, whose value comes from ExperimentContext (arms: { "${experiment.flag}": "control" | "treatment" }); other sites read window.kismet.variant("${experiment.flag}"). Force the arm that way.
-Pick the simplest approach that works in this sandbox (no network except package registries; no database, auth, or API keys): for example a temporary script that renders the page's component with react-dom/server and the needed providers/stores seeded with sample data, plus the project's own Tailwind/CSS build to compile the stylesheet. Keep app chrome (sidebars, nav) out unless the change is in it.
-Write exactly these files: /mnt/session/outputs/control.html and /mnt/session/outputs/treatment.html — complete, self-contained HTML documents (all CSS inlined in a <style>, no <script>, no external URLs, desktop width 1280px, white background), and /mnt/session/outputs/scenario.json as {"scenario": "<one short sentence naming the situation shown, e.g. An account with no experiments yet>"}.
-Check that treatment.html visibly contains the change and control.html does not. If you cannot render the page faithfully, write scenario.json with {"error": "<why>"} and stop.`;
+Do not install or use browsers, puppeteer, playwright, or chromium, and do not produce images. Produce only the five output files. Render with react-dom/server (renderToStaticMarkup) and compile CSS with the project's own Tailwind/PostCSS setup. Prefer npm ci --ignore-scripts (or the repo's lockfile tool) once; don't run the dev server or a production build. Keep app chrome (sidebars, nav) out unless the change is in it. No network except package registries; no database, auth, or API keys.
+Write /mnt/session/outputs/control.html and /mnt/session/outputs/treatment.html — complete, self-contained HTML documents (all CSS inlined in a <style>, no <script>, no external URLs, desktop width 1280px, white background), and /mnt/session/outputs/scenario.json as {"scenario": "<one short sentence naming the situation shown, e.g. An account with no experiments yet>"}.
+Also write /mnt/session/outputs/recipe.md with short, exact steps that worked in this repo (install commands, how CSS was compiled, and how providers/sample data were set up), and /mnt/session/outputs/render.mjs with the reusable script you ran, parameterized by arm and sample data where practical and under 40 KB.
+Check that treatment.html visibly contains the change and control.html does not. If you cannot render the page faithfully, write scenario.json with {"error": "<why>"} and stop.
+${previous}`;
 }
 
 export async function startSnapshot(experiment: Experiment, summary: ChangeSummary): Promise<SnapshotRow> {
-  if (!coderConfigured()) throw new SnapshotError("Kismet's coding agent is not configured.");
+  const agentId = process.env.KISMET_RENDER_AGENT_ID?.trim() || process.env.KISMET_CODER_AGENT_ID?.trim();
+  if (!process.env.ANTHROPIC_API_KEY?.trim() || !agentId || !process.env.KISMET_CODER_ENVIRONMENT_ID?.trim()) {
+    throw new SnapshotError("Kismet's rendering agent is not configured.");
+  }
   if (summary.kind !== "ui") throw new SnapshotError("Only visual changes can be rendered.");
   const source = await snapshotSource(experiment);
   if (!source) throw new SnapshotError("This change does not have code to render yet.");
@@ -127,8 +145,18 @@ export async function startSnapshot(experiment: Experiment, summary: ChangeSumma
   if ((counts?.rendering ?? 0) >= 1) throw new SnapshotError("Another sample preview is already rendering.");
   if ((counts?.starts ?? 0) >= DAILY_LIMIT) throw new SnapshotError("Daily sample preview limit reached. Try again tomorrow.");
   const { repo, token } = await repoAndToken();
+  const attempts = await sql<RecipeAttemptRow[]>`
+    select status, used_recipe from kismet.experiment_snapshots
+    where user_id = ${userId} and experiment_id = ${experiment.id}
+    order by updated_at desc limit 1
+  `;
+  const skipRecipe = attempts[0]?.status === "failed" && attempts[0].used_recipe;
+  const recipeRows = skipRecipe ? [] : await sql<RenderRecipeRow[]>`
+    select recipe, script from kismet.render_recipes where user_id = ${userId} and repo = ${repo} limit 1
+  `;
+  const recipe = recipeRows[0] ?? null;
   const session = await client().beta.sessions.create({
-    agent: process.env.KISMET_CODER_AGENT_ID!,
+    agent: agentId,
     environment_id: process.env.KISMET_CODER_ENVIRONMENT_ID!,
     title: `Render: ${experiment.title}`.slice(0, 80),
     budget: { type: "limit", max_list_cost: { amount: SNAPSHOT_BUDGET_CENTS, currency: "USD" } },
@@ -140,16 +168,16 @@ export async function startSnapshot(experiment: Experiment, summary: ChangeSumma
       mount_path: "/workspace/repo",
       checkout: { type: "commit", sha: source.sha },
     }],
-    initial_events: [{ type: "user.message", content: [{ type: "text", text: renderMessage(experiment, summary) }] }],
+    initial_events: [{ type: "user.message", content: [{ type: "text", text: renderMessage(experiment, summary, recipe) }] }],
   });
   const id = existing?.id ?? newId("snapshot");
   const rows = await sql<SnapshotDbRow[]>`
     insert into kismet.experiment_snapshots
-      (id, user_id, experiment_id, sha, status, session_id, scenario, control_html, treatment_html, error, updated_at)
-    values (${id}, ${userId}, ${experiment.id}, ${source.sha}, 'rendering', ${session.id}, null, null, null, null, now())
+      (id, user_id, experiment_id, sha, status, session_id, scenario, control_html, treatment_html, error, used_recipe, updated_at)
+    values (${id}, ${userId}, ${experiment.id}, ${source.sha}, 'rendering', ${session.id}, null, null, null, null, ${Boolean(recipe)}, now())
     on conflict (user_id, experiment_id, sha) do update set
       status = 'rendering', session_id = excluded.session_id, scenario = null,
-      control_html = null, treatment_html = null, error = null, updated_at = now()
+      control_html = null, treatment_html = null, error = null, used_recipe = excluded.used_recipe, updated_at = now()
     returning *
   `;
   return toSnapshot(rows[0]);
@@ -159,7 +187,8 @@ async function outputFiles(sessionId: string): Promise<Map<string, string>> {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const files = [];
     for await (const file of client().beta.files.list({ scope_id: sessionId, betas: [MANAGED_AGENTS_BETA] })) files.push(file);
-    const wanted = files.filter((file) => ["control.html", "treatment.html", "scenario.json"].some((name) => file.filename.endsWith(name)));
+    const wanted = files.filter((file) => ["control.html", "treatment.html", "scenario.json", "recipe.md", "render.mjs"]
+      .some((name) => file.filename.endsWith(name)));
     if (wanted.length >= 3 || attempt === 2) {
       const results = new Map<string, string>();
       await Promise.all(wanted.map(async (file) => {
@@ -202,6 +231,18 @@ async function finishSnapshot(row: SnapshotRow): Promise<void> {
         control_html = ${sanitizeSnapshotHtml(control)}, treatment_html = ${sanitizeSnapshotHtml(treatment)}, error = null, updated_at = now()
       where id = ${row.id} and user_id = ${autopilotUser()}
     `;
+    const recipe = files.get("recipe.md")?.trim();
+    if (recipe) {
+      const { repo } = await repoAndToken();
+      const script = files.get("render.mjs");
+      const savedScript = script && Buffer.byteLength(script, "utf8") <= MAX_RENDER_SCRIPT_BYTES ? script : null;
+      await sql`
+        insert into kismet.render_recipes (user_id, repo, recipe, script, updated_at)
+        values (${autopilotUser()}, ${repo}, ${recipe}, ${savedScript}, now())
+        on conflict (user_id, repo) do update set
+          recipe = excluded.recipe, script = excluded.script, updated_at = now()
+      `;
+    }
   } catch (error) {
     await failSnapshot(row.id, error instanceof Error ? error.message : "The rendered files could not be saved.");
   }

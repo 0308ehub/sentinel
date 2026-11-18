@@ -120,6 +120,17 @@ function VisualPreview({ experiment, changes, siteUrl, when, addedText }: {
   const isLive = ["running", "awaiting_rollout", "rolled_out", "stopped"].includes(experiment.status)
     || changes.pull?.state === "merged";
   const hasSource = changes.source === "pull" || changes.source === "branch";
+  const shouldAutoRender = Boolean(when.trim()) || !isLive;
+
+  const startRender = async () => {
+    setSnapshotMessage("");
+    const started = await fetch(`/api/autopilot/experiments/${experiment.id}/snapshot`, { method: "POST" });
+    if (!started.ok) {
+      setSnapshotMessage((await started.text()) || "Could not start the sample preview.");
+      return;
+    }
+    setSnapshot((await started.json()) as SnapshotResponse);
+  };
 
   useEffect(() => {
     let active = true;
@@ -133,7 +144,7 @@ function VisualPreview({ experiment, changes, siteUrl, when, addedText }: {
         return;
       }
       setSnapshot(body);
-      if (body.status === "none" && hasSource && !startAttempted.current) {
+      if (body.status === "none" && hasSource && shouldAutoRender && !startAttempted.current) {
         startAttempted.current = true;
         const started = await fetch(`/api/autopilot/experiments/${experiment.id}/snapshot`, { method: "POST" });
         if (!active) return;
@@ -154,7 +165,7 @@ function VisualPreview({ experiment, changes, siteUrl, when, addedText }: {
       active = false;
       if (timer) window.clearTimeout(timer);
     };
-  }, [experiment.id, hasSource]);
+  }, [experiment.id, hasSource, shouldAutoRender]);
 
   return (
     <div className="mt-4">
@@ -168,6 +179,20 @@ function VisualPreview({ experiment, changes, siteUrl, when, addedText }: {
         addedText={addedText}
         snapshot={snapshot}
       />
+      {snapshot?.status === "none" && hasSource && !shouldAutoRender && (
+        <button
+          type="button"
+          className="mt-2 text-xs text-[#2563eb] hover:underline"
+          onClick={() => {
+            startAttempted.current = true;
+            startRender().catch((reason: unknown) => {
+              setSnapshotMessage(reason instanceof Error ? reason.message : "Could not start the sample preview.");
+            });
+          }}
+        >
+          Render a sample
+        </button>
+      )}
       {snapshot?.status === "rendering" && (
         <p className="mt-2 text-xs text-[#6b7280]">Rendering both versions with sample data… (usually a few minutes)</p>
       )}
