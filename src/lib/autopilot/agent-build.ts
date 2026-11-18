@@ -126,6 +126,7 @@ export async function cancelBuild(experiment: Experiment): Promise<string> {
   const sessionId = experiment.coderSessionId;
   await updateExperiment(experiment.id, {
     status: "rejected",
+    rejectedBy: "person",
     coderSessionId: null,
     endedAt: new Date().toISOString(),
     note: "Stopped by you. The unmerged change was removed.",

@@ -6,7 +6,7 @@ import { ExperimentDetail } from "@/components/autopilot/experiment-detail";
 import { Button } from "@/components/ui/button";
 import { RelativeTime } from "@/components/shared/relative-time";
 import { useVariant } from "@/lib/autopilot/variant";
-import type { AutopilotState, Experiment, Goal, Signal } from "@/lib/autopilot/types";
+import type { AutopilotState, Experiment, Goal, Learning, Signal } from "@/lib/autopilot/types";
 
 const ENDED = new Set<Experiment["status"]>(["rolled_out", "stopped", "rejected", "failed"]);
 const SUGGESTED_STATUS = new Set<Experiment["status"]>(["building", "awaiting_approval"]);
@@ -46,6 +46,7 @@ export function ExperimentBoard({
   onAct: (experiment: Experiment, action: "approve" | "reject" | "cancel" | "rollout" | "stop" | "approve-cleanup" | "dismiss-cleanup") => void;
 }) {
   const [query, setQuery] = useState("");
+  const [tab, setTab] = useState<"overview" | "learnings">("overview");
   const [filter, setFilter] = useState<StatusFilter>("active");
   const [selected, setSelected] = useState<Selection | null>(null);
   const [goals, setGoals] = useState<Goal[]>(state.goals);
@@ -133,6 +134,7 @@ export function ExperimentBoard({
       <ExperimentDetail
         experiment={openExperiment}
         signal={openSignal}
+        learning={openExperiment ? state.learnings.find((learning) => learning.experimentId === openExperiment.id) ?? null : null}
         suggested={suggested}
         busy={busy}
         onBack={() => setSelected(null)}
@@ -193,7 +195,8 @@ export function ExperimentBoard({
           </Button>
         </div>
         <div className="mt-4 flex gap-6 border-b border-[#e6e8ec] text-sm">
-          <span className="border-b-2 border-[#2563eb] pb-2 font-medium text-[#2563eb]">Overview</span>
+          <button type="button" onClick={() => setTab("overview")} className={tab === "overview" ? "border-b-2 border-[#2563eb] pb-2 font-medium text-[#2563eb]" : "pb-2 text-[#6b7280]"}>Overview</button>
+          <button type="button" onClick={() => setTab("learnings")} className={tab === "learnings" ? "border-b-2 border-[#2563eb] pb-2 font-medium text-[#2563eb]" : "pb-2 text-[#6b7280]"}>Learnings</button>
         </div>
         {(!state.configured || state.error) && (
           <p className="mt-4 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
@@ -212,7 +215,7 @@ export function ExperimentBoard({
           </div>
         )}
         {message && <p className="mt-3 text-xs text-[#6b7280]">{message}</p>}
-        <div className="mt-4 flex flex-wrap items-center gap-2">
+        {tab === "overview" && <div className="mt-4 flex flex-wrap items-center gap-2">
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -235,9 +238,12 @@ export function ExperimentBoard({
             </select>
             <ChevronDown className="pointer-events-none absolute right-2 top-2.5 h-4 w-4 text-[#6b7280]" />
           </label>
-        </div>
+        </div>}
       </div>
       <div className="mt-3 px-6 pb-8">
+        {tab === "learnings" ? (
+          <LearningsTable learnings={state.learnings} onOpen={(id) => setSelected({ kind: "experiment", id })} />
+        ) : (
         <table className="w-full border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-[#e6e8ec] text-xs text-[#6b7280]">
@@ -302,9 +308,39 @@ export function ExperimentBoard({
             )}
           </tbody>
         </table>
+        )}
       </div>
     </div>
   );
+}
+
+function LearningsTable({ learnings, onOpen }: { learnings: Learning[]; onOpen: (experimentId: string) => void }) {
+  return (
+    <table className="w-full border-collapse text-left text-sm">
+      <thead><tr className="border-b border-[#e6e8ec] text-xs text-[#6b7280]">
+        <th className="px-3 py-2 font-medium">Date</th><th className="px-3 py-2 font-medium">Experiment</th>
+        <th className="px-3 py-2 font-medium">Outcome</th><th className="px-3 py-2 font-medium">Lift</th>
+        <th className="px-3 py-2 font-medium">Learning</th>
+      </tr></thead>
+      <tbody>{learnings.length === 0 ? <tr><td colSpan={5} className="px-3 py-8 text-sm text-[#6b7280]">Kismet writes down what each finished experiment taught it. Nothing has finished yet.</td></tr> : learnings.map((learning) => (
+        <tr key={learning.id} className="border-b border-[#eef0f3] text-[#374151] hover:bg-[#f8fafc] [&>td]:px-3">
+          <td className="whitespace-nowrap py-3">{formatDay(learning.createdAt)}</td>
+          <td><button type="button" className="text-left font-medium text-[#2563eb] hover:underline" onClick={() => onOpen(learning.experimentId)}>{learning.title}</button></td>
+          <td><LearningBadge outcome={learning.outcome} /></td>
+          <td className="whitespace-nowrap">{learning.lift == null ? "—" : `${learning.lift > 0 ? "+" : ""}${(learning.lift * 100).toFixed(1)}%`}</td>
+          <td className="max-w-xl py-3 leading-5">{learning.learning}</td>
+        </tr>
+      ))}</tbody>
+    </table>
+  );
+}
+
+function LearningBadge({ outcome }: { outcome: Learning["outcome"] }) {
+  const styles = outcome === "won" ? "border-green-200 bg-green-50 text-green-700"
+    : outcome === "lost" ? "border-red-200 bg-red-50 text-red-700"
+      : outcome === "rejected" ? "border-amber-200 bg-amber-50 text-amber-700"
+        : "border-[#d5d8de] bg-[#f8fafc] text-[#6b7280]";
+  return <span className={`inline-flex rounded border px-2 py-0.5 text-xs font-medium ${styles}`}>{outcome[0].toUpperCase() + outcome.slice(1)}</span>;
 }
 
 function Env({ live, muted }: { live: boolean; muted: boolean }) {

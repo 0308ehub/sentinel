@@ -16,6 +16,8 @@ import {
   type Experiment,
   type ExperimentStatus,
   type Goal,
+  type Learning,
+  type LearningOutcome,
   type Readout,
   type Signal,
   type SignalStatus,
@@ -74,6 +76,7 @@ function toExperiment(row: Row): Experiment {
     treatment: String(row.treatment ?? ""),
     flag: String(row.flag),
     status: row.status as ExperimentStatus,
+    rejectedBy: row.rejected_by === "person" || row.rejected_by === "kismet" ? row.rejected_by : null,
     branch: (row.branch as string | null) ?? null,
     prUrl: (row.pr_url as string | null) ?? null,
     prNumber: row.pr_number == null ? null : Number(row.pr_number),
@@ -218,6 +221,79 @@ export async function listExperiments(): Promise<Experiment[]> {
   return rows.map(toExperiment);
 }
 
+function toLearning(row: Row): Learning {
+  return {
+    id: String(row.id),
+    experimentId: String(row.experiment_id),
+    signalId: (row.signal_id as string | null) ?? null,
+    kind: row.kind as Learning["kind"],
+    outcome: row.outcome as LearningOutcome,
+    title: String(row.title ?? ""),
+    page: String(row.page ?? ""),
+    metric: String(row.metric ?? ""),
+    change: String(row.change ?? ""),
+    lift: row.lift == null ? null : Number(row.lift),
+    pValue: row.p_value == null ? null : Number(row.p_value),
+    visitors: row.visitors == null ? null : Number(row.visitors),
+    learning: String(row.learning),
+    createdAt: iso(row.created_at),
+  };
+}
+
+export async function listLearnings(limit = 100): Promise<Learning[]> {
+  const sql = await db();
+  const safeLimit = Math.max(1, Math.min(500, Math.floor(limit)));
+  const rows = await sql`
+    select * from kismet.autopilot_learnings
+    where user_id = ${scopeUser()}
+    order by created_at desc limit ${safeLimit}::int
+  `;
+  return rows.map(toLearning);
+}
+
+export async function learningFor(experimentId: string): Promise<Learning | null> {
+  const sql = await db();
+  const rows = await sql`
+    select * from kismet.autopilot_learnings
+    where user_id = ${scopeUser()} and experiment_id = ${experimentId}
+    limit 1
+  `;
+  return rows[0] ? toLearning(rows[0]) : null;
+}
+
+export async function insertLearning(input: Omit<Learning, "id" | "createdAt">): Promise<void> {
+  const sql = await db();
+  await sql`
+    insert into kismet.autopilot_learnings
+      (id, user_id, experiment_id, signal_id, kind, outcome, title, page, metric, change, lift, p_value, visitors, learning)
+    values
+      (${newId("learn")}, ${scopeUser()}, ${input.experimentId}, ${input.signalId}, ${input.kind}, ${input.outcome},
+       ${input.title.slice(0, 200)}, ${input.page.slice(0, 200)}, ${input.metric.slice(0, 120)}, ${input.change.slice(0, 500)},
+       ${input.lift}::float8, ${input.pValue}::float8, ${input.visitors}::int, ${input.learning.slice(0, 1200)})
+    on conflict (user_id, experiment_id) do nothing
+  `;
+}
+
+export async function experimentsNeedingLearnings(): Promise<Experiment[]> {
+  const sql = await db();
+  const rows = await sql`
+    select e.* from kismet.experiments e
+    where e.user_id = ${scopeUser()}
+      and e.ended_at is not null
+      and e.status in ('rolled_out', 'stopped', 'rejected')
+      and (e.status <> 'rejected' or e.rejected_by = 'person'
+        or (e.rejected_by is null and coalesce(e.note, '') <> 'Its evidence went stale before it was built.'))
+      -- Results measured mostly on simulated traffic teach nothing about real people.
+      and coalesce((e.readout ->> 'syntheticShare')::float8, 0) < 0.5::float8
+      and not exists (
+        select 1 from kismet.autopilot_learnings l
+        where l.user_id = ${scopeUser()} and l.experiment_id = e.id
+      )
+    order by e.ended_at desc limit 5
+  `;
+  return rows.map(toExperiment);
+}
+
 /** Retires unsupported problems and revives stale ones when current evidence returns. */
 export async function retireStaleSignals(): Promise<string | null> {
   const sql = await db();
@@ -245,7 +321,7 @@ export async function retireStaleSignals(): Promise<string | null> {
   if (stale.length > 0) {
     const ids = stale.map((row) => String(row.id));
     await sql`
-      update kismet.experiments set status = 'rejected', note = 'Its evidence went stale before it was built.', ended_at = now()
+      update kismet.experiments set status = 'rejected', rejected_by = 'kismet', note = 'Its evidence went stale before it was built.', ended_at = now()
       where user_id = ${userId} and signal_id in ${sql(ids)} and status = 'building'
         and pr_number is null and coder_session_id is null and build_ref is null
     `;
@@ -306,6 +382,7 @@ export async function updateExperiment(
   id: string,
   patch: Partial<{
     status: ExperimentStatus;
+    rejectedBy: "person" | "kismet" | null;
     prUrl: string | null;
     prNumber: number | null;
     branch: string | null;
@@ -333,6 +410,7 @@ export async function updateExperiment(
   const sql = await db();
   const columns: Row = {};
   if (patch.status !== undefined) columns.status = patch.status;
+  if (patch.rejectedBy !== undefined) columns.rejected_by = patch.rejectedBy;
   if (patch.prUrl !== undefined) columns.pr_url = patch.prUrl;
   if (patch.prNumber !== undefined) columns.pr_number = patch.prNumber;
   if (patch.branch !== undefined) columns.branch = patch.branch;

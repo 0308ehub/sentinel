@@ -17,6 +17,7 @@ import { inferGoals } from "@/lib/autopilot/goals";
 import { goalFindings } from "@/lib/autopilot/goal-findings";
 import { startExperiment, startQueued } from "@/lib/autopilot/lifecycle";
 import { measureRunning } from "@/lib/autopilot/measure";
+import { learnFromFinished } from "@/lib/autopilot/learn";
 import { sampleEvidenceCount } from "@/lib/autopilot/sample-data";
 import { simulateTraffic } from "@/lib/autopilot/simulate";
 import {
@@ -25,6 +26,7 @@ import {
   lastRunAt,
   listActivity,
   listExperiments,
+  listLearnings,
   listGoals,
   listSignals,
   log,
@@ -87,10 +89,12 @@ async function runScopedTick(): Promise<TickResult> {
     // Steps that touch code need a repository; an account that has not chosen one stops at noticing.
     if (!(await sourceLabel())) {
       await step("repo", result, async () => NO_REPO_MESSAGE);
+      await step("learn", result, learnFromFinished);
     } else {
       // After the gate: follow PRs, measure live experiments, and act on results.
       await step("follow", result, () => followPulls(startExperiment));
       await step("measure", result, measureRunning);
+      await step("learn", result, learnFromFinished);
       await step("queue", result, startQueued);
 
       // Decided experiments: remove the switch and the losing version from the code.
@@ -126,6 +130,7 @@ export async function autopilotState(): Promise<AutopilotState> {
     configured: autopilotConfigured(),
     signals: [],
     experiments: [],
+    learnings: [],
     goals: [],
     activity: [],
     lastRunAt: null,
@@ -155,9 +160,10 @@ export async function autopilotState(): Promise<AutopilotState> {
           await log("error", `dispatch-build failed: ${message}`).catch(() => {});
         });
       }
-      const [signals, experiments, goals, activity, last, counts, repo, sampleEvidence] = await Promise.all([
+      const [signals, experiments, learnings, goals, activity, last, counts, repo, sampleEvidence] = await Promise.all([
         listSignals(),
         listExperiments(),
+        listLearnings(),
         listGoals(),
         listActivity(),
         lastRunAt(),
@@ -171,6 +177,7 @@ export async function autopilotState(): Promise<AutopilotState> {
         sampleEvidence,
         signals,
         experiments,
+        learnings,
         goals,
         activity,
         lastRunAt: last,

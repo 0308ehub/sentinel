@@ -176,7 +176,7 @@ export async function followPulls(start: (experiment: Experiment) => Promise<unk
       continue;
     }
     if (pull.state === "closed") {
-      await updateExperiment(experiment.id, { status: "rejected", endedAt: new Date().toISOString(), note: "Closed on GitHub." });
+      await updateExperiment(experiment.id, { status: "rejected", rejectedBy: "person", endedAt: new Date().toISOString(), note: "Closed on GitHub." });
       await setSignalStatus(experiment.signalId, "open");
       await log("gate", `“${experiment.title}” was closed on GitHub.`, experiment.id);
       continue;

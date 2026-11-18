@@ -106,6 +106,7 @@ export interface Experiment {
   treatment: string;
   flag: string;
   status: ExperimentStatus;
+  rejectedBy: "person" | "kismet" | null;
   branch: string | null;
   prUrl: string | null;
   prNumber: number | null;
@@ -127,6 +128,25 @@ export interface Experiment {
   endedAt: string | null;
 }
 
+export type LearningOutcome = "won" | "lost" | "flat" | "inconclusive" | "rejected";
+
+export interface Learning {
+  id: string;
+  experimentId: string;
+  signalId: string | null;
+  kind: "result" | "rejected";
+  outcome: LearningOutcome;
+  title: string;
+  page: string;
+  metric: string;
+  change: string;
+  lift: number | null;
+  pValue: number | null;
+  visitors: number | null;
+  learning: string;
+  createdAt: string;
+}
+
 export interface Activity {
   id: number;
   at: string;
@@ -140,6 +160,7 @@ export interface AutopilotState {
   error?: string;
   signals: Signal[];
   experiments: Experiment[];
+  learnings: Learning[];
   goals: Goal[];
   activity: Activity[];
   lastRunAt: string | null;

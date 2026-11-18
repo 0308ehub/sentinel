@@ -2,7 +2,8 @@ import "server-only";
 
 import { askForJson, readJson } from "@/lib/ai/respond";
 import { describeMetric, parseMetricSpec } from "@/lib/autopilot/assign";
-import { createExperiment, interviewContext, listExperiments, listGoals, listSignals, log, metricBaseline, setSignalStatus, snoozeSignal } from "@/lib/autopilot/store";
+import { relevantLearnings } from "@/lib/autopilot/learning-core";
+import { createExperiment, interviewContext, listExperiments, listGoals, listLearnings, listSignals, log, metricBaseline, setSignalStatus, snoozeSignal } from "@/lib/autopilot/store";
 import { daysToResult, type ResultEstimate } from "@/lib/autopilot/power";
 import { maxExperimentDays, relativeMde } from "@/lib/autopilot/thresholds";
 import type { Experiment, Signal } from "@/lib/autopilot/types";
@@ -72,7 +73,10 @@ async function designCandidate(candidate: Signal, experiments: Experiment[], per
     return null;
   }
 
-  const goals = await listGoals();
+  const [goals, allLearnings] = await Promise.all([listGoals(), listLearnings(200)]);
+  const candidatePage = previous.findLast((experiment) => experiment.page)?.page ?? candidate.area;
+  const usefulLearnings = relevantLearnings(allLearnings, { page: candidatePage, area: candidate.area });
+  const earlierLearnings = allLearnings.filter((learning) => learning.signalId === candidate.id);
   const goalsText = goals.length ? goals.map((g) => `- ${g.name}: ${describeMetric(g.spec)} (${(g.baselineRate * 100).toFixed(1)}%, ${Math.round(g.weeklyVisitors)} visitors/week)`).join("\n") : "No goals yet.";
   const system = [
       "You are an autonomous product manager. Design one small, shippable A/B experiment that addresses the problem.",
@@ -85,6 +89,7 @@ async function designCandidate(candidate: Signal, experiments: Experiment[], per
       "page is the route the change appears on, like /features or /settings/connectors.",
       "Return JSON: {title, hypothesis, control, treatment, metric, page, guardrail}. Keep each field to one or two sentences.",
       "If earlier attempts failed or were rejected, try a meaningfully different idea.",
+      "Build on LEARNINGS: repeat what won in new places, do not retry ideas that lost, were flat, or that a person rejected, unless you change them meaningfully and say how.",
       "Prefer one of the GOALS as the metric when the change can plausibly move it; otherwise use the closest outcome both versions share.",
     ].join(" ");
   const user = [
@@ -93,7 +98,8 @@ async function designCandidate(candidate: Signal, experiments: Experiment[], per
       `PROBLEM\n${candidate.title}: ${candidate.problem} (area: ${candidate.area || "unknown"})`,
       `EVIDENCE (${candidate.evidence.length})`,
       ...candidate.evidence.slice(0, 15).map((e) => `- [${e.source}] ${e.title}${e.body && e.source !== "slack" ? ` — ${e.body}` : ""}`),
-      `EARLIER ATTEMPTS\n${attemptsSummary(previous)}`,
+      `LEARNINGS\n${usefulLearnings.length ? usefulLearnings.map((learning) => `- ${learning.outcome}: ${learning.title} — ${learning.learning}`).join("\n") : "No relevant learnings yet."}`,
+      `EARLIER ATTEMPTS\n${attemptsSummary(previous)}${earlierLearnings.length ? `\nLearnings from this signal:\n${earlierLearnings.map((learning) => `- ${learning.outcome}: ${learning.learning}`).join("\n")}` : ""}`,
     ].join("\n");
   async function request(message: string): Promise<{ answer: DesignAnswer; spec: NonNullable<ReturnType<typeof parseMetricSpec>>; estimate: ResultEstimate }> {
     const text = await askForJson(system, message, false, undefined, "experiment");

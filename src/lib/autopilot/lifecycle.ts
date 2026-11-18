@@ -67,7 +67,7 @@ export async function reject(experiment: Experiment): Promise<string> {
   const repo = await autopilotRepo();
   if (experiment.prNumber) await closePull(repo, experiment.prNumber).catch(() => {});
   if (experiment.branch) await deleteBranch(repo, experiment.branch).catch(() => {});
-  await updateExperiment(experiment.id, { status: "rejected", endedAt: new Date().toISOString(), note: "Rejected by you." });
+  await updateExperiment(experiment.id, { status: "rejected", rejectedBy: "person", endedAt: new Date().toISOString(), note: "Rejected by you." });
   await setSignalStatus(experiment.signalId, "open");
   await log("gate", `You rejected “${experiment.title}”. Kismet will try a different idea.`, experiment.id);
   return "Rejected. Kismet will try a different idea for this problem.";

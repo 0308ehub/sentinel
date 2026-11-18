@@ -5,7 +5,7 @@ import { ExternalLink, Loader2 } from "lucide-react";
 import { BuildLive } from "@/components/autopilot/build-live";
 import { CodeChange } from "@/components/autopilot/code-change";
 import { Button } from "@/components/ui/button";
-import type { ArmResult, Experiment, Readout, Signal } from "@/lib/autopilot/types";
+import type { ArmResult, Experiment, Learning, Readout, Signal } from "@/lib/autopilot/types";
 
 const DECISION_VISITORS = 200;
 const PANEL_KEY = "kismet-experiment-panel-width";
@@ -48,6 +48,7 @@ interface DailyVisitors {
 export function ExperimentDetail({
   experiment,
   signal,
+  learning,
   suggested,
   busy,
   onBack,
@@ -63,6 +64,7 @@ export function ExperimentDetail({
 }: {
   experiment: Experiment | null;
   signal: Signal | null;
+  learning: Learning | null;
   suggested: boolean;
   busy: string | null;
   onBack: () => void;
@@ -146,7 +148,7 @@ export function ExperimentDetail({
             </div>
           )}
         </dl>
-        <Autonomous experiment={experiment} signal={signal} suggested={suggested} />
+        <Autonomous experiment={experiment} signal={signal} learning={learning} suggested={suggested} />
       </aside>
       <div
         role="separator"
@@ -242,10 +244,12 @@ function MainPanel(props: {
 function Autonomous({
   experiment,
   signal,
+  learning,
   suggested,
 }: {
   experiment: Experiment | null;
   signal: Signal | null;
+  learning: Learning | null;
   suggested: boolean;
 }) {
   return (
@@ -273,10 +277,27 @@ function Autonomous({
       {experiment?.readout?.verdict && experiment.readout.verdict !== "collecting" && (
         <p>Kismet calls this {experiment.readout.verdict}.</p>
       )}
+      {learning && (
+        <div className="rounded border border-[#e1e4e8] bg-[#f8fafc] p-2.5 text-[#374151]">
+          <div className="flex items-center gap-2">
+            <p className="font-medium">What Kismet learned</p>
+            <LearningBadge outcome={learning.outcome} />
+          </div>
+          <p className="mt-1 leading-5">{learning.learning}</p>
+        </div>
+      )}
       {experiment?.status === "building" && experiment.coderSessionId && <BuildLive experimentId={experiment.id} />}
       <Links experiment={experiment} />
     </div>
   );
+}
+
+function LearningBadge({ outcome }: { outcome: Learning["outcome"] }) {
+  const styles = outcome === "won" ? "border-green-200 bg-green-50 text-green-700"
+    : outcome === "lost" ? "border-red-200 bg-red-50 text-red-700"
+      : outcome === "rejected" ? "border-amber-200 bg-amber-50 text-amber-700"
+        : "border-[#d5d8de] bg-white text-[#6b7280]";
+  return <span className={`rounded border px-1.5 py-0.5 text-[10px] font-medium uppercase ${styles}`}>{outcome}</span>;
 }
 
 function Decisions({

@@ -101,7 +101,28 @@ alter table kismet.experiments add column if not exists build_ref text;
 alter table kismet.experiments add column if not exists build_url text;
 alter table kismet.experiments add column if not exists build_started_at timestamptz;
 alter table kismet.experiments add column if not exists estimate jsonb;
+alter table kismet.experiments add column if not exists rejected_by text;
 alter table kismet.signals add column if not exists snoozed_until timestamptz;
+
+create table if not exists kismet.autopilot_learnings (
+  id text primary key,
+  user_id text not null,
+  experiment_id text not null,
+  signal_id text,
+  kind text not null,
+  outcome text not null,
+  title text,
+  page text,
+  metric text,
+  change text,
+  lift float8,
+  p_value float8,
+  visitors int,
+  learning text not null,
+  created_at timestamptz default now(),
+  unique (user_id, experiment_id)
+);
+create index if not exists autopilot_learnings_user_created_idx on kismet.autopilot_learnings (user_id, created_at desc);
 
 create table if not exists kismet.autopilot_goals (
   id text primary key,
