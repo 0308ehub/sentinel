@@ -1,7 +1,7 @@
 import "server-only";
 
 import postgres from "postgres";
-import { pooledDatabase, resolveDatabaseUrl } from "@/lib/db/url";
+import { resolveDatabaseUrl } from "@/lib/db/url";
 
 type Sql = postgres.Sql;
 
@@ -24,7 +24,9 @@ function client(): Sql {
     globalForSql.kismetSql = postgres(url, {
       max: 5,
       ssl: local ? false : "require",
-      prepare: pooledDatabase(url) ? false : true,
+      // No cached prepared statements: a deploy that adds columns would otherwise break every
+      // `select *` another instance had cached ("cached plan must not change result type").
+      prepare: false,
       onnotice: () => {},
       connection: { search_path: "kismet" },
     });
