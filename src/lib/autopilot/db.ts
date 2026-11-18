@@ -262,6 +262,14 @@ create table if not exists kismet.autopilot_notifications (
   primary key (user_id, event_key)
 );
 
+-- One row per account while its loop runs. A lease, not an advisory lock: the transaction pooler
+-- can run lock and unlock on different connections, which left advisory locks held forever.
+create table if not exists kismet.autopilot_tick_lock (
+  user_id text primary key,
+  holder text not null,
+  expires_at timestamptz not null
+);
+
 -- One row per Slack mention, so accounts sharing a bot never both act on it.
 create table if not exists kismet.slack_mention_claims (
   mention_key text primary key,

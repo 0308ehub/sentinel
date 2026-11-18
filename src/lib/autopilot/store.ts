@@ -576,22 +576,31 @@ export async function evidenceCounts(sinceDays: number): Promise<{ total: number
 }
 
 /** Runs fn only if no other tick holds the lock, so overlapping cron and button runs never double-act. */
+/** Longer than the tick route's 300s limit, so a run that was killed frees its account soon after. */
+const TICK_LEASE_SECONDS = 360;
+
+/**
+ * Runs fn only if no other run holds this account's lease. Each statement stands alone, so this
+ * works through a transaction pooler, unlike a session advisory lock.
+ */
 export async function withTickLock<T>(fn: () => Promise<T>): Promise<T | null> {
   const sql = await db();
-  return sql.reserve().then(async (conn) => {
-    try {
-      const userId = scopeUser();
-      const [{ locked }] = await conn`select pg_try_advisory_lock(hashtext(${userId})) as locked`;
-      if (!locked) return null;
-      try {
-        return await fn();
-      } finally {
-        await conn`select pg_advisory_unlock(hashtext(${userId}))`;
-      }
-    } finally {
-      conn.release();
-    }
-  });
+  const userId = scopeUser();
+  const holder = newId("tick");
+  const claimed = await sql`
+    insert into kismet.autopilot_tick_lock (user_id, holder, expires_at)
+    values (${userId}, ${holder}, now() + make_interval(secs => ${TICK_LEASE_SECONDS}))
+    on conflict (user_id) do update
+      set holder = excluded.holder, expires_at = excluded.expires_at
+      where kismet.autopilot_tick_lock.expires_at < now()
+    returning holder
+  `;
+  if (!claimed.length) return null;
+  try {
+    return await fn();
+  } finally {
+    await sql`delete from kismet.autopilot_tick_lock where user_id = ${userId} and holder = ${holder}`;
+  }
 }
 
 function toFlag(row: Row): FlagState {
