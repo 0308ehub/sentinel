@@ -5,6 +5,7 @@ import { ChevronDown, Loader2, Play } from "lucide-react";
 import { ExperimentDetail } from "@/components/autopilot/experiment-detail";
 import { Button } from "@/components/ui/button";
 import { RelativeTime } from "@/components/shared/relative-time";
+import { useVariant } from "@/lib/autopilot/variant";
 import type { AutopilotState, Experiment, Signal } from "@/lib/autopilot/types";
 
 const ENDED = new Set<Experiment["status"]>(["rolled_out", "stopped", "rejected", "failed"]);
@@ -47,6 +48,7 @@ export function ExperimentBoard({
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<StatusFilter>("active");
   const [selected, setSelected] = useState<Selection | null>(null);
+  const variant = useVariant("ap-add-first-experiment-guidance-to-the-exp-v1");
 
   const taken = useMemo(
     () => new Set(state.experiments.filter((experiment) => ACTIVE_EXPERIMENT.has(experiment.status)).map((experiment) => experiment.signalId)),
@@ -145,6 +147,12 @@ export function ExperimentBoard({
                 "Kismet has not run yet."
               )}
             </p>
+            {variant === "treatment" && state.experiments.length === 0 && (
+              <p data-track="ap-add-first-experiment-guidance-to-the-exp-v1" className="mt-2 max-w-xl text-sm text-[#374151]">
+                Experiments help you compare product changes and measure outcomes. Start by letting Kismet suggest a safe first
+                experiment from your features, decisions, and analytics.
+              </p>
+            )}
           </div>
           <Button className="bg-[#2563eb] text-white hover:bg-[#1d4ed8]" onClick={onRun} disabled={running || !state.configured}>
             {running ? <Loader2 className="animate-spin" /> : <Play />}
