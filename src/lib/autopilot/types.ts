@@ -2,6 +2,7 @@ import type { MetricSpec } from "@/lib/autopilot/assign";
 import type { OutsideBuilder } from "@/lib/autopilot/builders";
 import type { ResultEstimate } from "@/lib/autopilot/power";
 import type { ChangeSummary } from "@/lib/autopilot/change-summary";
+import type { Theme } from "@/lib/autopilot/themes";
 
 export type EvidenceSource = "slack" | "ticket" | "analytics" | "interview";
 
@@ -175,10 +176,25 @@ export interface Activity {
   ref: string | null;
 }
 
+export type SuggestionRatingValue = "good" | "not_useful";
+export type SuggestionTargetKind = "signal" | "experiment";
+
+export interface SuggestionRating {
+  id: string;
+  targetKind: SuggestionTargetKind;
+  targetId: string;
+  rating: SuggestionRatingValue;
+  reason: string | null;
+  title: string;
+  createdAt: string;
+}
+
 export interface AutopilotState {
   configured: boolean;
   error?: string;
   signals: Signal[];
+  themes: Theme[];
+  ratings: SuggestionRating[];
   experiments: Experiment[];
   learnings: Learning[];
   goals: Goal[];

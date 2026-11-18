@@ -194,6 +194,19 @@ create table if not exists kismet.feedback (
 );
 create index if not exists feedback_user_created_idx on kismet.feedback (user_id, created_at desc);
 
+create table if not exists kismet.suggestion_ratings (
+  id text primary key,
+  user_id text not null,
+  target_kind text not null,
+  target_id text not null,
+  rating text not null,
+  reason text,
+  title text,
+  created_at timestamptz default now(),
+  unique (user_id, target_kind, target_id)
+);
+create index if not exists suggestion_ratings_user_created_idx on kismet.suggestion_ratings (user_id, created_at desc);
+
 -- Flag names used to be unique across the whole product. Each account can now reuse one.
 do $$
 declare row record;

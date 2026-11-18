@@ -6,7 +6,7 @@ import { ExperimentDetail } from "@/components/autopilot/experiment-detail";
 import { Button } from "@/components/ui/button";
 import { RelativeTime } from "@/components/shared/relative-time";
 import { useVariant } from "@/lib/autopilot/variant";
-import type { AutopilotState, Experiment, Goal, Learning, Signal } from "@/lib/autopilot/types";
+import type { AutopilotState, Experiment, Goal, Learning, Signal, SuggestionRating } from "@/lib/autopilot/types";
 
 const ENDED = new Set<Experiment["status"]>(["rolled_out", "stopped", "rejected", "failed"]);
 const SUGGESTED_STATUS = new Set<Experiment["status"]>(["building", "awaiting_approval"]);
@@ -34,6 +34,7 @@ export function ExperimentBoard({
   onTest,
   onDismiss,
   onAct,
+  onRated,
 }: {
   state: AutopilotState;
   running: boolean;
@@ -44,9 +45,10 @@ export function ExperimentBoard({
   onTest: (signal: Signal) => void;
   onDismiss: (signal: Signal) => void;
   onAct: (experiment: Experiment, action: "approve" | "reject" | "cancel" | "rollout" | "stop" | "approve-cleanup" | "dismiss-cleanup") => void;
+  onRated: () => void;
 }) {
   const [query, setQuery] = useState("");
-  const [tab, setTab] = useState<"overview" | "learnings">("overview");
+  const [tab, setTab] = useState<"overview" | "learnings" | "themes">("overview");
   const [filter, setFilter] = useState<StatusFilter>("active");
   const [selected, setSelected] = useState<Selection | null>(null);
   // Goals come from the server; a local copy only holds the result of an edit made here. (Keying the
@@ -126,7 +128,7 @@ export function ExperimentBoard({
   const openExperiment = selection?.kind === "experiment" ? state.experiments.find((experiment) => experiment.id === selection.id) ?? null : null;
   const openSignal =
     selection?.kind === "signal"
-      ? suggestions.find((signal) => signal.id === selection.id) ?? null
+      ? state.signals.find((signal) => signal.id === selection.id) ?? null
       : openExperiment
         ? state.signals.find((signal) => signal.id === openExperiment.signalId) ?? null
         : null;
@@ -150,6 +152,8 @@ export function ExperimentBoard({
         onDismissCleanup={() => openExperiment && onAct(openExperiment, "dismiss-cleanup")}
         onStart={() => openSignal && onTest(openSignal)}
         onDismissSignal={() => openSignal && onDismiss(openSignal)}
+        rating={ratingForSelection(state.ratings, selection)}
+        onRated={onRated}
       />
     );
   }
@@ -200,6 +204,7 @@ export function ExperimentBoard({
         <div className="mt-4 flex gap-6 border-b border-[#e6e8ec] text-sm">
           <button type="button" onClick={() => setTab("overview")} className={tab === "overview" ? "border-b-2 border-brand pb-2 font-medium text-brand" : "pb-2 text-[#6b7280]"}>Overview</button>
           <button type="button" onClick={() => setTab("learnings")} className={tab === "learnings" ? "border-b-2 border-brand pb-2 font-medium text-brand" : "pb-2 text-[#6b7280]"}>Learnings</button>
+          <button type="button" onClick={() => setTab("themes")} className={tab === "themes" ? "border-b-2 border-brand pb-2 font-medium text-brand" : "pb-2 text-[#6b7280]"}>Themes</button>
         </div>
         {(!state.configured || state.error) && (
           <p className="mt-4 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
@@ -246,6 +251,8 @@ export function ExperimentBoard({
       <div className="mt-3 px-6 pb-8">
         {tab === "learnings" ? (
           <LearningsTable learnings={state.learnings} onOpen={(id) => setSelected({ kind: "experiment", id })} />
+        ) : tab === "themes" ? (
+          <ThemesTable themes={state.themes} onOpen={(id) => setSelected({ kind: "signal", id })} />
         ) : (
         <table className="w-full border-collapse text-left text-sm">
           <thead>
@@ -314,6 +321,31 @@ export function ExperimentBoard({
         )}
       </div>
     </div>
+  );
+}
+
+function ratingForSelection(ratings: SuggestionRating[], selection: Selection): SuggestionRating | null {
+  return ratings.find((rating) => rating.targetKind === selection.kind && rating.targetId === selection.id) ?? null;
+}
+
+function ThemesTable({ themes, onOpen }: { themes: AutopilotState["themes"]; onOpen: (signalId: string) => void }) {
+  const trend = { rising: "↑ rising", steady: "→ steady", falling: "↓ falling" } as const;
+  return (
+    <table className="w-full border-collapse text-left text-sm">
+      <thead><tr className="border-b border-[#e6e8ec] text-xs text-[#6b7280]">
+        <th className="px-3 py-2 font-medium">Theme</th><th className="px-3 py-2 font-medium">People</th>
+        <th className="px-3 py-2 font-medium">Mentions</th><th className="px-3 py-2 font-medium">Trend</th>
+        <th className="px-3 py-2 font-medium">Also in the numbers</th><th className="px-3 py-2 font-medium">Quotes</th>
+      </tr></thead>
+      <tbody>{themes.length === 0 ? <tr><td colSpan={6} className="px-3 py-8 text-sm text-[#6b7280]">Themes appear as Kismet reads feedback, Slack, tickets and what you told it.</td></tr> : themes.map((theme) => (
+        <tr key={theme.signalId} tabIndex={0} className="cursor-pointer border-b border-[#eef0f3] text-[#374151] hover:bg-[#f8fafc] focus:bg-[#f8fafc] [&>td]:px-3" onClick={() => onOpen(theme.signalId)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(theme.signalId); } }}>
+          <td className="max-w-sm py-3"><div className="font-medium text-[#111827]">{theme.title}</div><div className="mt-0.5 text-xs text-[#9aa0a8]">{theme.problem}</div></td>
+          <td>{theme.people}</td><td>{theme.mentions}</td><td className="whitespace-nowrap">{trend[theme.trend]}</td>
+          <td className="text-center" aria-label={theme.hasNumbers ? "Also in the numbers" : "Not in the numbers"}>{theme.hasNumbers ? "✓" : "—"}</td>
+          <td className="max-w-lg py-3"><ul className="space-y-1 text-xs">{theme.quotes.map((quote, index) => <li key={`${quote.source}-${index}`}>“{quote.text}” <span className="text-[#9aa0a8]">— {quote.source}{quote.author ? ` · ${quote.author}` : ""}</span></li>)}</ul></td>
+        </tr>
+      ))}</tbody>
+    </table>
   );
 }
 

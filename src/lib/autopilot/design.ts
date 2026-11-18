@@ -3,10 +3,12 @@ import "server-only";
 import { askForJson, readJson } from "@/lib/ai/respond";
 import { describeMetric, parseMetricSpec } from "@/lib/autopilot/assign";
 import { relevantLearnings } from "@/lib/autopilot/learning-core";
-import { createExperiment, interviewContext, listExperiments, listGoals, listLearnings, listSignals, log, metricBaseline, recentJourneys, setSignalStatus, snoozeSignal } from "@/lib/autopilot/store";
+import { createExperiment, interviewContext, listExperiments, listGoals, listLearnings, listRatings, listSignals, log, metricBaseline, recentJourneys, setSignalStatus, snoozeSignal } from "@/lib/autopilot/store";
 import { daysToResult, type ResultEstimate } from "@/lib/autopilot/power";
 import { maxExperimentDays, relativeMde } from "@/lib/autopilot/thresholds";
 import type { Experiment, Signal } from "@/lib/autopilot/types";
+import { buildThemes } from "@/lib/autopilot/themes";
+import { formatPreferences } from "@/lib/autopilot/preferences";
 
 /** After this many attempts on one problem, Autopilot stops and leaves it to a person. */
 export const MAX_VERSIONS = 3;
@@ -82,11 +84,15 @@ async function designCandidate(candidate: Signal, experiments: Experiment[], per
     return null;
   }
 
-  const [goals, allLearnings] = await Promise.all([listGoals(), listLearnings(200)]);
+  const [goals, allLearnings, ratings] = await Promise.all([listGoals(), listLearnings(200), listRatings()]);
   const candidatePage = previous.findLast((experiment) => experiment.page)?.page ?? candidate.area;
   const usefulLearnings = relevantLearnings(allLearnings, { page: candidatePage, area: candidate.area });
   const earlierLearnings = allLearnings.filter((learning) => learning.signalId === candidate.id);
   const goalsText = goals.length ? goals.map((g) => `- ${g.name}: ${describeMetric(g.spec)} (${(g.baselineRate * 100).toFixed(1)}%, ${Math.round(g.weeklyVisitors)} visitors/week)`).join("\n") : "No goals yet.";
+  const theme = buildThemes([candidate], new Date())[0];
+  const themeText = theme
+    ? `${theme.people} people mentioned this ${theme.mentions} times (${theme.trend})${theme.quotes.length ? `\n${theme.quotes.map((quote) => `- “${quote.text}” — ${quote.source}${quote.author ? ` · ${quote.author}` : ""}`).join("\n")}` : ""}`
+    : "No qualitative theme for this problem.";
   const system = [
       "You are an autonomous product manager. Design one small, shippable A/B experiment that addresses the problem.",
       "The change must be a UI change to one existing React component, safe to show to half of visitors.",
@@ -105,10 +111,12 @@ async function designCandidate(candidate: Signal, experiments: Experiment[], per
       `PRODUCT\n${await productContext()}`,
       `GOALS\n${goalsText}`,
       `PROBLEM\n${candidate.title}: ${candidate.problem} (area: ${candidate.area || "unknown"})`,
+      `THEMES\n${themeText}`,
       `EVIDENCE (${candidate.evidence.length})`,
       ...candidate.evidence.slice(0, 15).map((e) => `- [${e.source}] ${e.title}${e.body && e.source !== "slack" ? ` — ${e.body}` : ""}`),
       `LEARNINGS\n${usefulLearnings.length ? usefulLearnings.map((learning) => `- ${learning.outcome}: ${learning.title} — ${learning.learning}`).join("\n") : "No relevant learnings yet."}`,
       `EARLIER ATTEMPTS\n${attemptsSummary(previous)}${earlierLearnings.length ? `\nLearnings from this signal:\n${earlierLearnings.map((learning) => `- ${learning.outcome}: ${learning.learning}`).join("\n")}` : ""}`,
+      `PREFERENCES\n${formatPreferences(ratings)}`,
     ].join("\n");
   async function request(message: string): Promise<{ answer: DesignAnswer; spec: NonNullable<ReturnType<typeof parseMetricSpec>>; estimate: ResultEstimate }> {
     const text = await askForJson(system, message, false, undefined, "experiment");
@@ -200,12 +208,14 @@ async function designCandidate(candidate: Signal, experiments: Experiment[], per
 
 /** Turns the strongest ready problem into an experiment brief. One per run keeps cost and noise down. */
 export async function designNext(): Promise<string | null> {
-  const [signals, experiments] = await Promise.all([listSignals(), listExperiments()]);
+  const [signals, experiments, ratings] = await Promise.all([listSignals(), listExperiments(), listRatings()]);
   // One change in the build pipeline at a time, so a blocked build doesn't pile up drafts.
   if (experiments.some((e) => e.status === "building")) return null;
   const busy = new Set(experiments.filter((e) => ACTIVE.has(e.status)).map((e) => e.signalId));
   const now = Date.now();
-  const candidate = signals.find((s) => s.ready && s.status === "open" && (!s.snoozedUntil || Date.parse(s.snoozedUntil) <= now) && !busy.has(s.id));
+  const liked = new Set(ratings.filter((rating) => rating.targetKind === "signal" && rating.rating === "good").map((rating) => rating.targetId));
+  const candidates = signals.filter((s) => s.ready && s.status === "open" && (!s.snoozedUntil || Date.parse(s.snoozedUntil) <= now) && !busy.has(s.id));
+  const candidate = candidates.find((signal) => liked.has(signal.id)) ?? candidates[0];
   if (!candidate) return null;
   return designCandidate(candidate, experiments);
 }

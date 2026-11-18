@@ -144,6 +144,7 @@ export function AutopilotView() {
       onTest={(signal) => void testSignal(signal)}
       onDismiss={(signal) => void dismissSignal(signal)}
       onAct={(experiment, action) => void act(experiment, action)}
+      onRated={() => void load()}
     />
   );
 }

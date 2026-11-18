@@ -29,6 +29,7 @@ import {
   listExperiments,
   listLearnings,
   listGoals,
+  listRatings,
   listSignals,
   log,
   addEvidence,
@@ -37,6 +38,7 @@ import {
 } from "@/lib/autopilot/store";
 import { syntheticEnabled, syntheticEvidence } from "@/lib/autopilot/synthetic";
 import type { AutopilotState } from "@/lib/autopilot/types";
+import { buildThemes } from "@/lib/autopilot/themes";
 
 export interface TickResult {
   ran: boolean;
@@ -131,6 +133,8 @@ export async function autopilotState(): Promise<AutopilotState> {
   const empty: AutopilotState = {
     configured: autopilotConfigured(),
     signals: [],
+    themes: [],
+    ratings: [],
     experiments: [],
     learnings: [],
     goals: [],
@@ -162,11 +166,12 @@ export async function autopilotState(): Promise<AutopilotState> {
           await log("error", `dispatch-build failed: ${message}`).catch(() => {});
         });
       }
-      const [signals, experiments, learnings, goals, activity, last, counts, repo, sampleEvidence] = await Promise.all([
+      const [signals, experiments, learnings, goals, ratings, activity, last, counts, repo, sampleEvidence] = await Promise.all([
         listSignals(),
         listExperiments(),
         listLearnings(),
         listGoals(),
+        listRatings(),
         listActivity(),
         lastRunAt(),
         evidenceCounts(7),
@@ -178,6 +183,8 @@ export async function autopilotState(): Promise<AutopilotState> {
         repo,
         sampleEvidence,
         signals,
+        themes: buildThemes(signals, new Date()),
+        ratings,
         experiments,
         learnings,
         goals,

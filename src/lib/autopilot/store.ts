@@ -8,6 +8,7 @@ import { ANALYTICS_FRESH_DAYS, ELEMENT_GONE_DAYS, otherFreshDays } from "@/lib/a
 import type { ResultEstimate } from "@/lib/autopilot/power";
 import type { ChangeSummary } from "@/lib/autopilot/change-summary";
 import { formatJourneys, type JourneyEvent } from "@/lib/autopilot/journeys";
+import { signalIsReady } from "@/lib/autopilot/readiness";
 import {
   READY_MIN_EVIDENCE,
   READY_MIN_SOURCES,
@@ -23,6 +24,9 @@ import {
   type Readout,
   type Signal,
   type SignalStatus,
+  type SuggestionRating,
+  type SuggestionRatingValue,
+  type SuggestionTargetKind,
 } from "@/lib/autopilot/types";
 
 type Row = Record<string, unknown>;
@@ -214,11 +218,68 @@ export async function listSignals(): Promise<Signal[]> {
         distinctEvidence,
         staleEvidence: staleBySignal.get(String(row.id)) ?? 0,
         sources,
-        ready: distinctEvidence >= READY_MIN_EVIDENCE && sources.length >= READY_MIN_SOURCES,
+        ready: signalIsReady({
+          distinctEvidence,
+          distinctSources: sources.length,
+          evidence: items,
+          minEvidence: READY_MIN_EVIDENCE,
+          minSources: READY_MIN_SOURCES,
+        }),
         snoozedUntil: isoOrNull(row.active_snoozed_until),
       };
     })
     .sort((a, b) => b.evidence.length - a.evidence.length);
+}
+
+function toRating(row: Row): SuggestionRating {
+  return {
+    id: String(row.id),
+    targetKind: row.target_kind as SuggestionTargetKind,
+    targetId: String(row.target_id),
+    rating: row.rating as SuggestionRatingValue,
+    reason: (row.reason as string | null) ?? null,
+    title: String(row.title),
+    createdAt: iso(row.created_at),
+  };
+}
+
+export async function rateSuggestion(input: {
+  targetKind: SuggestionTargetKind;
+  targetId: string;
+  rating: SuggestionRatingValue;
+  reason?: string | null;
+  title: string;
+}): Promise<SuggestionRating> {
+  const sql = await db();
+  const rows = await sql`
+    insert into kismet.suggestion_ratings (id, user_id, target_kind, target_id, rating, reason, title)
+    values (${newId("rating")}, ${scopeUser()}, ${input.targetKind}, ${input.targetId}, ${input.rating}, ${input.reason?.slice(0, 200) || null}, ${input.title.slice(0, 200)})
+    on conflict (user_id, target_kind, target_id) do update
+      set rating = excluded.rating, reason = excluded.reason, title = excluded.title, created_at = now()
+    returning *
+  `;
+  return toRating(rows[0]);
+}
+
+export async function listRatings(limit = 30): Promise<SuggestionRating[]> {
+  const sql = await db();
+  const safeLimit = Math.max(1, Math.min(100, Math.floor(limit)));
+  const rows = await sql`
+    select * from kismet.suggestion_ratings
+    where user_id = ${scopeUser()}
+    order by created_at desc limit ${safeLimit}::int
+  `;
+  return rows.map(toRating);
+}
+
+export async function ratingFor(targetKind: SuggestionTargetKind, targetId: string): Promise<SuggestionRating | null> {
+  const sql = await db();
+  const rows = await sql`
+    select * from kismet.suggestion_ratings
+    where user_id = ${scopeUser()} and target_kind = ${targetKind} and target_id = ${targetId}
+    limit 1
+  `;
+  return rows[0] ? toRating(rows[0]) : null;
 }
 
 export async function listExperiments(): Promise<Experiment[]> {

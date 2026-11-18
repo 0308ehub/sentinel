@@ -6,7 +6,7 @@ import { BuildLive } from "@/components/autopilot/build-live";
 import { CodeChange } from "@/components/autopilot/code-change";
 import { WhatChanges } from "@/components/autopilot/what-changes";
 import { Button } from "@/components/ui/button";
-import type { ArmResult, Experiment, Learning, Readout, Signal } from "@/lib/autopilot/types";
+import type { ArmResult, Experiment, Learning, Readout, Signal, SuggestionRating } from "@/lib/autopilot/types";
 
 const DECISION_VISITORS = 200;
 const PANEL_KEY = "kismet-experiment-panel-width";
@@ -62,6 +62,8 @@ export function ExperimentDetail({
   onDismissCleanup,
   onStart,
   onDismissSignal,
+  rating,
+  onRated,
 }: {
   experiment: Experiment | null;
   signal: Signal | null;
@@ -78,6 +80,8 @@ export function ExperimentDetail({
   onDismissCleanup: () => void;
   onStart: () => void;
   onDismissSignal: () => void;
+  rating: SuggestionRating | null;
+  onRated: () => void;
 }) {
   const title = experiment?.title ?? signal?.title ?? "Experiment";
   const readout = experiment?.readout ?? null;
@@ -103,6 +107,8 @@ export function ExperimentDetail({
       onDismissCleanup={onDismissCleanup}
       onStart={onStart}
       onDismissSignal={onDismissSignal}
+      rating={rating}
+      onRated={onRated}
     />
   );
   const panelWidth = useSyncExternalStore(subscribePanelWidth, readPanelWidth, () => DEFAULT_PANEL_WIDTH);
@@ -343,6 +349,8 @@ function Decisions({
   onDismissCleanup,
   onStart,
   onDismissSignal,
+  rating,
+  onRated,
 }: {
   experiment: Experiment | null;
   signal: Signal | null;
@@ -356,6 +364,8 @@ function Decisions({
   onDismissCleanup: () => void;
   onStart: () => void;
   onDismissSignal: () => void;
+  rating: SuggestionRating | null;
+  onRated: () => void;
 }) {
   const id = experiment?.id ?? signal?.id ?? "";
   return (
@@ -412,6 +422,62 @@ function Decisions({
             </Button>
           </>
         )}
+        {(!experiment || experiment.status === "building" || experiment.status === "awaiting_approval") && signal && (
+          <RatingControls key={experiment?.id ?? signal.id} experiment={experiment} signal={signal} initialRating={rating} onRated={onRated} />
+        )}
+    </div>
+  );
+}
+
+function RatingControls({
+  experiment,
+  signal,
+  initialRating,
+  onRated,
+}: {
+  experiment: Experiment | null;
+  signal: Signal;
+  initialRating: SuggestionRating | null;
+  onRated: () => void;
+}) {
+  const [rating, setRating] = useState(initialRating);
+  const [askingReason, setAskingReason] = useState(false);
+  const [reason, setReason] = useState(initialRating?.rating === "not_useful" ? initialRating.reason ?? "" : "");
+  const [saving, setSaving] = useState(false);
+  async function save(value: "good" | "not_useful") {
+    setSaving(true);
+    try {
+      const response = await fetch("/api/autopilot/ratings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          targetKind: experiment ? "experiment" : "signal",
+          targetId: experiment?.id ?? signal.id,
+          rating: value,
+          ...(value === "not_useful" && reason.trim() ? { reason: reason.trim() } : {}),
+        }),
+      });
+      if (!response.ok) return;
+      const body = (await response.json()) as { rating: SuggestionRating };
+      setRating(body.rating);
+      setAskingReason(false);
+      onRated();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 border-l border-[#e1e4e8] pl-2">
+      <button type="button" aria-pressed={rating?.rating === "good"} disabled={saving} onClick={() => void save("good")} className={`rounded border px-2 py-1 text-xs ${rating?.rating === "good" ? "border-brand bg-[#eef4ff] text-brand" : "border-[#d5d8de] text-[#374151]"}`}>Good idea</button>
+      <button type="button" aria-pressed={rating?.rating === "not_useful"} disabled={saving} onClick={() => setAskingReason(true)} className={`rounded border px-2 py-1 text-xs ${rating?.rating === "not_useful" ? "border-brand bg-[#eef4ff] text-brand" : "border-[#d5d8de] text-[#374151]"}`}>Not useful</button>
+      {askingReason && (
+        <form className="flex items-center gap-1.5" onSubmit={(event) => { event.preventDefault(); void save("not_useful"); }}>
+          <label className="sr-only" htmlFor="rating-reason">Why is this not useful? (optional)</label>
+          <input id="rating-reason" autoFocus maxLength={200} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Why? (optional)" className="h-7 w-44 rounded border border-[#d5d8de] px-2 text-xs" />
+          <button type="submit" disabled={saving} className="rounded border border-[#d5d8de] px-2 py-1 text-xs">Save</button>
+        </form>
+      )}
     </div>
   );
 }
