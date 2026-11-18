@@ -3,14 +3,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { ChangeSummary } from "@/lib/autopilot/change-summary";
+import { addedTextFromPatch, normalizePreviewCondition, textDifference } from "@/lib/autopilot/preview-diff";
 import type { Experiment } from "@/lib/autopilot/types";
+
+type ChangeFile = { patch?: string };
 
 type Changes = {
   source: "none" | "draft" | "branch" | "pull";
   previewUrl?: string | null;
   siteUrl?: string | null;
   ownRepo?: boolean;
-  pull?: { state: "open" | "closed" | "merged" };
+  files?: ChangeFile[];
+  pull?: { state: "open" | "closed" | "merged"; files?: ChangeFile[] };
 };
 
 type SummaryResponse = { summary?: ChangeSummary; pending?: boolean; siteUrl?: string | null; error?: string };
@@ -67,6 +71,10 @@ function SummaryContent({ experiment, summary, changes, siteUrl }: {
   siteUrl: string | null;
 }) {
   const place = [summary.where ? `On ${summary.where}` : "", summary.when].filter(Boolean).join(" · ");
+  const addedText = useMemo(() => {
+    const files = changes.source === "pull" ? changes.pull?.files : changes.files;
+    return addedTextFromPatch((files ?? []).flatMap((file) => file.patch ? [file.patch] : []));
+  }, [changes]);
   return (
     <div className="mt-3">
       <div className="grid gap-3 md:grid-cols-2">
@@ -75,7 +83,7 @@ function SummaryContent({ experiment, summary, changes, siteUrl }: {
       </div>
       {place && <p className="mt-2 text-xs text-[#6b7280]">{place}</p>}
       {summary.kind === "ui" && (
-        <VisualPreview experiment={experiment} changes={changes} siteUrl={siteUrl} when={summary.when} />
+        <VisualPreview experiment={experiment} changes={changes} siteUrl={siteUrl} when={summary.when} addedText={addedText} />
       )}
     </div>
   );
@@ -90,11 +98,12 @@ function SummaryCard({ label, text }: { label: string; text: string }) {
   );
 }
 
-function VisualPreview({ experiment, changes, siteUrl, when }: {
+function VisualPreview({ experiment, changes, siteUrl, when, addedText }: {
   experiment: Experiment;
   changes: Changes;
   siteUrl: string | null;
   when: string;
+  addedText: string[];
 }) {
   const ownOrigin = changes.ownRepo && typeof window !== "undefined" ? window.location.origin : null;
   const liveOrigin = ownOrigin ?? siteUrl;
@@ -102,18 +111,20 @@ function VisualPreview({ experiment, changes, siteUrl, when }: {
     || changes.pull?.state === "merged";
   if (when) return (
     <div className="mt-4">
-      <p className="mb-2 text-xs text-[#6b7280]">The new version only appears {when}.</p>
-      <PreviewBody experiment={experiment} changes={changes} liveOrigin={liveOrigin} isLive={isLive} />
+      <p className="mb-2 text-xs text-[#6b7280]">The new version only appears {normalizePreviewCondition(when)}.</p>
+      <PreviewBody experiment={experiment} changes={changes} liveOrigin={liveOrigin} isLive={isLive} when={when} addedText={addedText} />
     </div>
   );
-  return <div className="mt-4"><PreviewBody experiment={experiment} changes={changes} liveOrigin={liveOrigin} isLive={isLive} /></div>;
+  return <div className="mt-4"><PreviewBody experiment={experiment} changes={changes} liveOrigin={liveOrigin} isLive={isLive} when={when} addedText={addedText} /></div>;
 }
 
-function PreviewBody({ experiment, changes, liveOrigin, isLive }: {
+function PreviewBody({ experiment, changes, liveOrigin, isLive, when, addedText }: {
   experiment: Experiment;
   changes: Changes;
   liveOrigin: string | null;
   isLive: boolean;
+  when: string;
+  addedText: string[];
 }) {
   if (!liveOrigin) return (
     <p className="rounded border border-[#e1e4e8] bg-[#f8f9fa] p-3 text-sm text-[#6b7280]">
@@ -131,7 +142,7 @@ function PreviewBody({ experiment, changes, liveOrigin, isLive }: {
     </div>
   );
   if (!treatment) return null;
-  return <PreviewSwitcher control={control} treatment={treatment} />;
+  return <PreviewSwitcher control={control} treatment={treatment} when={when} addedText={addedText} />;
 }
 
 const FRAME_WIDTH = 1200;
@@ -141,9 +152,51 @@ const FRAME_HEIGHT = 760;
  * One large frame with a Current / New version switch. Both pages stay loaded so flipping is
  * instant, which makes the difference easy to spot; side by side they shrank to unreadable.
  */
-function PreviewSwitcher({ control, treatment }: { control: string; treatment: string }) {
+type FrameText = { element: HTMLElement; text: string };
+
+function frameTextBlocks(document: Document): FrameText[] {
+  const ignored = new Set(["SCRIPT", "STYLE", "NOSCRIPT"]);
+  const elements = [document.body, ...document.body.querySelectorAll<HTMLElement>("*")];
+  return elements.flatMap((element) => {
+    if (ignored.has(element.tagName) || element.getAttribute("aria-hidden") === "true") return [];
+    if (document.defaultView?.getComputedStyle(element).display === "none") return [];
+    const text = Array.from(element.childNodes)
+      .filter((node) => node.nodeType === Node.TEXT_NODE)
+      .map((node) => node.textContent ?? "")
+      .join(" ")
+      .trim()
+      .replace(/\s+/g, " ");
+    return text ? [{ element, text }] : [];
+  });
+}
+
+function highlightTreatment(document: Document, blocks: FrameText[], texts: string[]) {
+  const remaining = new Map<string, number>();
+  for (const text of texts) remaining.set(text, (remaining.get(text) ?? 0) + 1);
+  for (const block of blocks) {
+    const count = remaining.get(block.text) ?? 0;
+    if (count > 0) {
+      block.element.setAttribute("data-kismet-new", "");
+      remaining.set(block.text, count - 1);
+    }
+  }
+  const style = document.createElement("style");
+  style.textContent = "[data-kismet-new]{outline:2px solid #f59e0b;outline-offset:2px;border-radius:2px;background:rgba(245,158,11,.08)}";
+  document.head.appendChild(style);
+}
+
+function PreviewSwitcher({ control, treatment, when, addedText }: {
+  control: string;
+  treatment: string;
+  when: string;
+  addedText: string[];
+}) {
   const [showing, setShowing] = useState<"control" | "treatment">("treatment");
   const box = useRef<HTMLDivElement>(null);
+  const controlFrame = useRef<HTMLIFrameElement>(null);
+  const treatmentFrame = useRef<HTMLIFrameElement>(null);
+  const [loads, setLoads] = useState({ control: 0, treatment: 0 });
+  const [comparison, setComparison] = useState<{ onlyInTreatment: string[]; onlyInControl: string[] } | null>(null);
   const [scale, setScale] = useState(0.6);
   useEffect(() => {
     const node = box.current;
@@ -154,6 +207,27 @@ function PreviewSwitcher({ control, treatment }: { control: string; treatment: s
     observer.observe(node);
     return () => observer.disconnect();
   }, []);
+  useEffect(() => {
+    if (!loads.control || !loads.treatment) return;
+    const timer = window.setTimeout(() => {
+      try {
+        const controlDocument = controlFrame.current?.contentDocument;
+        const treatmentDocument = treatmentFrame.current?.contentDocument;
+        if (!controlDocument?.body || !treatmentDocument?.body) return;
+        const controlBlocks = frameTextBlocks(controlDocument);
+        const treatmentBlocks = frameTextBlocks(treatmentDocument);
+        const result = textDifference(
+          controlBlocks.map(({ text }) => text),
+          treatmentBlocks.map(({ text }) => text),
+        );
+        if (result.onlyInTreatment.length) highlightTreatment(treatmentDocument, treatmentBlocks, result.onlyInTreatment);
+        setComparison(result);
+      } catch {
+        // Cross-origin frames cannot be inspected. The preview still works without comparison notes.
+      }
+    }, 1500);
+    return () => window.clearTimeout(timer);
+  }, [loads]);
   const src = showing === "control" ? control : treatment;
   const fullPage = useMemo(() => {
     const url = new URL(src);
@@ -170,6 +244,10 @@ function PreviewSwitcher({ control, treatment }: { control: string; treatment: s
       {label}
     </button>
   );
+  const hasNewText = Boolean(comparison?.onlyInTreatment.length);
+  const pagesMatch = comparison !== null
+    && comparison.onlyInTreatment.length === 0
+    && comparison.onlyInControl.length === 0;
   return (
     <div>
       <div className="mb-2 flex items-center justify-between text-xs">
@@ -179,12 +257,39 @@ function PreviewSwitcher({ control, treatment }: { control: string; treatment: s
         </div>
         <a href={fullPage} target="_blank" rel="noreferrer" className="text-[#2563eb] hover:underline">Open full page ↗</a>
       </div>
+      {hasNewText && (
+        <p className="mb-2 rounded border border-[#f59e0b] bg-[#fffbeb] px-3 py-2 text-xs text-[#92400e]">
+          {showing === "treatment" ? "Highlighted in the new version: what’s new" : "Switch to New version to see what’s highlighted"}
+        </p>
+      )}
+      {pagesMatch && (
+        <div className="mb-2 rounded border border-[#f59e0b] bg-[#fffbeb] p-3 text-xs text-[#78350f]">
+          <p className="font-medium text-[#92400e]">
+            These look the same on your account{when ? ` because the new version only appears ${normalizePreviewCondition(when)}` : ""}.
+          </p>
+          {addedText.length ? (
+            <div className="mt-2 border-t border-[#fcd34d] pt-2">
+              <p className="font-medium">What the new version adds</p>
+              <ul className="mt-1 space-y-1">
+                {addedText.map((text) => <li key={text}>&ldquo;{text}&rdquo;</li>)}
+              </ul>
+            </div>
+          ) : (
+            <p className="mt-1">The difference isn&apos;t visible on this page right now; see the code change below.</p>
+          )}
+        </div>
+      )}
       <div ref={box} className="relative overflow-hidden rounded border border-[#e1e4e8] bg-white" style={{ aspectRatio: `${FRAME_WIDTH} / ${FRAME_HEIGHT}` }}>
         {([["control", control], ["treatment", treatment]] as const).map(([value, url]) => (
           <iframe
             key={value}
             title={value === "control" ? "Current version" : "New version"}
             src={url}
+            ref={value === "control" ? controlFrame : treatmentFrame}
+            onLoad={() => {
+              setComparison(null);
+              setLoads((current) => ({ ...current, [value]: current[value] + 1 }));
+            }}
             loading="lazy"
             aria-hidden={showing !== value}
             className="absolute left-0 top-0 border-0"
