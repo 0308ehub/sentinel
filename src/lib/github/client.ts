@@ -2,20 +2,14 @@ import "server-only";
 
 import { actingUserId } from "@/lib/connections/current";
 import { getConnection } from "@/lib/connections/store";
+import { githubConnectionKind, githubInstallationsFor, githubTokenFor, installationToken } from "@/lib/github/app";
+import { GitHubApiError } from "@/lib/github/errors";
+
+export { GitHubApiError } from "@/lib/github/errors";
 
 const API = "https://api.github.com";
 const CONNECT = "Connect GitHub in Settings → Connectors → GitHub.";
 const MISSING = "Add GITHUB_TOKEN to .env and restart the dev server.";
-
-export class GitHubApiError extends Error {
-  constructor(
-    public code: string,
-    public hint?: string,
-    public status = 502
-  ) {
-    super(code);
-  }
-}
 
 export interface GitHubAccount {
   login: string;
@@ -26,6 +20,13 @@ export interface GitHubRepoSummary {
   private: boolean;
   defaultBranch: string;
   description: string;
+  account: string;
+  updatedAt: string;
+}
+
+export interface GitHubNamespace {
+  account: string;
+  installationId?: number;
 }
 
 export interface GitHubFile {
@@ -92,6 +93,9 @@ interface RepoPayload {
   default_branch?: string;
   description?: string | null;
   permissions?: { push?: boolean; };
+  owner?: { login?: string };
+  pushed_at?: string | null;
+  updated_at?: string | null;
 }
 
 interface ContentPayload {
@@ -107,12 +111,11 @@ interface TreePayload {
   tree?: { path?: string; type?: string }[];
 }
 
-async function token(): Promise<string> {
+async function token(repo?: string): Promise<string> {
   const userId = await actingUserId();
   if (userId) {
     try {
-      const stored = await getConnection<{ token?: unknown }>(userId, "github");
-      const value = typeof stored?.secret.token === "string" ? stored.secret.token.trim() : "";
+      const value = await githubTokenFor(userId, repo);
       if (value) return value;
     } catch (error) {
       if (process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) throw error;
@@ -131,7 +134,8 @@ export function repoName(value: string): { owner: string; repo: string } | null 
 }
 
 async function github<T>(path: string, init?: RequestInit, candidateToken?: string): Promise<T> {
-  const resolvedToken = candidateToken ?? await token();
+  const match = /^\/repos\/([^/]+)\/([^/?]+)/.exec(path);
+  const resolvedToken = candidateToken ?? await token(match ? `${match[1]}/${match[2]}` : undefined);
   const res = await fetch(`${API}${path}`, {
     ...init,
     headers: {
@@ -165,18 +169,73 @@ export async function githubAccount(candidateToken?: string): Promise<GitHubAcco
   return { login: user.login };
 }
 
-export async function listWritableRepos(): Promise<GitHubRepoSummary[]> {
-  const rows = await github<RepoPayload[]>(
-    "/user/repos?per_page=50&sort=updated&affiliation=owner,collaborator,organization_member",
-  );
-  return rows
+export async function githubConnectionStatus(userId: string): Promise<{
+  connected: boolean;
+  login?: string;
+  account?: string;
+  via?: "app" | "token";
+}> {
+  const kind = await githubConnectionKind(userId);
+  if (kind === "app") {
+    const connection = await getConnection<{ installationId?: unknown; installations?: unknown }>(userId, "github");
+    const login = typeof connection?.meta.login === "string" ? connection.meta.login : undefined;
+    const accounts = Array.isArray(connection?.meta.accounts)
+      ? connection.meta.accounts.filter((value): value is string => typeof value === "string")
+      : [];
+    const account = accounts[0] ?? (typeof connection?.meta.account === "string" ? connection.meta.account : login);
+    return { connected: true, login, account, via: "app" };
+  }
+  if (kind === "token") {
+    const account = await githubAccount(await githubTokenFor(userId));
+    return { connected: true, login: account.login, account: account.login, via: "token" };
+  }
+  if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
+    const account = await githubAccount();
+    return { connected: true, login: account.login, account: account.login, via: "token" };
+  }
+  return { connected: false };
+}
+
+export async function listWritableRepos(): Promise<{ repos: GitHubRepoSummary[]; namespaces: GitHubNamespace[] }> {
+  const userId = await actingUserId();
+  const kind = userId ? await githubConnectionKind(userId) : null;
+  const namespaces: GitHubNamespace[] = [];
+  let rows: RepoPayload[] = [];
+  if (kind === "app" && userId) {
+    const installations = await githubInstallationsFor(userId);
+    for (const installation of installations) {
+      namespaces.push({ account: installation.account, installationId: installation.id });
+      const candidateToken = await installationToken(installation.id);
+      for (let page = 1; page <= 3; page += 1) {
+        const pageRows = (await github<{ repositories?: RepoPayload[] }>(
+          `/installation/repositories?per_page=100&page=${page}`,
+          undefined,
+          candidateToken,
+        )).repositories ?? [];
+        rows.push(...pageRows);
+        if (pageRows.length < 100) break;
+      }
+    }
+  } else {
+    rows = await github<RepoPayload[]>(
+      "/user/repos?per_page=100&sort=updated&affiliation=owner,collaborator,organization_member",
+    );
+  }
+  const repos = rows
     .filter((row) => row.full_name && row.permissions?.push !== false)
     .map((row) => ({
       fullName: row.full_name as string,
       private: Boolean(row.private),
       defaultBranch: row.default_branch || "main",
       description: row.description?.trim() || "",
-    }));
+      account: row.owner?.login || (row.full_name as string).split("/", 1)[0],
+      updatedAt: row.pushed_at || row.updated_at || "",
+    }))
+    .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
+  if (kind !== "app") {
+    for (const account of new Set(repos.map((repo) => repo.account))) namespaces.push({ account });
+  }
+  return { repos, namespaces };
 }
 
 export async function repoDefaultBranch(fullName: string): Promise<string> {
@@ -434,7 +493,7 @@ export async function recentRepoNotes(): Promise<string> {
   const named = process.env.KISMET_GITHUB_REPO?.trim() ?? "";
   let fullName = repoName(named) ? named : "";
   if (!fullName) {
-    const repos = await listWritableRepos();
+    const { repos } = await listWritableRepos();
     fullName = repos[0]?.fullName ?? "";
   }
   const parsed = repoName(fullName);

@@ -5,8 +5,8 @@ import type { BetaManagedAgentsSessionEvent } from "@anthropic-ai/sdk/resources/
 import { db } from "@/lib/autopilot/db";
 import { chosenAutopilotRepo } from "@/lib/autopilot/repo";
 import { withAutopilotUser } from "@/lib/autopilot/scope";
-import { getConnection } from "@/lib/connections/store";
 import { toCoderView, type CoderView } from "@/lib/coder/view";
+import { githubTokenFor } from "@/lib/github/app";
 
 export const SESSION_BUDGET_CENTS = "500";
 export const DAILY_LIMIT = 10;
@@ -63,9 +63,8 @@ export async function managedSessionView(sessionId: string): Promise<CoderView> 
 }
 
 export async function startCoderSession(userId: string, text: string): Promise<CoderSessionRow> {
-  const connection = await getConnection<{ token?: unknown }>(userId, "github");
-  const githubToken = typeof connection?.secret.token === "string" ? connection.secret.token.trim() : "";
   const repo = await withAutopilotUser(userId, chosenAutopilotRepo);
+  const githubToken = await githubTokenFor(userId, repo ?? undefined);
   if (!githubToken || !repo) throw new CoderError(CONNECT_MESSAGE, 409);
   const sql = await db();
   const count = await sql<{ count: number }[]>`

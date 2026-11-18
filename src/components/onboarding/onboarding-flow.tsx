@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Check, Loader2 } from "lucide-react";
 import { OnboardingShell } from "@/components/onboarding/onboarding-shell";
@@ -14,6 +14,12 @@ import {
 } from "@/lib/onboarding";
 import { useAccount } from "@/lib/auth/use-account";
 import { cn } from "@/lib/utils";
+import { openGitHubInstall, type GitHubInstallStatus } from "@/components/settings/github-connect";
+import {
+  GitHubImportList,
+  type GitHubImportNamespace,
+  type GitHubImportRepo,
+} from "@/components/settings/github-import-list";
 
 const LEGACY_STEPS: Record<string, OnboardingStep> = {
   company: "you",
@@ -125,26 +131,34 @@ function YouStep({
   );
 }
 
-interface GitHubRepo {
-  fullName: string;
-}
-
 function GitHubStep({ onBack, onNext }: { onBack: () => void; onNext: () => void }) {
+  const searchParams = useSearchParams();
+  const [appAvailable, setAppAvailable] = useState(false);
   const [connected, setConnected] = useState(false);
   const [login, setLogin] = useState("");
+  const [via, setVia] = useState<"app" | "token" | "">("");
   const [token, setToken] = useState("");
-  const [repos, setRepos] = useState<GitHubRepo[]>([]);
+  const [repos, setRepos] = useState<GitHubImportRepo[]>([]);
+  const [namespaces, setNamespaces] = useState<GitHubImportNamespace[]>([]);
   const [repo, setRepo] = useState("");
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState("");
+  const [refresh, setRefresh] = useState(0);
+  const [waiting, setWaiting] = useState(false);
+  const popupCleanup = useRef<(() => void) | null>(null);
+
+  useEffect(() => () => popupCleanup.current?.(), []);
 
   useEffect(() => {
     let cancelled = false;
     void loadGitHub().then((result) => {
       if (cancelled) return;
       setConnected(result.connected);
+      setAppAvailable(result.appAvailable);
       setLogin(result.login);
+      setVia(result.via);
       setRepos(result.repos);
+      setNamespaces(result.namespaces);
       setRepo(result.repo);
       setError(result.error);
       setBusy(false);
@@ -152,7 +166,7 @@ function GitHubStep({ onBack, onNext }: { onBack: () => void; onNext: () => void
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refresh]);
 
   async function connect() {
     setBusy(true);
@@ -164,16 +178,44 @@ function GitHubStep({ onBack, onNext }: { onBack: () => void; onNext: () => void
         body: JSON.stringify({ token }),
       });
       if (!body.connected) throw new Error(body.error || "Could not connect GitHub.");
-      const repoBody = await requestJson<{ repos?: GitHubRepo[]; error?: string }>("/api/github/repos");
+      const repoBody = await requestJson<{
+        repos?: GitHubImportRepo[];
+        namespaces?: GitHubImportNamespace[];
+        error?: string;
+      }>("/api/github/repos");
       if (repoBody.error) throw new Error(repoBody.error);
       setConnected(true);
       setLogin(body.login ?? "");
       setRepos(repoBody.repos ?? []);
+      setNamespaces(repoBody.namespaces ?? []);
+      setVia("token");
       setToken("");
     } catch (caught) {
       setError(errorMessage(caught, "Could not connect GitHub."));
     } finally {
       setBusy(false);
+    }
+  }
+
+  function install() {
+    popupCleanup.current?.();
+    setWaiting(true);
+    setError("");
+    popupCleanup.current = openGitHubInstall("/onboarding/github", (status, code) => {
+      popupCleanup.current = null;
+      setWaiting(false);
+      handleInstallResult(status, code);
+    });
+  }
+
+  function handleInstallResult(status: GitHubInstallStatus, code?: string) {
+    if (status === "connected") {
+      setBusy(true);
+      setRefresh((value) => value + 1);
+    } else if (status === "pending") {
+      setError("An organization owner needs to approve Kismet");
+    } else if (code !== "popup_closed") {
+      setError(githubAppError(code));
     }
   }
 
@@ -208,7 +250,33 @@ function GitHubStep({ onBack, onNext }: { onBack: () => void; onNext: () => void
       nextDisabled={!repo || busy}
     >
       {connected ? (
-        <RepoChoice login={login} repos={repos} repo={repo} busy={busy} onChange={(value) => void chooseRepo(value)} />
+        <div className="rounded-xl border border-[#e6e8ec] p-4">
+          <p className="mb-4 flex items-center gap-2 text-sm font-medium"><Check className="h-4 w-4 text-[#0571d3]" />Connected{login ? ` as ${login}` : ""}</p>
+          <GitHubImportList
+            repos={repos}
+            namespaces={namespaces}
+            selected={repo}
+            busy={busy || waiting}
+            onImport={(value) => void chooseRepo(value)}
+            onAdjust={via === "app" ? () => { install(); } : undefined}
+          />
+          {waiting ? <p className="mt-3 text-sm text-[#5c6570]">Waiting for GitHub…</p> : null}
+        </div>
+      ) : appAvailable ? (
+        <>
+          {searchParams.get("pending") === "1" ? (
+            <p className="mb-3 text-sm text-[#5c6570]">Waiting for an organization owner to approve the install.</p>
+          ) : null}
+          <button type="button" onClick={() => { install(); }} disabled={waiting} className={primaryClass}>
+            {waiting ? "Waiting for GitHub…" : "Install Kismet on GitHub"}
+          </button>
+          <details className="mt-4 rounded-xl border border-[#e6e8ec] p-4">
+            <summary className="cursor-pointer text-sm font-medium">Use a personal access token instead</summary>
+            <div className="mt-4">
+              <GitHubToken token={token} busy={busy} onChange={setToken} onConnect={() => void connect()} />
+            </div>
+          </details>
+        </>
       ) : (
         <GitHubToken token={token} busy={busy} onChange={setToken} onConnect={() => void connect()} />
       )}
@@ -218,23 +286,46 @@ function GitHubStep({ onBack, onNext }: { onBack: () => void; onNext: () => void
   );
 }
 
+function githubAppError(code?: string): string {
+  if (code === "state") return "The GitHub install expired or could not be verified. Please try again.";
+  if (code === "not_configured") return "The Kismet GitHub App is not configured.";
+  return "Kismet could not finish connecting the GitHub App. Please try again.";
+}
+
 async function loadGitHub() {
   try {
-    const status = await requestJson<{ connected?: boolean; login?: string }>("/api/github/status");
-    if (!status.connected) return { connected: false, login: "", repos: [], repo: "", error: "" };
+    const [status, availability] = await Promise.all([
+      requestJson<{ connected?: boolean; login?: string; via?: "app" | "token" }>("/api/github/status"),
+      requestJson<{ available?: boolean }>("/api/github/app/available"),
+    ]);
+    if (!status.connected) {
+      return { connected: false, appAvailable: Boolean(availability.available), login: "", via: "" as const, repos: [], namespaces: [], repo: "", error: "" };
+    }
     const [repoList, selected] = await Promise.all([
-      requestJson<{ repos?: GitHubRepo[]; error?: string }>("/api/github/repos"),
+      requestJson<{ repos?: GitHubImportRepo[]; namespaces?: GitHubImportNamespace[]; error?: string }>("/api/github/repos"),
       requestJson<{ repo?: string }>("/api/autopilot/repo"),
     ]);
     return {
       connected: true,
+      appAvailable: Boolean(availability.available),
       login: status.login ?? "",
+      via: status.via ?? "token",
       repos: repoList.repos ?? [],
+      namespaces: repoList.namespaces ?? [],
       repo: selected.repo ?? "",
       error: repoList.error ?? "",
     };
   } catch (caught) {
-    return { connected: false, login: "", repos: [], repo: "", error: errorMessage(caught, "Could not load GitHub.") };
+    return {
+      connected: false,
+      appAvailable: false,
+      login: "",
+      via: "" as const,
+      repos: [],
+      namespaces: [],
+      repo: "",
+      error: errorMessage(caught, "Could not load GitHub."),
+    };
   }
 }
 
@@ -277,32 +368,6 @@ function GitHubToken({
         Connect GitHub
       </button>
     </>
-  );
-}
-
-function RepoChoice({
-  login,
-  repos,
-  repo,
-  busy,
-  onChange,
-}: {
-  login: string;
-  repos: GitHubRepo[];
-  repo: string;
-  busy: boolean;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <div className="rounded-xl border border-[#e6e8ec] p-4">
-      <p className="flex items-center gap-2 text-sm font-medium"><Check className="h-4 w-4 text-[#0571d3]" />Connected{login ? ` as ${login}` : ""}</p>
-      <Field label="Repository Kismet ships to" className="mt-4">
-        <select value={repo} onChange={(event) => onChange(event.target.value)} disabled={busy} className={inputClass}>
-          <option value="">Choose a repository</option>
-          {repos.map((item) => <option key={item.fullName} value={item.fullName}>{item.fullName}</option>)}
-        </select>
-      </Field>
-    </div>
   );
 }
 

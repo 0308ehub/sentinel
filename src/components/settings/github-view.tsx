@@ -1,50 +1,81 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { CodingAgentSection } from "@/components/settings/coding-agent-section";
 import { SettingsShell } from "@/components/settings/settings-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
-interface RepoOption {
-  fullName: string;
-  description: string;
-}
+import { openGitHubInstall, type GitHubInstallStatus } from "@/components/settings/github-connect";
+import {
+  GitHubImportList,
+  type GitHubImportNamespace,
+  type GitHubImportRepo,
+} from "@/components/settings/github-import-list";
 
 export function GitHubView() {
+  const searchParams = useSearchParams();
+  const [appAvailable, setAppAvailable] = useState(false);
+  const [account, setAccount] = useState("");
   const [login, setLogin] = useState("");
   const [hint, setHint] = useState("");
-  const [repos, setRepos] = useState<RepoOption[] | null>(null);
+  const [repos, setRepos] = useState<GitHubImportRepo[] | null>(null);
+  const [namespaces, setNamespaces] = useState<GitHubImportNamespace[]>([]);
   const [token, setToken] = useState("");
   const [refresh, setRefresh] = useState(0);
   const [saving, setSaving] = useState(false);
   const [target, setTarget] = useState("");
+  const [via, setVia] = useState<"app" | "token" | "">("");
+  const [waiting, setWaiting] = useState(false);
+  const [popupCleanup, setPopupCleanup] = useState<(() => void) | null>(null);
+
+  useEffect(() => () => popupCleanup?.(), [popupCleanup]);
 
   useEffect(() => {
     let cancelled = false;
 
-    fetch("/api/github/status", { cache: "no-store" })
-      .then((res) => res.json())
-      .then(async (body: { connected?: boolean; login?: string; hint?: string }) => {
+    Promise.all([
+      fetch("/api/github/status", { cache: "no-store" }),
+      fetch("/api/github/app/available", { cache: "no-store" }),
+    ])
+      .then(async ([statusRes, availableRes]) => {
+        const body = (await statusRes.json()) as {
+          connected?: boolean;
+          login?: string;
+          account?: string;
+          hint?: string;
+          via?: "app" | "token";
+        };
+        const availability = (await availableRes.json()) as { available?: boolean };
         if (cancelled) return;
+        setAppAvailable(Boolean(availability.available));
         setHint("");
         if (!body.connected) {
+          setAccount("");
           setLogin("");
+          setVia("");
           setRepos(null);
           setHint(body.hint?.startsWith("Connect ") ? "" : body.hint || "GitHub is not connected.");
           return;
         }
+        setAccount(body.account || body.login || "");
         setLogin(body.login || "");
+        setVia(body.via || "token");
         const [reposRes, targetRes] = await Promise.all([
           fetch("/api/github/repos", { cache: "no-store" }),
           fetch("/api/autopilot/repo", { cache: "no-store" }),
         ]);
-        const reposBody = (await reposRes.json()) as { repos?: RepoOption[]; hint?: string };
+        const reposBody = (await reposRes.json()) as {
+          repos?: GitHubImportRepo[];
+          namespaces?: GitHubImportNamespace[];
+          hint?: string;
+        };
         const targetBody = (await targetRes.json()) as { repo?: string };
         if (!cancelled) {
           if (!reposRes.ok) setHint(reposBody.hint || "Could not list repositories.");
           else setRepos(reposBody.repos ?? []);
+          setNamespaces(reposBody.namespaces ?? []);
           if (targetRes.ok && targetBody.repo) setTarget(targetBody.repo);
         }
       })
@@ -90,43 +121,68 @@ export function GitHubView() {
     }
   }
 
+  function install() {
+    popupCleanup?.();
+    setWaiting(true);
+    setHint("");
+    const cleanup = openGitHubInstall("/settings/connectors/github", (status, error) => {
+      setWaiting(false);
+      setPopupCleanup(null);
+      handleInstallResult(status, error);
+    });
+    setPopupCleanup(() => cleanup);
+  }
+
+  function handleInstallResult(status: GitHubInstallStatus, error?: string) {
+    if (status === "connected") {
+      setRefresh((value) => value + 1);
+      return;
+    }
+    if (status === "pending") {
+      setHint("An organization owner needs to approve Kismet");
+      return;
+    }
+    if (error !== "popup_closed") setHint(appErrorMessage(error || "connect_failed"));
+  }
+
   return (
     <SettingsShell
       title="GitHub"
-      description="Kismet opens an experiment pull request on a repository this token can push to."
+      description={appAvailable
+        ? "Kismet opens experiment pull requests in repositories you grant it access to."
+        : "Kismet opens an experiment pull request on a repository this token can push to."}
     >
       {!login ? (
         <div className="max-w-lg space-y-3">
-          <div className="space-y-1">
-            <Label htmlFor="github-token">Personal access token</Label>
-            <Input
-              id="github-token"
-              type="password"
-              value={token}
-              onChange={(event) => setToken(event.target.value)}
-            />
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Create a fine-grained token at{" "}
-            <a
-              className="text-[#0571d3] hover:underline"
-              href="https://github.com/settings/tokens"
-              target="_blank"
-              rel="noreferrer"
-            >
-              github.com/settings/tokens
-            </a>{" "}
-            with Contents and Pull requests read/write access.
-          </p>
-          {hint && <p className="text-xs text-destructive">{hint}</p>}
-          <Button size="sm" disabled={saving} onClick={() => void update("connect")}>
-            {saving ? "Connecting…" : "Connect"}
-          </Button>
+          {searchParams.get("pending") === "1" && (
+            <p className="text-sm text-muted-foreground">Waiting for an organization owner to approve the install.</p>
+          )}
+          {searchParams.get("error") && (
+            <p className="text-xs text-destructive">{appErrorMessage(searchParams.get("error")!)}</p>
+          )}
+          {appAvailable && (
+            <Button size="sm" disabled={waiting} onClick={install}>
+              {waiting ? "Waiting for GitHub…" : "Install Kismet on GitHub"}
+            </Button>
+          )}
+          {appAvailable && hint && <p role="alert" className="text-xs text-destructive">{hint}</p>}
+          {appAvailable ? (
+            <details className="rounded-md border border-border px-3 py-2">
+              <summary className="cursor-pointer text-sm">Use a personal access token instead</summary>
+              <div className="mt-3 space-y-3">
+                <TokenForm token={token} saving={saving} hint={hint} onChange={setToken} onConnect={() => void update("connect")} />
+              </div>
+            </details>
+          ) : (
+            <TokenForm token={token} saving={saving} hint={hint} onChange={setToken} onConnect={() => void update("connect")} />
+          )}
         </div>
       ) : (
         <>
           <div className="flex items-center gap-3">
-            <p className="text-sm">Connected as {login}.</p>
+            <p className="text-sm">
+              {via === "app" ? `Connected through the Kismet GitHub App as ${account}.` : `Connected as ${login}.`}
+            </p>
             <Button
               className="ml-auto"
               variant="outline"
@@ -136,45 +192,76 @@ export function GitHubView() {
               Disconnect
             </Button>
           </div>
-          {hint && <p className="mt-3 text-xs text-destructive">{hint}</p>}
-          <div className="mt-4 max-w-lg space-y-1">
-            <Label htmlFor="autopilot-repo">Repository Kismet ships to</Label>
-            <select
-              id="autopilot-repo"
-              className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
-              value={target}
-              onChange={(event) => void chooseRepo(event.target.value)}
+          {via === "app" && (
+            <a
+              className="mt-2 inline-block text-xs text-[#0571d3] hover:underline"
+              href="https://github.com/settings/installations"
+              target="_blank"
+              rel="noreferrer"
             >
-              {!target && (
-                <option value="" disabled>
-                  Choose a repository…
-                </option>
-              )}
-              {target && !(repos ?? []).some((repo) => repo.fullName === target) && (
-                <option value={target}>{target}</option>
-              )}
-              {(repos ?? []).map((repo) => (
-                <option key={repo.fullName} value={repo.fullName}>{repo.fullName}</option>
-              ))}
-            </select>
+              Manage or remove the app on GitHub
+            </a>
+          )}
+          {hint && <p className="mt-3 text-xs text-destructive">{hint}</p>}
+          <div className="mt-4 max-w-2xl">
+            <GitHubImportList
+              repos={repos ?? []}
+              namespaces={namespaces}
+              selected={target}
+              busy={saving || waiting}
+              onImport={(repo) => void chooseRepo(repo)}
+              onAdjust={via === "app" ? install : undefined}
+            />
+            {waiting && <p className="mt-2 text-sm text-muted-foreground">Waiting for GitHub…</p>}
           </div>
           <CodingAgentSection repo={target} />
-          <ul className="mt-4 divide-y divide-border rounded-xl border border-border">
-            {(repos ?? []).length === 0 ? (
-              <li className="px-3 py-3 text-sm text-muted-foreground">
-                No repositories this token can push to.
-              </li>
-            ) : (
-              repos?.map((repo) => (
-                <li key={repo.fullName} className="px-3 py-2 text-sm">
-                  <p>{repo.fullName}</p>
-                  {repo.description && <p className="text-xs text-muted-foreground">{repo.description}</p>}
-                </li>
-              ))
-            )}
-          </ul>
         </>
       )}
     </SettingsShell>
   );
+}
+
+function TokenForm({
+  token,
+  saving,
+  hint,
+  onChange,
+  onConnect,
+}: {
+  token: string;
+  saving: boolean;
+  hint: string;
+  onChange: (value: string) => void;
+  onConnect: () => void;
+}) {
+  return (
+    <>
+      <div className="space-y-1">
+        <Label htmlFor="github-token">Personal access token</Label>
+        <Input
+          id="github-token"
+          type="password"
+          value={token}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Create a fine-grained token at{" "}
+        <a className="text-[#0571d3] hover:underline" href="https://github.com/settings/tokens" target="_blank" rel="noreferrer">
+          github.com/settings/tokens
+        </a>{" "}
+        with Contents and Pull requests read/write access.
+      </p>
+      {hint && <p className="text-xs text-destructive">{hint}</p>}
+      <Button size="sm" disabled={saving} onClick={onConnect}>
+        {saving ? "Connecting…" : "Connect"}
+      </Button>
+    </>
+  );
+}
+
+function appErrorMessage(code: string): string {
+  if (code === "state") return "The GitHub install expired or could not be verified. Please try again.";
+  if (code === "not_configured") return "The Kismet GitHub App is not configured.";
+  return "Kismet could not finish connecting the GitHub App. Please try again.";
 }

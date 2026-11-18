@@ -8,17 +8,17 @@ import { listExperiments, listSignals, log, setSignalStatus, updateExperiment } 
 import { isLocalSource } from "@/lib/autopilot/source";
 import type { Experiment, Signal } from "@/lib/autopilot/types";
 import { client, coderConfigured, managedSessionView, SESSION_BUDGET_CENTS } from "@/lib/coder/sessions";
-import { getConnection } from "@/lib/connections/store";
+import { githubTokenFor } from "@/lib/github/app";
 import { closePull, compareFiles, createPullFromBranch, deleteBranch, readFile, repoDefaultBranch } from "@/lib/github/client";
 
-async function githubToken(): Promise<string> {
-  const connection = await getConnection<{ token?: unknown }>(autopilotUser(), "github");
-  return typeof connection?.secret.token === "string" ? connection.secret.token.trim() : "";
+async function githubToken(repo?: string): Promise<string> {
+  return githubTokenFor(autopilotUser(), repo);
 }
 
 export async function agentBuildAvailable(): Promise<boolean> {
   if (!coderConfigured() || autopilotDryRun() || isLocalSource()) return false;
-  return Boolean(await githubToken().catch(() => ""));
+  const repo = await autopilotRepo().catch(() => undefined);
+  return Boolean(await githubToken(repo).catch(() => ""));
 }
 
 export async function startAgentBuild(experiment: Experiment, signal: Signal | undefined): Promise<string | null> {
@@ -27,7 +27,7 @@ export async function startAgentBuild(experiment: Experiment, signal: Signal | u
   );
   if (active) return null;
   const repo = await autopilotRepo();
-  const token = await githubToken();
+  const token = await githubToken(repo);
   if (!token) return null;
   const external = repo !== defaultAutopilotRepo();
   const session = await client().beta.sessions.create({
