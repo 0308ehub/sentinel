@@ -83,7 +83,9 @@ export function ExperimentDetail({
   const readout = experiment?.readout ?? null;
   const control = readout?.arms.find((arm) => arm.arm === "control") ?? null;
   const treatment = readout?.arms.find((arm) => arm.arm === "treatment") ?? null;
-  const visitors = (control?.visitors ?? 0) + (treatment?.visitors ?? 0);
+  const visitors = experiment?.kind === "change"
+    ? experiment.directional?.after.visitors ?? 0
+    : (control?.visitors ?? 0) + (treatment?.visitors ?? 0);
   const status = experiment ? statusLabel(experiment.status) : "Suggested";
   const runningLook = !suggested && experiment != null;
   const names = armNames(experiment, signal);
@@ -127,7 +129,7 @@ export function ExperimentDetail({
         <div>
           <h1 className="text-xl leading-tight text-[#111827]">{title}</h1>
           <p className="mt-2 text-xs text-[#6b7280]">
-            A/B Test · <span className={status === "Running" ? "text-[#1f9d55]" : "text-[#374151]"}>{status}</span>
+            {experiment?.kind === "change" ? "Change" : "A/B Test"} · <span className={status === "Running" ? "text-[#1f9d55]" : "text-[#374151]"}>{status}</span>
           </p>
           {suggested && (
             <p className="mt-2 inline-flex rounded border border-[#c7d7fe] bg-[#eef4ff] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-brand">
@@ -140,7 +142,7 @@ export function ExperimentDetail({
           <Fact label="Days running" value={daysRunning(experiment)} />
           <Fact label="Audiences" value="Everyone" />
           <Fact label="Experiment visitors" value={visitors ? visitors.toLocaleString("en-US") : "—"} />
-          {experiment?.estimate && (
+          {experiment?.estimate && experiment.kind !== "change" && (
             <div>
               <Fact label="Expected result" value={`~${experiment.estimate.days} days`} />
               <p className="mt-1 text-[11px] leading-4 text-[#9aa0a8]">
@@ -237,7 +239,7 @@ function MainPanel(props: {
   return (
     <div>
       {!change && decisions && <div className="flex justify-end border-b border-[#e6e8ec] px-4 py-3">{decisions}</div>}
-      <ResultsCanvas experiment={experiment} {...results} />
+      {experiment?.kind === "change" ? <ChangeFollowUp experiment={experiment} /> : <ResultsCanvas experiment={experiment} {...results} />}
       {change && <div className="border-t border-[#e6e8ec]">{change}</div>}
     </div>
   );
@@ -266,6 +268,7 @@ function Autonomous({
         </div>
       )}
       {experiment?.hypothesis && <p>{experiment.hypothesis}</p>}
+      {experiment?.kind === "change" && experiment.rationale && <ChangeRationaleBlock experiment={experiment} />}
       {experiment && <p className="text-[#374151]">{experiment.metric}</p>}
       {experiment?.guardrail && <p className="text-[#374151]">Guardrail: {experiment.guardrail}</p>}
       {suggested && !experiment && (
@@ -300,6 +303,31 @@ function LearningBadge({ outcome }: { outcome: Learning["outcome"] }) {
       : outcome === "rejected" ? "border-amber-200 bg-amber-50 text-amber-700"
         : "border-[#d5d8de] bg-white text-[#6b7280]";
   return <span className={`rounded border px-1.5 py-0.5 text-[10px] font-medium uppercase ${styles}`}>{outcome}</span>;
+}
+
+function ChangeRationaleBlock({ experiment }: { experiment: Experiment }) {
+  const [copied, setCopied] = useState(false);
+  const rationale = experiment.rationale;
+  if (!rationale) return null;
+  return (
+    <div className="space-y-2 rounded border border-[#dbe7ff] bg-[#f8fbff] p-3 text-[#374151]">
+      <p className="font-medium text-[#111827]">Why Kismet thinks this helps</p>
+      <p className="leading-5">{rationale.reasoning}</p>
+      <ul className="space-y-1">
+        {rationale.evidence.map((item, index) => <li key={`${item.source}-${index}`}>“{item.quote}” <span className="text-[#6b7280]">— {item.source}</span></li>)}
+      </ul>
+      <p><span className="font-medium">Confidence: {rationale.confidence === "high" ? "High" : "Medium"}</span> — {rationale.confidenceReason}</p>
+      <p><span className="font-medium">What could go wrong:</span> {rationale.risks}</p>
+      {rationale.question && (
+        <div className="rounded border border-[#e1e4e8] bg-white p-2">
+          <p><span className="font-medium">Ask your users:</span> “{rationale.question}”</p>
+          <Button size="sm" variant="outline" className="mt-2" onClick={() => {
+            void navigator.clipboard.writeText(rationale.question ?? "").then(() => setCopied(true));
+          }}>{copied ? "Copied" : "Copy"}</Button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function Decisions({
@@ -347,7 +375,7 @@ function Decisions({
           <>
             <Button size="sm" className="bg-[#111] text-white hover:bg-[#2a2a2a]" onClick={onApprove} disabled={busy !== null}>
               {busy === id + "approve" && <Loader2 className="animate-spin" />}
-              Approve & ship
+              {experiment.kind === "change" ? "Approve & ship to everyone" : "Approve & ship"}
             </Button>
             <Button size="sm" variant="outline" onClick={onReject} disabled={busy !== null}>
               Discard change
@@ -409,6 +437,30 @@ function Links({ experiment }: { experiment: Experiment | null }) {
         </a>
       )}
     </div>
+  );
+}
+
+function ChangeFollowUp({ experiment }: { experiment: Experiment }) {
+  const result = experiment.directional;
+  const rate = (count: { visitors: number; conversions: number }) => count.visitors ? count.conversions / count.visitors : null;
+  const display = (value: number | null) => value == null ? "—" : `${(value * 100).toFixed(1)}%`;
+  return (
+    <section className="px-4 py-5 text-[#374151]">
+      <div className="rounded border border-[#e1e4e8] p-4">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-sm font-medium text-[#111827]">Follow-up</h2>
+          {result && <span className="rounded border border-[#d5d8de] bg-[#f8fafc] px-2 py-0.5 text-xs text-[#6b7280]">Directional, not proven</span>}
+        </div>
+        {!result ? (
+          <p className="mt-3 text-sm">Ships to everyone behind a switch; Kismet checks the before/after for {experiment.metric} after 14 days.</p>
+        ) : (
+          <div className="mt-4 grid max-w-lg grid-cols-2 gap-4">
+            <div className="rounded bg-[#f8fafc] p-3"><p className="text-xs text-[#6b7280]">14 days before</p><p className="mt-1 text-2xl font-medium">{display(rate(result.before))}</p><p className="text-xs text-[#6b7280]">{result.before.conversions} conversions · {result.before.visitors} visitors</p></div>
+            <div className="rounded bg-[#f8fafc] p-3"><p className="text-xs text-[#6b7280]">After shipping</p><p className="mt-1 text-2xl font-medium">{display(rate(result.after))}</p><p className="text-xs text-[#6b7280]">{result.after.conversions} conversions · {result.after.visitors} visitors</p></div>
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 

@@ -2,6 +2,7 @@ import type { Experiment, Learning, LearningOutcome } from "@/lib/autopilot/type
 
 export function outcomeFor(experiment: Experiment): LearningOutcome {
   if (experiment.status === "rejected" && experiment.rejectedBy !== "kismet") return "rejected";
+  if (experiment.kind === "change" && experiment.startedAt) return "directional";
   const verdict = experiment.readout?.verdict;
   if (experiment.status === "rolled_out") {
     return verdict === "lost" || verdict === "flat" ? verdict : "won";
@@ -32,6 +33,12 @@ export function fallbackLearning(experiment: Experiment, outcome: LearningOutcom
   const page = experiment.page || "the tested page";
   const metric = experiment.metric || "the target metric";
   const lift = experiment.readout?.lift;
+  if (outcome === "directional") {
+    const before = experiment.directional?.before;
+    const after = experiment.directional?.after;
+    const rate = (count: typeof before) => count?.visitors ? `${(count.conversions / count.visitors * 100).toFixed(1)}%` : "—";
+    return `After shipping ${change} to everyone on ${page}, ${metric} moved from ${rate(before)} to ${rate(after)} (not a controlled test).`;
+  }
   if (outcome === "rejected") return `A person rejected this change before it ran: ${change}.`;
   if (outcome === "flat") return `Showing ${change} on ${page} made no measurable difference to ${metric}${evidence(experiment)}.`;
   if (outcome === "inconclusive") return `Showing ${change} on ${page} did not collect enough evidence to determine its effect on ${metric}${evidence(experiment)}.`;

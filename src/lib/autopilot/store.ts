@@ -7,6 +7,7 @@ import { isOutsideBuilder, type OutsideBuilder } from "@/lib/autopilot/builders"
 import { ANALYTICS_FRESH_DAYS, ELEMENT_GONE_DAYS, otherFreshDays } from "@/lib/autopilot/freshness";
 import type { ResultEstimate } from "@/lib/autopilot/power";
 import type { ChangeSummary } from "@/lib/autopilot/change-summary";
+import { formatJourneys, type JourneyEvent } from "@/lib/autopilot/journeys";
 import {
   READY_MIN_EVIDENCE,
   READY_MIN_SOURCES,
@@ -66,6 +67,7 @@ function toExperiment(row: Row): Experiment {
     id: String(row.id),
     signalId: String(row.signal_id),
     version: Number(row.version),
+    kind: row.kind === "change" ? "change" : "test",
     title: String(row.title),
     hypothesis: String(row.hypothesis ?? ""),
     metric: String(row.metric ?? ""),
@@ -84,6 +86,8 @@ function toExperiment(row: Row): Experiment {
     prNumber: row.pr_number == null ? null : Number(row.pr_number),
     note: (row.note as string | null) ?? null,
     readout: (row.readout as Readout | null) ?? null,
+    rationale: (row.rationale as Experiment["rationale"]) ?? null,
+    directional: (row.directional as Experiment["directional"]) ?? null,
     estimate: (row.estimate as ResultEstimate | null) ?? null,
     draftPath: (row.draft_path as string | null) ?? null,
     coderSessionId: (row.coder_session_id as string | null) ?? null,
@@ -374,16 +378,18 @@ export async function createExperiment(input: {
   treatment: string;
   flag: string;
   estimate: ResultEstimate;
+  kind?: Experiment["kind"];
+  rationale?: Experiment["rationale"];
 }): Promise<string> {
   const sql = await db();
   const id = newId("exp");
   await sql`
     insert into kismet.experiments
-      (id, user_id, signal_id, version, title, hypothesis, metric, metric_spec, page, guardrail, control, treatment, flag, estimate, status)
+      (id, user_id, signal_id, version, kind, title, hypothesis, metric, metric_spec, page, guardrail, control, treatment, flag, estimate, rationale, status)
     values
-      (${id}, ${scopeUser()}, ${input.signalId}, ${input.version}, ${input.title.slice(0, 200)}, ${input.hypothesis.slice(0, 1000)},
+      (${id}, ${scopeUser()}, ${input.signalId}, ${input.version}, ${input.kind ?? "test"}, ${input.title.slice(0, 200)}, ${input.hypothesis.slice(0, 1000)},
        ${input.metric.slice(0, 120)}, ${sql.json(input.metricSpec)}, ${input.page.slice(0, 200)}, ${input.guardrail.slice(0, 300)}, ${input.control.slice(0, 500)},
-       ${input.treatment.slice(0, 500)}, ${input.flag}, ${sql.json(input.estimate as never)}, 'building')
+       ${input.treatment.slice(0, 500)}, ${input.flag}, ${sql.json(input.estimate as never)}, ${input.rationale ? sql.json(input.rationale as never) : null}, 'building')
   `;
   return id;
 }
@@ -398,6 +404,7 @@ export async function updateExperiment(
     branch: string | null;
     note: string | null;
     readout: Readout | null;
+    directional: Experiment["directional"];
     draftPath: string | null;
     coderSessionId: string | null;
     agentFailed: boolean;
@@ -426,6 +433,7 @@ export async function updateExperiment(
   if (patch.branch !== undefined) columns.branch = patch.branch;
   if (patch.note !== undefined) columns.note = patch.note;
   if (patch.readout !== undefined) columns.readout = patch.readout === null ? null : sql.json(patch.readout as never);
+  if (patch.directional !== undefined) columns.directional = patch.directional === null ? null : sql.json(patch.directional as never);
   if (patch.draftPath !== undefined) columns.draft_path = patch.draftPath;
   if (patch.coderSessionId !== undefined) columns.coder_session_id = patch.coderSessionId;
   if (patch.agentFailed !== undefined) columns.agent_failed = patch.agentFailed;
@@ -633,6 +641,34 @@ export interface MetricBaseline {
   weeklyVisitors: number;
 }
 
+/** Account-wide metric counts for an explicit half-open time window. */
+export async function metricWindow(spec: MetricSpec, from: string, to: string): Promise<MetricBaseline> {
+  const sql = await db();
+  const userId = scopeUser();
+  const converts = spec.kind === "click"
+    ? sql`e.name = 'click' and e.element ilike ${"%" + spec.text + "%"}`
+    : sql`e.name = 'view' and e.page like ${spec.path.replace(/[%_]/g, "") + "%"}`;
+  const [row] = await sql`
+    with mode as (
+      select not exists (
+        select 1 from kismet.events where user_id = ${userId} and at >= ${from} and at < ${to} and synthetic = false
+      ) as include_synthetic
+    ), active as (
+      select distinct visitor from kismet.events, mode
+      where user_id = ${userId} and at >= ${from} and at < ${to} and (not synthetic or mode.include_synthetic)
+    ), converted as (
+      select distinct e.visitor from kismet.events e, mode
+      where e.user_id = ${userId} and e.at >= ${from} and e.at < ${to}
+        and (not e.synthetic or mode.include_synthetic) and ${converts}
+    )
+    select count(*)::int as visitors, count(c.visitor)::int as conversions
+    from active a left join converted c on c.visitor = a.visitor
+  `;
+  const visitors = Number(row?.visitors ?? 0);
+  const days = Math.max(1, (Date.parse(to) - Date.parse(from)) / 86_400_000);
+  return { visitors, conversions: Number(row?.conversions ?? 0), weeklyVisitors: visitors * 7 / days };
+}
+
 /** Account-wide baseline using the same visitor/conversion semantics as experiment measurement. */
 export async function metricBaseline(spec: MetricSpec, days = 14): Promise<MetricBaseline> {
   const sql = await db();
@@ -661,6 +697,40 @@ export async function metricBaseline(spec: MetricSpec, days = 14): Promise<Metri
   `;
   const visitors = Number(row?.visitors ?? 0);
   return { visitors, conversions: Number(row?.conversions ?? 0), weeklyVisitors: visitors * 7 / safeDays };
+}
+
+/** Recent ordered journeys, preferring real traffic and anonymizing visitor identifiers. */
+export async function recentJourneys(days = 14, limit = 12): Promise<string[]> {
+  const sql = await db();
+  const userId = scopeUser();
+  const safeDays = Math.max(1, Math.min(90, Math.floor(days)));
+  const safeLimit = Math.max(1, Math.min(50, Math.floor(limit)));
+  const rows = await sql`
+    with mode as (
+      select not exists (
+        select 1 from kismet.events where user_id = ${userId}
+          and at >= now() - make_interval(days => ${safeDays}::int) and synthetic = false
+      ) as include_synthetic
+    ), eligible as (
+      select e.* from kismet.events e, mode where e.user_id = ${userId}
+        and e.at >= now() - make_interval(days => ${safeDays}::int)
+        and (not e.synthetic or mode.include_synthetic)
+    ), chosen as (
+      select visitor, max(at) as latest, count(distinct at::date)::int as visits
+      from eligible group by visitor order by latest desc limit ${safeLimit}::int
+    ), firsts as (
+      select visitor, min(at) as first_at
+      from kismet.events where user_id = ${userId} group by visitor
+    )
+    select e.visitor, e.name, e.page, e.element, e.at, f.first_at, c.visits
+    from eligible e join chosen c on c.visitor = e.visitor join firsts f on f.visitor = e.visitor
+    order by c.latest desc, e.at asc
+  `;
+  const windowStart = new Date(Date.now() - safeDays * 86_400_000).toISOString();
+  return formatJourneys(rows.map((row) => ({
+    visitor: String(row.visitor), name: row.name as JourneyEvent["name"], page: String(row.page ?? ""),
+    element: String(row.element ?? ""), at: iso(row.at), firstAt: iso(row.first_at), windowStart, visits: Number(row.visits),
+  })));
 }
 
 export async function snoozeSignal(id: string): Promise<void> {

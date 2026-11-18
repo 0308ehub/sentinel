@@ -289,7 +289,7 @@ export function ExperimentBoard({
                       </div>
                       <div className="text-xs text-[#9aa0a8]">{row.key}</div>
                     </td>
-                    <td className="whitespace-nowrap">A/B Test</td>
+                    <td className="whitespace-nowrap">{row.kind === "experiment" && row.experiment.kind === "change" ? "Change" : "A/B Test"}</td>
                     <td>{row.feature}</td>
                     <td>
                       <Env live={row.live} muted={row.suggested} />

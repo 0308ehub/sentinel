@@ -105,6 +105,9 @@ alter table kismet.experiments add column if not exists build_started_at timesta
 alter table kismet.experiments add column if not exists estimate jsonb;
 alter table kismet.experiments add column if not exists rejected_by text;
 alter table kismet.experiments add column if not exists change_summary jsonb;
+alter table kismet.experiments add column if not exists kind text not null default 'test';
+alter table kismet.experiments add column if not exists rationale jsonb;
+alter table kismet.experiments add column if not exists directional jsonb;
 alter table kismet.signals add column if not exists snoozed_until timestamptz;
 
 create table if not exists kismet.autopilot_learnings (

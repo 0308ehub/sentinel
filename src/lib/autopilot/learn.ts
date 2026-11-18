@@ -12,7 +12,9 @@ export async function learnFromFinished(): Promise<string | null> {
   const learned: string[] = [];
   for (const experiment of experiments) {
     const outcome = outcomeFor(experiment);
-    const visitors = experiment.readout?.arms.reduce((sum, arm) => sum + arm.visitors, 0) ?? null;
+    const visitors = experiment.kind === "change"
+      ? experiment.directional?.after.visitors ?? null
+      : experiment.readout?.arms.reduce((sum, arm) => sum + arm.visitors, 0) ?? null;
     const problem = signals.find((signal) => signal.id === experiment.signalId)?.title ?? "Unknown problem";
     let learning: string;
     try {
@@ -20,12 +22,13 @@ export async function learnFromFinished(): Promise<string | null> {
         "Write one or two sentences a product manager would keep as an experiment learning.",
         "Say what changed, what happened to the metric including the numeric result and certainty when available,",
         "and what this suggests trying or avoiding next. Return JSON: {learning}.",
+        experiment.kind === "change" ? "This was shipped to everyone and followed up with a directional before/after, not a controlled test. Say that plainly and do not claim causation." : "",
       ].join(" ");
       const user = JSON.stringify({ problem, experiment: {
         title: experiment.title, hypothesis: experiment.hypothesis, control: experiment.control,
         treatment: experiment.treatment, metric: experiment.metric, page: experiment.page,
         guardrail: experiment.guardrail, note: experiment.note, outcome,
-        readout: experiment.readout, estimate: experiment.estimate,
+        readout: experiment.readout, directional: experiment.directional, estimate: experiment.estimate,
       } });
       const answer = readJson<LearningAnswer>(await askForJson(system, user, false, undefined, "experiment"));
       if (!answer.learning?.trim()) throw new Error("The learning was empty.");

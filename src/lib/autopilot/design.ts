@@ -3,7 +3,7 @@ import "server-only";
 import { askForJson, readJson } from "@/lib/ai/respond";
 import { describeMetric, parseMetricSpec } from "@/lib/autopilot/assign";
 import { relevantLearnings } from "@/lib/autopilot/learning-core";
-import { createExperiment, interviewContext, listExperiments, listGoals, listLearnings, listSignals, log, metricBaseline, setSignalStatus, snoozeSignal } from "@/lib/autopilot/store";
+import { createExperiment, interviewContext, listExperiments, listGoals, listLearnings, listSignals, log, metricBaseline, recentJourneys, setSignalStatus, snoozeSignal } from "@/lib/autopilot/store";
 import { daysToResult, type ResultEstimate } from "@/lib/autopilot/power";
 import { maxExperimentDays, relativeMde } from "@/lib/autopilot/thresholds";
 import type { Experiment, Signal } from "@/lib/autopilot/types";
@@ -47,6 +47,15 @@ interface DesignAnswer {
   metric?: unknown;
   page?: string;
   guardrail?: string;
+}
+
+interface ChangeAnswer extends DesignAnswer {
+  reasoning?: string;
+  evidence?: Array<{ source?: string; quote?: string }>;
+  confidence?: "high" | "medium" | "low";
+  confidenceReason?: string;
+  risks?: string;
+  question?: string;
 }
 
 function attemptsSummary(previous: Experiment[]): string {
@@ -122,11 +131,50 @@ async function designCandidate(candidate: Signal, experiments: Experiment[], per
   const { answer, spec, estimate } = proposed;
   if (!answer.title || !answer.treatment || !spec) throw new Error("The experiment design was missing a title, change or metric.");
   if (estimate.days > maxDays && !personApproved) {
-    await snoozeSignal(candidate.id);
-    const days = Number.isFinite(estimate.days) ? estimate.days : "infinite";
-    const message = `“${answer.title}” needs about ${days} days of traffic to show a result; Kismet will look again next week.`;
-    await log("design", message, candidate.id);
-    return message;
+    const journeys = await recentJourneys();
+    const changeSystem = [
+      "You are an autonomous product manager working in evidence-backed change mode.",
+      "There is not enough traffic for an A/B test. Propose one small, reversible UI change that the evidence strongly supports.",
+      "Cite the specific evidence and journeys that support it with 2–6 evidence items.",
+      "Judge confidence honestly: high = several independent pieces of evidence point the same way and the fix follows directly; medium = solid but indirect; low = speculative.",
+      "Say what could go wrong. Optionally draft one short question to ask users that would most reduce the uncertainty.",
+      "metric is the outcome to check before and after the change (prefer one of the GOALS). It must be exactly one of:",
+      '{"kind":"click","text":"<visible label of a button or link that exists before and after the change>"}',
+      'or {"kind":"visit","path":"/some/path"}. page is the route the change appears on, like /settings/connectors.',
+      'Return JSON: {title, hypothesis, control, treatment, metric, page, guardrail, reasoning, evidence:[{source, quote}], confidence, confidenceReason, risks, question}.',
+    ].join(" ");
+    const changeText = await askForJson(changeSystem, `${user}\n\nJOURNEYS\n${journeys.length ? journeys.join("\n") : "No recent journeys."}`, false, undefined, "experiment");
+    const change = readJson<ChangeAnswer>(changeText);
+    const changeSpec = parseMetricSpec(change.metric);
+    const cited = (change.evidence ?? []).filter((item) => item.source?.trim() && item.quote?.trim()).slice(0, 6);
+    if (!change.title || !change.treatment || !changeSpec) throw new Error("The evidence-backed change was missing a title, change or metric.");
+    if (change.confidence === "low" || cited.length === 0 || !change.confidence) {
+      await snoozeSignal(candidate.id);
+      const message = `Not enough evidence to change anything for “${candidate.title}” yet; Kismet will look again next week.`;
+      await log("design", message, candidate.id);
+      return message;
+    }
+    const baseline = await metricBaseline(changeSpec);
+    const baselineRate = baseline.visitors ? baseline.conversions / baseline.visitors : 0;
+    const relative = relativeMde();
+    const result = daysToResult({ weeklyVisitors: baseline.weeklyVisitors, baselineRate, relativeMde: relative });
+    proposed = { answer: change, spec: changeSpec, estimate: { baselineRate, weeklyVisitors: baseline.weeklyVisitors, relativeMde: relative, ...result, at: new Date().toISOString() } };
+    const version = previous.length + 1;
+    await createExperiment({
+      signalId: candidate.id, version, kind: "change", title: change.title, hypothesis: change.hypothesis ?? "",
+      metric: describeMetric(changeSpec), metricSpec: changeSpec,
+      page: change.page?.trim().startsWith("/") ? change.page.trim() : candidate.area,
+      guardrail: change.guardrail ?? "", control: change.control ?? "", treatment: change.treatment,
+      flag: `ap-${slug(change.title)}-v${version}`, estimate: proposed.estimate,
+      rationale: {
+        reasoning: change.reasoning?.trim() ?? "", evidence: cited.map((item) => ({ source: item.source!.trim(), quote: item.quote!.trim() })),
+        confidence: change.confidence, confidenceReason: change.confidenceReason?.trim() ?? "", risks: change.risks?.trim() ?? "",
+        ...(change.question?.trim() ? { question: change.question.trim() } : {}),
+      },
+    });
+    await setSignalStatus(candidate.id, "experimenting");
+    await log("design", `Proposed a change “${change.title}” for “${candidate.title}”.`, candidate.id);
+    return `Proposed a change for “${candidate.title}”.`;
   }
 
   const version = previous.length + 1;

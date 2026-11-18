@@ -76,6 +76,21 @@ export interface Readout {
   at: string;
 }
 
+export interface ChangeRationale {
+  reasoning: string;
+  evidence: Array<{ source: string; quote: string }>;
+  confidence: "high" | "medium";
+  confidenceReason: string;
+  risks: string;
+  question?: string;
+}
+
+export interface DirectionalResult {
+  before: { visitors: number; conversions: number };
+  after: { visitors: number; conversions: number };
+  at: string;
+}
+
 /**
  * Removing the experiment switch once the decision is made: keep the winner (rolled out) or the
  * original (turned off). "awaiting" means the change is ready and waits for your approval.
@@ -94,6 +109,7 @@ export interface Experiment {
   id: string;
   signalId: string;
   version: number;
+  kind: "test" | "change";
   title: string;
   hypothesis: string;
   metric: string;
@@ -114,6 +130,8 @@ export interface Experiment {
   prNumber: number | null;
   note: string | null;
   readout: Readout | null;
+  rationale: ChangeRationale | null;
+  directional: DirectionalResult | null;
   estimate: ResultEstimate | null;
   /** The file the change edits. In dry-run mode the change is stored, not pushed. */
   draftPath: string | null;
@@ -130,7 +148,7 @@ export interface Experiment {
   endedAt: string | null;
 }
 
-export type LearningOutcome = "won" | "lost" | "flat" | "inconclusive" | "rejected";
+export type LearningOutcome = "won" | "lost" | "flat" | "inconclusive" | "rejected" | "directional";
 
 export interface Learning {
   id: string;

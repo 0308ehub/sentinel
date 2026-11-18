@@ -12,6 +12,18 @@ import { closePull, deleteBranch, mergePull } from "@/lib/github/client";
  * experiments on the same page or metric. If there's no room yet, it queues and starts later.
  */
 export async function startExperiment(experiment: Experiment): Promise<boolean> {
+  if (experiment.kind === "change") {
+    await setFlag(experiment.flag, "rolled_out", 100);
+    await updateExperiment(experiment.id, {
+      status: "running",
+      startedAt: new Date().toISOString(),
+      overlap: null,
+      note: "Shipped to everyone. Turn it off any time.",
+    });
+    await setSignalStatus(experiment.signalId, "experimenting");
+    await log("gate", `Shipped “${experiment.title}” to everyone behind a switch.`, experiment.id);
+    return true;
+  }
   const placement = await place(experiment);
   if (placement.kind === "wait") {
     await updateExperiment(experiment.id, { status: "queued", overlap: placement.note, note: "Shipped, waiting for its turn." });

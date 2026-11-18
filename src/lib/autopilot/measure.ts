@@ -1,8 +1,9 @@
 import "server-only";
 
 import { stop } from "@/lib/autopilot/lifecycle";
+import { directionalNote } from "@/lib/autopilot/directional";
 import { findInteraction } from "@/lib/autopilot/overlap";
-import { countArms, listExperiments, log, updateExperiment } from "@/lib/autopilot/store";
+import { countArms, listExperiments, log, metricWindow, setSignalStatus, updateExperiment } from "@/lib/autopilot/store";
 import type { Experiment, Readout } from "@/lib/autopilot/types";
 
 const MIN_VISITORS = Number(process.env.AUTOPILOT_MIN_VISITORS) || 200;
@@ -67,6 +68,31 @@ export async function measureRunning(): Promise<string | null> {
   const running = (await listExperiments()).filter((e) => e.status === "running");
   const results: string[] = [];
   for (const experiment of running) {
+    if (experiment.kind === "change") {
+      if (!experiment.metricSpec || !experiment.startedAt) continue;
+      const started = Date.parse(experiment.startedAt);
+      const ageDays = (Date.now() - started) / 86_400_000;
+      if (ageDays < 7) continue;
+      const after = await metricWindow(experiment.metricSpec, experiment.startedAt, new Date().toISOString());
+      if (ageDays < 14 && after.visitors < 40) continue;
+      const before = await metricWindow(
+        experiment.metricSpec,
+        new Date(started - 14 * 86_400_000).toISOString(),
+        experiment.startedAt,
+      );
+      const directional = {
+        before: { visitors: before.visitors, conversions: before.conversions },
+        after: { visitors: after.visitors, conversions: after.conversions },
+        at: new Date().toISOString(),
+      };
+      await updateExperiment(experiment.id, {
+        status: "rolled_out", directional, endedAt: directional.at, note: directionalNote(before, after),
+      });
+      await setSignalStatus(experiment.signalId, "resolved");
+      await log("measure", `Followed up on “${experiment.title}” with a directional before/after.`, experiment.id);
+      results.push(`Followed up on “${experiment.title}” (directional only).`);
+      continue;
+    }
     // The experiment it interacted with has finished: start counting again, so the result reflects only
     // what people will actually see from now on.
     if (experiment.readout?.interaction && !(await findInteraction(experiment))) {
