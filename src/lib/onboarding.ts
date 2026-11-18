@@ -136,7 +136,7 @@ export function destinationAfterSignIn(): string {
   const draft = readOnboarding();
   if (draft.completed) return "/ai";
   if (draft.started) return `/onboarding/${draft.step}`;
-  return "/ai";
+  return "/onboarding/you";
 }
 
 export function initialsFor(name: string): string {

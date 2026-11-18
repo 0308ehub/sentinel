@@ -13,6 +13,7 @@ export default function SignUpPage() {
           path="/sign-up"
           signInUrl="/sign-in"
           forceRedirectUrl="/onboarding/you"
+          fallbackRedirectUrl="/onboarding/you"
           appearance={authAppearance}
         />
       ) : (

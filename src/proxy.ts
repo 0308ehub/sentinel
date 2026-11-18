@@ -41,8 +41,15 @@ const clerkProxy = clerkMiddleware(
   async (auth, request) => {
     const { userId } = await auth();
 
-    if (userId && (request.nextUrl.pathname.startsWith("/sign-in") || request.nextUrl.pathname.startsWith("/sign-up"))) {
-      return NextResponse.redirect(new URL("/ai", request.url));
+    // A Clerk handshake has to finish on the URL it landed on. Redirecting it
+    // drops the session, so the homepage looks signed out until Sign in is clicked again.
+    const handshake = ["__clerk_handshake", "__clerk_handshake_nonce", "__clerk_db_jwt", "__dev_session", "__clerk_synced"].some(
+      (key) => request.nextUrl.searchParams.has(key),
+    );
+    const path = request.nextUrl.pathname;
+    if (userId && !handshake && (path === "/" || path.startsWith("/sign-in") || path.startsWith("/sign-up"))) {
+      const next = path.startsWith("/sign-up") ? "/onboarding/you" : "/enter";
+      return NextResponse.redirect(new URL(next, request.url));
     }
 
     if (!isPublicRoute(request) && !isCronRequest(request) && !userId) {

@@ -38,7 +38,7 @@ export function KeylessAuth({ mode }: { mode: "sign-in" | "sign-up" }) {
         Authentication is disabled in this local environment.
       </p>
       <Link
-        href={signingIn ? "/ai" : "/onboarding/you"}
+        href={signingIn ? "/enter" : "/onboarding/you"}
         className="mt-6 flex h-11 w-full items-center justify-center rounded-md bg-foreground text-sm font-semibold text-background transition-colors hover:bg-[#2a2a2a]"
       >
         Continue

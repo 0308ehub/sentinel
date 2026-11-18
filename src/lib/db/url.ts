@@ -1,4 +1,4 @@
-/** Connection string for the Postgres database. Supabase is Postgres, so either paste works. */
+/** Kismet's own Postgres. A pasted URI wins. Otherwise a Supabase project URL plus its database password becomes the direct connection. */
 export function resolveDatabaseUrl(env: NodeJS.ProcessEnv = process.env): string | null {
   const pasted = [env.KISMET_DATABASE_URL, env.DATABASE_URL, env.SUPABASE_DB_URL];
   for (const value of pasted) {
@@ -13,12 +13,7 @@ export function resolveDatabaseUrl(env: NodeJS.ProcessEnv = process.env): string
   const password = env.SUPABASE_DB_PASSWORD?.trim();
   if (!ref || !password) return null;
 
-  const pass = encodeURIComponent(password);
-  const region = env.SUPABASE_REGION?.trim() ?? "";
-  if (/^[a-z0-9-]+$/i.test(region)) {
-    return `postgresql://postgres.${ref}:${pass}@aws-0-${region}.pooler.supabase.com:6543/postgres`;
-  }
-  return `postgresql://postgres:${pass}@db.${ref}.supabase.co:5432/postgres`;
+  return `postgresql://postgres:${encodeURIComponent(password)}@db.${ref}.supabase.co:5432/postgres`;
 }
 
 /** Transaction poolers reject prepared statements, so the client has to turn them off. */

@@ -23,6 +23,7 @@ export default function robots(): MetadataRoute.Robots {
           "/decisions",
           "/settings",
           "/onboarding",
+          "/enter",
           "/p/",
           "/sign-in",
           "/sign-up",

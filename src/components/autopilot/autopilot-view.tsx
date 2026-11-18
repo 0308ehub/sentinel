@@ -210,7 +210,7 @@ export function AutopilotView() {
 
           {!state.configured || state.error ? (
             <p className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-              {state.error ?? "Kismet needs a database. Set KISMET_DATABASE_URL and restart."}
+              {state.error ?? "Kismet needs a database. Set DATABASE_URL and restart."}
             </p>
           ) : (
             <p className="text-sm">

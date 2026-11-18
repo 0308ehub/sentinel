@@ -70,7 +70,15 @@ export default async function RootLayout({
         suppressHydrationWarning
       >
         {process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? (
-          <ClerkProvider>{content}</ClerkProvider>
+          <ClerkProvider
+            signInUrl="/sign-in"
+            signUpUrl="/sign-up"
+            signInFallbackRedirectUrl="/enter"
+            signUpFallbackRedirectUrl="/onboarding/you"
+            signUpForceRedirectUrl="/onboarding/you"
+          >
+            {content}
+          </ClerkProvider>
         ) : (
           content
         )}

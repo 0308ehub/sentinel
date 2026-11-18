@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SignedInRedirect } from "@/components/auth/signed-in-redirect";
 import { ExperimentDemo } from "@/components/marketing/experiment-demo";
 import { FeatureBento } from "@/components/marketing/feature-bento";
 import { MarketingFrame } from "@/components/marketing/marketing-frame";
@@ -8,6 +9,7 @@ import { TopoField } from "@/components/marketing/topo-field";
 export function LandingView() {
   return (
     <MarketingFrame>
+      <SignedInRedirect />
       <main>
         <section className="mx-auto max-w-[1200px] px-6 pb-2 pt-14 md:px-8 md:pt-20">
           <h1 className="max-w-[16em] text-left text-[clamp(1.85rem,3vw,2.6rem)] font-medium leading-[1.18] tracking-[-0.035em] text-[#141414]">

@@ -7,17 +7,14 @@ test("a pasted postgres URI is used as the database", () => {
   assert.equal(resolveDatabaseUrl({ DATABASE_URL: url }), url);
 });
 
-test("a project URL and password build a pooler URI when the region is set", () => {
+test("a project URL and password build the direct connection", () => {
   const url = resolveDatabaseUrl({
     SUPABASE_URL: "https://abcd1234.supabase.co",
     SUPABASE_DB_PASSWORD: "p@ss word",
     SUPABASE_REGION: "us-east-1",
   });
-  assert.equal(
-    url,
-    "postgresql://postgres.abcd1234:p%40ss%20word@aws-0-us-east-1.pooler.supabase.com:6543/postgres",
-  );
-  assert.equal(pooledDatabase(url ?? ""), true);
+  assert.equal(url, "postgresql://postgres:p%40ss%20word@db.abcd1234.supabase.co:5432/postgres");
+  assert.equal(pooledDatabase(url ?? ""), false);
 });
 
 test("the project page is not treated as a postgres URI", () => {
