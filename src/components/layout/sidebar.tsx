@@ -191,7 +191,8 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        "flex h-full flex-col border-r border-sidebar-border bg-sidebar transition-all duration-200",
+        // shrink-0: wide pages (like an experiment's results table) must scroll, not squeeze the sidebar.
+        "flex h-full shrink-0 flex-col border-r border-sidebar-border bg-sidebar transition-all duration-200",
         sidebarCollapsed ? "w-14" : "w-56"
       )}
     >

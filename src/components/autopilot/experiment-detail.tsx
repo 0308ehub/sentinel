@@ -61,12 +61,12 @@ export function ExperimentDetail({
           ‹ Experiments
         </button>
         <div>
-          <h1 className={`text-xl leading-tight ${suggested ? "text-[#9aa0a8]" : ""}`}>{title}</h1>
+          <h1 className="text-xl leading-tight text-[#111827]">{title}</h1>
           <p className="mt-2 text-xs text-[#6b7280]">
-            A/B Test · <span className={status === "Running" ? "text-[#1f9d55]" : suggested ? "text-[#9aa0a8]" : ""}>{status}</span>
+            A/B Test · <span className={status === "Running" ? "text-[#1f9d55]" : "text-[#374151]"}>{status}</span>
           </p>
           {suggested && (
-            <p className="mt-2 inline-flex rounded border border-[#d5d8de] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[#8b909a]">
+            <p className="mt-2 inline-flex rounded border border-[#c7d7fe] bg-[#eef4ff] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[#2563eb]">
               Suggested
             </p>
           )}
@@ -93,7 +93,7 @@ export function ExperimentDetail({
           onDismissSignal={onDismissSignal}
         />
       </aside>
-      <div className={`min-w-0 flex-1 overflow-auto ${suggested ? "bg-[#f7f8fa]" : ""}`}>
+      <div className="min-w-0 flex-1 overflow-auto">
         <ResultsCanvas
           experiment={experiment}
           signal={signal}
@@ -275,7 +275,7 @@ function ResultsCanvas({
   const compare = control && treatment ? rateInterval(control, treatment) : null;
   const start = experiment?.startedAt ?? experiment?.createdAt ?? signal?.createdAt ?? null;
   return (
-    <div className={muted ? "text-[#a0a6ae]" : ""}>
+    <div className="text-[#374151]">
       <div className="flex flex-wrap items-center gap-3 border-b border-[#e6e8ec] px-4 py-3 text-xs text-[#6b7280]">
         <ToolbarLabel label="Date range" value={rangeLabel(start)} />
         <ToolbarLabel label="Segment" value="All visitors" />
@@ -283,7 +283,7 @@ function ResultsCanvas({
         <ToolbarLabel label="Metric" value={experiment?.metric || "Conversion"} />
         {muted && <span className="ml-auto text-[11px]">Results stay hidden until this suggestion is approved.</span>}
       </div>
-      <div className={`px-4 py-4 ${muted ? "opacity-60" : ""}`}>
+      <div className="px-4 py-4">
         <table className="w-full border-collapse text-left text-xs">
           <thead>
             <tr className="text-xs text-[#6b7280]">

@@ -22,7 +22,7 @@ export function AppShell({
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <Sidebar />
-      <div className="flex flex-1 flex-col overflow-hidden relative">
+      <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
         {header && <Header />}
         <PendingPrd />
         <main className="flex-1 overflow-hidden">{children}</main>
