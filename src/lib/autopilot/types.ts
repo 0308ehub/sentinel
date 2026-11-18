@@ -1,4 +1,5 @@
 import type { MetricSpec } from "@/lib/autopilot/assign";
+import type { OutsideBuilder } from "@/lib/autopilot/builders";
 
 export type EvidenceSource = "slack" | "ticket" | "analytics" | "interview";
 
@@ -100,6 +101,11 @@ export interface Experiment {
   draftPath: string | null;
   coderSessionId: string | null;
   agentFailed: boolean;
+  /** Set when the account's own coding agent writes the change: which one, its run, and where to watch it. */
+  builder: OutsideBuilder | null;
+  buildRef: string | null;
+  buildUrl: string | null;
+  buildStartedAt: string | null;
   cleanup: Cleanup | null;
   createdAt: string;
   startedAt: string | null;

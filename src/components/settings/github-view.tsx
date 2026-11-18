@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CodingAgentSection } from "@/components/settings/coding-agent-section";
 import { SettingsShell } from "@/components/settings/settings-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -157,6 +158,7 @@ export function GitHubView() {
               ))}
             </select>
           </div>
+          <CodingAgentSection repo={target} />
           <ul className="mt-4 divide-y divide-border rounded-xl border border-border">
             {(repos ?? []).length === 0 ? (
               <li className="px-3 py-3 text-sm text-muted-foreground">

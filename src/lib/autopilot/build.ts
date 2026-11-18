@@ -3,6 +3,8 @@ import "server-only";
 import { askForJson, readJson } from "@/lib/ai/respond";
 import { codeRules, pullBody } from "@/lib/autopilot/agent-task";
 import { agentBuildAvailable, startAgentBuild } from "@/lib/autopilot/agent-build";
+import { accountBuilder } from "@/lib/autopilot/builder-store";
+import { startDispatchBuild } from "@/lib/autopilot/dispatch-build";
 import { autopilotDryRun, autopilotRepo, defaultAutopilotRepo } from "@/lib/autopilot/repo";
 import { listExperiments, listSignals, log, setSignalStatus, updateExperiment } from "@/lib/autopilot/store";
 import type { Experiment, Signal } from "@/lib/autopilot/types";
@@ -88,8 +90,9 @@ async function writeChange(
 /** Writes the code change for one designed experiment and opens its pull request. */
 export async function buildNext(): Promise<string | null> {
   const experiments = await listExperiments();
-  // An experiment the coding agent is already building is followed by followAgentBuilds, never restarted here.
-  const experiment = experiments.find((e) => e.status === "building" && !e.prNumber && !e.coderSessionId);
+  // An experiment a coding agent is already building is followed by followAgentBuilds or
+  // followDispatchBuilds, never restarted here.
+  const experiment = experiments.find((e) => e.status === "building" && !e.prNumber && !e.coderSessionId && !e.buildRef);
   if (!experiment) return null;
   const signal = (await listSignals()).find((s) => s.id === experiment.signalId);
   const repo = await autopilotRepo();
@@ -103,6 +106,9 @@ export async function buildNext(): Promise<string | null> {
     await setSignalStatus(experiment.signalId, "open");
     return `Stopped “${experiment.title}”. The coding agent did not ship a change.`;
   }
+  // The account's own agent (Cursor or Claude Code) pushes to GitHub, so a dry run keeps to the paths below.
+  const builder = await accountBuilder();
+  if (builder !== "kismet" && !autopilotDryRun() && !isLocalSource()) return startDispatchBuild(experiment, signal, builder);
   if (await agentBuildAvailable()) return startAgentBuild(experiment, signal);
 
   try {

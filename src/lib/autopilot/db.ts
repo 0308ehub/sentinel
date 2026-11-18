@@ -95,6 +95,11 @@ alter table kismet.experiments add column if not exists cleanup_note text;
 alter table kismet.experiments add column if not exists coder_session_id text;
 alter table kismet.experiments add column if not exists agent_failed boolean not null default false;
 create index if not exists experiments_coder_session_idx on kismet.experiments (coder_session_id);
+-- A change written by the account's own coding agent (Cursor or Claude Code) instead of Kismet's.
+alter table kismet.experiments add column if not exists builder text;
+alter table kismet.experiments add column if not exists build_ref text;
+alter table kismet.experiments add column if not exists build_url text;
+alter table kismet.experiments add column if not exists build_started_at timestamptz;
 
 create table if not exists kismet.flags (
   key text primary key,
@@ -171,6 +176,13 @@ end $$;
 create table if not exists kismet.autopilot_repo (
   user_id text primary key,
   repo text not null,
+  updated_at timestamptz not null default now()
+);
+
+-- Which coding agent writes an account's experiments. No row means Kismet's own.
+create table if not exists kismet.autopilot_builder (
+  user_id text primary key,
+  builder text not null,
   updated_at timestamptz not null default now()
 );
 

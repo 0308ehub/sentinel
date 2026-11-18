@@ -592,6 +592,17 @@ function ExperimentCard({
       )}
       <div className="flex flex-wrap items-center gap-2">
         {actions}
+        {experiment.status === "building" && experiment.buildUrl && (
+          <a
+            href={experiment.buildUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground underline"
+          >
+            {experiment.builder === "cursor" ? "Watch it in Cursor" : "Watch the run on GitHub"}{" "}
+            <ExternalLink className="h-3 w-3" />
+          </a>
+        )}
         {experiment.draftPath && !experiment.prUrl && (
           <a
             href={`/api/autopilot/experiments/${experiment.id}/draft`}

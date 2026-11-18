@@ -3,6 +3,7 @@ import "server-only";
 import { db, newId } from "@/lib/autopilot/db";
 import { autopilotUser } from "@/lib/autopilot/scope";
 import { parseMetricSpec, type Arm, type FlagState, type MetricSpec } from "@/lib/autopilot/assign";
+import { isOutsideBuilder, type OutsideBuilder } from "@/lib/autopilot/builders";
 import {
   READY_MIN_EVIDENCE,
   READY_MIN_SOURCES,
@@ -78,6 +79,10 @@ function toExperiment(row: Row): Experiment {
     draftPath: (row.draft_path as string | null) ?? null,
     coderSessionId: (row.coder_session_id as string | null) ?? null,
     agentFailed: Boolean(row.agent_failed),
+    builder: isOutsideBuilder(row.builder) ? row.builder : null,
+    buildRef: (row.build_ref as string | null) ?? null,
+    buildUrl: (row.build_url as string | null) ?? null,
+    buildStartedAt: isoOrNull(row.build_started_at),
     cleanup: row.cleanup_status
       ? {
           status: row.cleanup_status as CleanupStatus,
@@ -247,6 +252,10 @@ export async function updateExperiment(
     draftPath: string | null;
     coderSessionId: string | null;
     agentFailed: boolean;
+    builder: OutsideBuilder | null;
+    buildRef: string | null;
+    buildUrl: string | null;
+    buildStartedAt: string | null;
     draft: string | null;
     original: string | null;
     cleanupStatus: CleanupStatus | null;
@@ -270,6 +279,10 @@ export async function updateExperiment(
   if (patch.draftPath !== undefined) columns.draft_path = patch.draftPath;
   if (patch.coderSessionId !== undefined) columns.coder_session_id = patch.coderSessionId;
   if (patch.agentFailed !== undefined) columns.agent_failed = patch.agentFailed;
+  if (patch.builder !== undefined) columns.builder = patch.builder;
+  if (patch.buildRef !== undefined) columns.build_ref = patch.buildRef;
+  if (patch.buildUrl !== undefined) columns.build_url = patch.buildUrl;
+  if (patch.buildStartedAt !== undefined) columns.build_started_at = patch.buildStartedAt;
   if (patch.draft !== undefined) columns.draft = patch.draft;
   if (patch.original !== undefined) columns.original = patch.original;
   if (patch.cleanupStatus !== undefined) columns.cleanup_status = patch.cleanupStatus;

@@ -7,6 +7,7 @@ import { currentUserId } from "@/lib/connections/current";
 import { isLocalSource, sourceLabel } from "@/lib/autopilot/source";
 import { buildNext, followPulls } from "@/lib/autopilot/build";
 import { followAgentBuilds } from "@/lib/autopilot/agent-build";
+import { followDispatchBuilds } from "@/lib/autopilot/dispatch-build";
 import { buildCleanup, followCleanups } from "@/lib/autopilot/cleanup";
 import { clusterEvidence } from "@/lib/autopilot/cluster";
 import { designNext } from "@/lib/autopilot/design";
@@ -92,6 +93,7 @@ async function runScopedTick(): Promise<TickResult> {
       // Before the gate: design the next experiment and build its PR.
       await step("design", result, designNext);
       await step("agent-build", result, followAgentBuilds);
+      await step("dispatch-build", result, followDispatchBuilds);
       await step("build", result, buildNext);
     }
 
@@ -99,6 +101,17 @@ async function runScopedTick(): Promise<TickResult> {
     return result;
   });
   return outcome ?? { ran: false, steps: ["Another run is already in progress."], errors: [] };
+}
+
+const DISPATCH_CHECK_MS = 30_000;
+const dispatchChecked = new Map<string, number>();
+
+/** An open page polls every few seconds; ask Cursor or GitHub about a build at most twice a minute. */
+function dispatchCheckDue(userId: string): boolean {
+  const now = Date.now();
+  if (now - (dispatchChecked.get(userId) ?? 0) < DISPATCH_CHECK_MS) return false;
+  dispatchChecked.set(userId, now);
+  return true;
 }
 
 export async function autopilotState(): Promise<AutopilotState> {
@@ -125,6 +138,13 @@ export async function autopilotState(): Promise<AutopilotState> {
         await followAgentBuilds().catch(async (error) => {
           const message = error instanceof Error ? error.message : String(error);
           await log("error", `agent-build failed: ${message}`).catch(() => {});
+        });
+      }
+      // The hourly run is too slow for a build that takes minutes, so an open page checks on it too.
+      if (before.some((experiment) => experiment.status === "building" && experiment.buildRef) && dispatchCheckDue(userId)) {
+        await followDispatchBuilds().catch(async (error) => {
+          const message = error instanceof Error ? error.message : String(error);
+          await log("error", `dispatch-build failed: ${message}`).catch(() => {});
         });
       }
       const [signals, experiments, activity, last, counts, repo, sampleEvidence] = await Promise.all([

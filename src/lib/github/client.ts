@@ -260,6 +260,98 @@ export async function openPullRequest(input: {
   return { number: pull.number, url: pull.html_url, branch: input.branch };
 }
 
+/** Creates a branch at the tip of `base`. A branch that already exists is left as it is. */
+export async function createBranch(fullName: string, branch: string, base: string): Promise<void> {
+  const parsed = repoName(fullName);
+  if (!parsed) throw new GitHubApiError("bad_repo", "Use a repository like owner/name.", 400);
+  const head = await github<{ object?: { sha?: string } }>(
+    `/repos/${parsed.owner}/${parsed.repo}/git/ref/heads/${encodeURIComponent(base)}`,
+  );
+  const sha = head.object?.sha;
+  if (!sha) throw new GitHubApiError("github_error", "GitHub did not return the base commit.", 502);
+  try {
+    await github(`/repos/${parsed.owner}/${parsed.repo}/git/refs`, {
+      method: "POST",
+      body: JSON.stringify({ ref: `refs/heads/${branch}`, sha }),
+    });
+  } catch (error) {
+    if (!(error instanceof GitHubApiError) || error.status !== 422) throw error;
+  }
+}
+
+export type WorkflowState = "ready" | "missing" | "disabled" | "forbidden";
+
+/** Whether a workflow file is on the default branch and can be started. */
+export async function workflowState(fullName: string, file: string): Promise<WorkflowState> {
+  const parsed = repoName(fullName);
+  if (!parsed) throw new GitHubApiError("bad_repo", "Use a repository like owner/name.", 400);
+  try {
+    const workflow = await github<{ state?: string }>(
+      `/repos/${parsed.owner}/${parsed.repo}/actions/workflows/${encodeURIComponent(file)}`,
+    );
+    return workflow.state === "active" ? "ready" : "disabled";
+  } catch (error) {
+    if (error instanceof GitHubApiError && error.status === 404) return "missing";
+    if (error instanceof GitHubApiError && error.status === 403) return "forbidden";
+    throw error;
+  }
+}
+
+/** Starts a workflow on `ref`. GitHub answers before the run exists; find it with listWorkflowRuns. */
+export async function dispatchWorkflow(
+  fullName: string,
+  file: string,
+  ref: string,
+  inputs: Record<string, string>,
+): Promise<void> {
+  const parsed = repoName(fullName);
+  if (!parsed) throw new GitHubApiError("bad_repo", "Use a repository like owner/name.", 400);
+  await github(`/repos/${parsed.owner}/${parsed.repo}/actions/workflows/${encodeURIComponent(file)}/dispatches`, {
+    method: "POST",
+    body: JSON.stringify({ ref, inputs }),
+  });
+}
+
+export interface GitHubWorkflowRun {
+  id: number;
+  status: string;
+  conclusion: string | null;
+  url: string;
+  createdAt: string;
+}
+
+/** Runs of a workflow that were started by hand or by the API on one branch, newest first. */
+export async function listWorkflowRuns(fullName: string, file: string, branch: string): Promise<GitHubWorkflowRun[]> {
+  const parsed = repoName(fullName);
+  if (!parsed) throw new GitHubApiError("bad_repo", "Use a repository like owner/name.", 400);
+  const result = await github<{
+    workflow_runs?: { id?: number; status?: string; conclusion?: string | null; html_url?: string; created_at?: string }[];
+  }>(
+    `/repos/${parsed.owner}/${parsed.repo}/actions/workflows/${encodeURIComponent(file)}/runs` +
+      `?branch=${encodeURIComponent(branch)}&event=workflow_dispatch&per_page=5`,
+  );
+  return (result.workflow_runs ?? [])
+    .filter((run) => typeof run.id === "number")
+    .map((run) => ({
+      id: run.id as number,
+      status: run.status ?? "",
+      conclusion: run.conclusion ?? null,
+      url: run.html_url ?? "",
+      createdAt: run.created_at ?? "",
+    }));
+}
+
+/** Stops a workflow run. A run that already ended cannot be cancelled, which is fine. */
+export async function cancelWorkflowRun(fullName: string, runId: number): Promise<void> {
+  const parsed = repoName(fullName);
+  if (!parsed) throw new GitHubApiError("bad_repo", "Use a repository like owner/name.", 400);
+  try {
+    await github(`/repos/${parsed.owner}/${parsed.repo}/actions/runs/${runId}/cancel`, { method: "POST" });
+  } catch (error) {
+    if (!(error instanceof GitHubApiError) || error.status !== 409) throw error;
+  }
+}
+
 export interface GitHubPullState {
   state: "open" | "closed";
   merged: boolean;

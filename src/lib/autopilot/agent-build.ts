@@ -1,6 +1,7 @@
 import "server-only";
 
-import { experimentTask, gateInPatch, pullBody } from "@/lib/autopilot/agent-task";
+import { experimentBranch, experimentTask, gateInPatch, pullBody } from "@/lib/autopilot/agent-task";
+import { cancelOutsideBuild } from "@/lib/autopilot/dispatch";
 import { autopilotDryRun, autopilotRepo, defaultAutopilotRepo } from "@/lib/autopilot/repo";
 import { autopilotUser } from "@/lib/autopilot/scope";
 import { listExperiments, listSignals, log, setSignalStatus, updateExperiment } from "@/lib/autopilot/store";
@@ -22,7 +23,7 @@ export async function agentBuildAvailable(): Promise<boolean> {
 
 export async function startAgentBuild(experiment: Experiment, signal: Signal | undefined): Promise<string | null> {
   const active = (await listExperiments()).some((item) =>
-    item.id !== experiment.id && item.status === "building" && item.coderSessionId,
+    item.id !== experiment.id && item.status === "building" && (item.coderSessionId || item.buildRef),
   );
   if (active) return null;
   const repo = await autopilotRepo();
@@ -47,7 +48,8 @@ export async function startAgentBuild(experiment: Experiment, signal: Signal | u
   return `Kismet's coding agent started building “${experiment.title}”.`;
 }
 
-async function failBuild(experiment: Experiment, reason: string): Promise<string> {
+/** Records a build that produced no usable change, whichever agent ran it, and reopens the problem. */
+export async function failBuild(experiment: Experiment, reason: string): Promise<string> {
   const note = `Could not build: ${reason}`;
   await updateExperiment(experiment.id, {
     status: "failed",
@@ -61,7 +63,13 @@ async function failBuild(experiment: Experiment, reason: string): Promise<string
   return note;
 }
 
-async function finishBuild(experiment: Experiment, signal: Signal | undefined, branch: string): Promise<string> {
+/** Checks the branch an agent pushed for the experiment gate, then opens the pull request. */
+export async function finishBuild(
+  experiment: Experiment,
+  signal: Signal | undefined,
+  branch: string,
+  by = "Kismet's coding agent",
+): Promise<string> {
   const repo = await autopilotRepo();
   const base = await repoDefaultBranch(repo);
   const files = await compareFiles(repo, base, branch);
@@ -81,7 +89,7 @@ async function finishBuild(experiment: Experiment, signal: Signal | undefined, b
   await updateExperiment(experiment.id, {
     status: "awaiting_approval", prUrl: pull.url, prNumber: pull.number, branch,
     draftPath: changed.filename, draft: draft.content, original: original.content,
-    note: "Built by Kismet's coding agent. Waiting for the preview build.",
+    note: `Built by ${by}. Waiting for the preview build.`,
   });
   await log("build", `Opened PR #${pull.number} for “${experiment.title}”.`, experiment.id);
   return `Opened a pull request for “${experiment.title}”.`;
@@ -132,8 +140,9 @@ export async function cancelBuild(experiment: Experiment): Promise<string> {
     }
   }
   const repo = await autopilotRepo().catch(() => "");
+  if (repo && experiment.builder && experiment.buildRef) await cancelOutsideBuild(experiment, repo).catch(() => {});
   if (repo && experiment.prNumber) await closePull(repo, experiment.prNumber).catch(() => {});
-  const branches = new Set([branch, `kismet/exp-${experiment.flag}`].filter((name): name is string => Boolean(name)));
+  const branches = new Set([branch, experimentBranch(experiment.flag)].filter((name): name is string => Boolean(name)));
   if (repo) {
     for (const name of branches) await deleteBranch(repo, name).catch(() => {});
   }

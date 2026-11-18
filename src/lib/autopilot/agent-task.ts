@@ -48,21 +48,43 @@ export function gateInPatch(files: readonly { patch?: string }[], gate: string):
   return files.some((file) => file.patch?.includes(gate));
 }
 
-export function experimentTask(experiment: TaskExperiment, signal: TaskSignal | undefined, external: boolean): string {
+/** The branch an experiment's change is built on. */
+export function experimentBranch(flag: string): string {
+  return `kismet/exp-${flag}`;
+}
+
+/**
+ * The brief a coding agent builds from. Kismet's own agent starts on the default branch and reports
+ * the branch it pushed. With `checkout`, an outside agent (Cursor, Claude Code) starts on the
+ * experiment branch Kismet already created, and its own tooling pushes the change.
+ */
+export function experimentTask(
+  experiment: TaskExperiment,
+  signal: TaskSignal | undefined,
+  external: boolean,
+  checkout = false,
+): string {
   const evidence = signal?.evidence.slice(0, 5).map((item) => `- ${item.title}`) ?? [];
+  const branch = experimentBranch(experiment.flag);
   return [
-    "Build this A/B experiment in the repository at /workspace/repo.",
+    checkout ? "Build this A/B experiment in this repository." : "Build this A/B experiment in the repository at /workspace/repo.",
     `PROBLEM: ${signal?.title ?? ""} — ${signal?.problem ?? ""}`,
     evidence.length ? `EVIDENCE:\n${evidence.join("\n")}` : "",
     `EXPERIMENT: ${experiment.title}\nHYPOTHESIS: ${experiment.hypothesis}\nPAGE: ${experiment.page}`,
     `CONTROL: ${experiment.control}\nTREATMENT: ${experiment.treatment}`,
     `METRIC: ${experiment.metric}\nGUARDRAIL: ${experiment.guardrail}`,
     `RULES: ${codeRules(experiment.flag, external)}`,
-    `Work on branch kismet/exp-${experiment.flag} from the default branch; change only what this experiment needs.`,
+    checkout
+      ? `You are on branch ${branch}, which Kismet created for this experiment. Stay on it and change only what this experiment needs.`
+      : `Work on branch ${branch} from the default branch; change only what this experiment needs.`,
     "Control must render exactly what it renders today.",
     `Add data-track="${experiment.flag}" to the new element.`,
-    "Run the project's checks if they finish in a few minutes. Commit and push the change.",
-    `End your final response with exactly: BRANCH: kismet/exp-${experiment.flag}`,
+    checkout
+      ? "Run the project's checks if they finish in a few minutes."
+      : "Run the project's checks if they finish in a few minutes. Commit and push the change.",
+    checkout
+      ? "Do not open a pull request and do not merge anything. Kismet checks the change and opens the pull request."
+      : `End your final response with exactly: BRANCH: ${branch}`,
   ].filter(Boolean).join("\n\n");
 }
 
