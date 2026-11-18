@@ -159,7 +159,7 @@ export function ExperimentBoard({
   }
 
   return (
-    <div className="flex h-full flex-col overflow-auto bg-white">
+    <div className="flex h-full flex-col overflow-auto bg-white [scrollbar-gutter:stable]">
       <div className="px-6 pt-5">
         <div className="flex items-start justify-between gap-4">
           <div>
