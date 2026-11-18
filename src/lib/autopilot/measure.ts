@@ -33,7 +33,8 @@ async function readout(experiment: Experiment, expectedTreatmentShare: number): 
   const [control, treatment] = arms;
   const { lift, pValue } = compareRates(control, treatment);
   const visitors = control.visitors + treatment.visitors;
-  const enough = Math.min(control.visitors, treatment.visitors) >= MIN_VISITORS;
+  const sample = experiment.mode === "stochastic" ? 2 : 1;
+  const enough = Math.min(control.visitors, treatment.visitors) >= MIN_VISITORS * sample;
   const ageDays = (Date.now() - new Date(experiment.startedAt).getTime()) / 86_400_000;
   const runtimeMet = ageDays >= MIN_DAYS;
   const tauSquared = mixingVariance(experiment);
@@ -62,7 +63,7 @@ async function readout(experiment: Experiment, expectedTreatmentShare: number): 
   let verdict: Readout["verdict"] = "collecting";
   if (!brokenSplit && runtimeMet && guardrail?.worse) verdict = "lost";
   else if (!brokenSplit && runtimeMet && enough && sequentialP != null && sequentialP < 0.05 && lift != null) verdict = lift > 0 ? "won" : "lost";
-  else if (!brokenSplit && runtimeMet && (Math.min(control.visitors, treatment.visitors) >= MAX_VISITORS || (ageDays > MAX_DAYS && enough))) verdict = "flat";
+  else if (!brokenSplit && runtimeMet && (Math.min(control.visitors, treatment.visitors) >= MAX_VISITORS * sample || (ageDays > MAX_DAYS * sample && enough))) verdict = "flat";
 
   return {
     arms: arms.map(armResult),
@@ -157,7 +158,7 @@ export async function measureRunning(): Promise<string | null> {
     if (result.verdict === "won") {
       await updateExperiment(experiment.id, {
         status: "awaiting_rollout",
-        note: `The new version won: ${pct(result.lift)} on ${experiment.metric}, peeking-safe p = ${result.sequentialP?.toFixed(3)}${fake}.`,
+        note: `The new version won: ${pct(result.lift)} on ${experiment.metric}, peeking-safe p = ${result.sequentialP?.toFixed(3)}${fake}${experiment.mode === "stochastic" ? " The output can differ each time, so this used twice the usual traffic." : ""}.`,
       });
       await log("measure", `“${experiment.title}” won (${pct(result.lift)}). Waiting for you to roll it out.`, experiment.id);
       results.push(`“${experiment.title}” won.`);

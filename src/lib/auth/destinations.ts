@@ -2,7 +2,7 @@
 export const SIGN_UP_DESTINATION = "/onboarding/you";
 
 /** An account that already exists. Sign-in opens the workspace. */
-export const SIGN_IN_DESTINATION = "/ai";
+export const SIGN_IN_DESTINATION = "/experiments";
 
 /** A signup still in progress. Older accounts are sent to the workspace. */
 const NEW_ACCOUNT_WINDOW_MS = 60 * 60 * 1000;

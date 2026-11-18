@@ -1,6 +1,7 @@
 import { cancelBuild } from "@/lib/autopilot/agent-build";
 import { approveCleanup, dismissCleanup } from "@/lib/autopilot/cleanup";
-import { approve, reject, rollout, stop } from "@/lib/autopilot/lifecycle";
+import { approve, reject, rollout, scheduleRollout, stop } from "@/lib/autopilot/lifecycle";
+import type { RolloutPhase } from "@/lib/autopilot/rollout-plan";
 import { withAutopilotUser } from "@/lib/autopilot/scope";
 import { getExperiment, visitorSeries } from "@/lib/autopilot/store";
 import { currentUserId } from "@/lib/connections/current";
@@ -8,7 +9,7 @@ import { GitHubApiError } from "@/lib/github/client";
 
 export const dynamic = "force-dynamic";
 
-const ACTIONS = ["approve", "reject", "cancel", "rollout", "stop", "approve-cleanup", "dismiss-cleanup"] as const;
+const ACTIONS = ["approve", "reject", "cancel", "rollout", "schedule", "stop", "approve-cleanup", "dismiss-cleanup"] as const;
 type Action = (typeof ACTIONS)[number];
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -27,14 +28,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const userId = await currentUserId();
   if (!userId) return Response.json({ error: "Sign in required." }, { status: 401 });
   const { id } = await params;
-  const body = (await request.json().catch(() => ({}))) as { action?: string };
+  const body = (await request.json().catch(() => ({}))) as { action?: string; phases?: RolloutPhase[] };
   const action = ACTIONS.find((a) => a === body.action) as Action | undefined;
   if (!action) return Response.json({ error: "Unknown action." }, { status: 400 });
 
-  return withAutopilotUser(userId, () => act(id, action));
+  return withAutopilotUser(userId, () => act(id, action, body.phases));
 }
 
-async function act(id: string, action: Action): Promise<Response> {
+async function act(id: string, action: Action, phases?: RolloutPhase[]): Promise<Response> {
   const experiment = await getExperiment(id);
   if (!experiment) return Response.json({ error: "Experiment not found." }, { status: 404 });
 
@@ -43,6 +44,7 @@ async function act(id: string, action: Action): Promise<Response> {
     if (action === "approve") message = await approve(experiment);
     else if (action === "reject" || action === "cancel") message = action === "cancel" ? await cancelBuild(experiment) : await reject(experiment);
     else if (action === "rollout") message = await rollout(experiment);
+    else if (action === "schedule") message = await scheduleRollout(experiment, phases ?? []);
     else if (action === "approve-cleanup") message = await approveCleanup(experiment);
     else if (action === "dismiss-cleanup") message = await dismissCleanup(experiment);
     else {

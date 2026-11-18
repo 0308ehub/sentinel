@@ -7,7 +7,7 @@ const now = Date.parse("2026-11-17T20:00:00Z");
 
 test("sign-up and sign-in open different places", () => {
   assert.equal(SIGN_UP_DESTINATION, "/onboarding/you");
-  assert.equal(SIGN_IN_DESTINATION, "/ai");
+  assert.equal(SIGN_IN_DESTINATION, "/experiments");
   assert.notEqual(SIGN_IN_DESTINATION, SIGN_UP_DESTINATION);
 });
 

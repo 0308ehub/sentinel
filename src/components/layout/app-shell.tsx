@@ -34,13 +34,13 @@ export function AppShell({
         <PendingPrd />
         <main className="flex-1 overflow-hidden">{children}</main>
       </div>
+      {!embedded && <ChatDock />}
       <CommandPalette />
       <ProposeFeatureDialog />
       <WorkWatcher />
       <WorkspaceSync />
       <MentionWatcher />
       <InboxPresence />
-      <ChatDock />
       <AgentRunner />
     </div>
   );

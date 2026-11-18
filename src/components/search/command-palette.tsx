@@ -9,14 +9,11 @@ import { useGraphStore } from "@/lib/graph/graph-store";
 import { useRouter } from "next/navigation";
 import {
   LayoutDashboard,
-  FolderTree,
   Layers,
   Frame,
-  Columns3,
   Clock,
   GitBranch,
   BarChart3,
-  FlaskConical,
   Scale,
   MessageSquare,
   Search,
@@ -30,19 +27,13 @@ import { ReportProblem } from "@/components/feedback/report-problem";
 
 const NAV_ITEMS = [
   { label: "Chat", href: "/ai", icon: MessageSquare },
-  { label: "Experiments", href: "/experiments", icon: FlaskConical },
+  { label: "Dashboard", href: "/experiments", icon: LayoutDashboard },
+  { label: "Timeline", href: "/timeline", icon: Clock },
+  { label: "Graph", href: "/graph", icon: GitBranch },
+  { label: "Design", href: "/design", icon: Frame },
+  { label: "Analytics", href: "/analytics", icon: BarChart3 },
   { label: "Connections", href: "/settings/connectors", icon: Boxes },
   { label: "Kismet home", href: "/", icon: Home },
-  { label: "Agents", href: "/agents", icon: Boxes },
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Explorer", href: "/explorer", icon: FolderTree },
-  { label: "Features", href: "/features", icon: Layers },
-  { label: "Design", href: "/design", icon: Frame },
-  { label: "Board", href: "/board", icon: Columns3 },
-  { label: "Timeline", href: "/timeline", icon: Clock },
-  { label: "Graph View", href: "/graph", icon: GitBranch },
-  { label: "Analytics", href: "/analytics", icon: BarChart3 },
-  { label: "Decisions", href: "/decisions", icon: Scale },
 ];
 
 const TYPE_ICONS: Partial<Record<NodeType, React.ElementType>> = {
@@ -143,9 +134,7 @@ export function CommandPalette() {
                       ? `/features/${result.id}`
                       : result.type === "ENGINEERING_TASK"
                         ? `/board/${result.id}`
-                      : result.type === "DECISION"
-                        ? `/decisions#${result.id}`
-                        : `/graph?node=${result.id}`;
+                      : `/graph?node=${result.id}`;
                   return (
                     <CommandItem key={result.id} onSelect={() => navigate(href)}>
                       <Icon className="mr-2 h-4 w-4 text-muted-foreground" />

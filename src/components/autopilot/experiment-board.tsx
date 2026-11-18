@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { ChevronDown, Loader2, Play } from "lucide-react";
 import { ExperimentDetail } from "@/components/autopilot/experiment-detail";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { RelativeTime } from "@/components/shared/relative-time";
+import type { RolloutPhase } from "@/lib/autopilot/rollout-plan";
 import { useVariant } from "@/lib/autopilot/variant";
 import type { AutopilotState, Experiment, Goal, Learning, Signal, SuggestionRating } from "@/lib/autopilot/types";
 
@@ -16,6 +18,7 @@ const ACTIVE_EXPERIMENT = new Set<Experiment["status"]>([
   "queued",
   "running",
   "awaiting_rollout",
+  "rolling_out",
 ]);
 
 type StatusFilter = "active" | "suggested" | "running" | "ended" | "all";
@@ -35,6 +38,8 @@ export function ExperimentBoard({
   onDismiss,
   onAct,
   onRated,
+  onSchedule,
+  onCreate,
 }: {
   state: AutopilotState;
   running: boolean;
@@ -46,10 +51,13 @@ export function ExperimentBoard({
   onDismiss: (signal: Signal) => void;
   onAct: (experiment: Experiment, action: "approve" | "reject" | "cancel" | "rollout" | "stop" | "approve-cleanup" | "dismiss-cleanup") => void;
   onRated: () => void;
+  onSchedule: (experiment: Experiment, phases: RolloutPhase[]) => Promise<void>;
+  onCreate: (input: { title: string; change: string; page: string }) => Promise<void>;
 }) {
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<"overview" | "learnings" | "themes">("overview");
   const [filter, setFilter] = useState<StatusFilter>("active");
+  const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState<Selection | null>(null);
   const initialExperiments = useRef(state.experiments);
   // Goals come from the server; a local copy only holds the result of an edit made here. (Keying the
@@ -102,7 +110,7 @@ export function ExperimentBoard({
       feature: experiment.page || "None",
       modified: experiment.endedAt || experiment.startedAt || experiment.createdAt,
       created: experiment.createdAt,
-      live: experiment.status === "running" || experiment.status === "queued" || experiment.status === "awaiting_rollout",
+      live: experiment.status === "running" || experiment.status === "queued" || experiment.status === "awaiting_rollout" || experiment.status === "rolling_out",
     }));
     const signalRows = suggestions.map((signal) => ({
       kind: "signal" as const,
@@ -155,6 +163,7 @@ export function ExperimentBoard({
         onReject={() => openExperiment && onAct(openExperiment, "reject")}
         onCancel={() => openExperiment && onAct(openExperiment, "cancel")}
         onRollout={() => openExperiment && onAct(openExperiment, "rollout")}
+        onSchedule={(phases) => openExperiment ? onSchedule(openExperiment, phases) : Promise.resolve()}
         onStop={() => openExperiment && onAct(openExperiment, "stop")}
         onApproveCleanup={() => openExperiment && onAct(openExperiment, "approve-cleanup")}
         onDismissCleanup={() => openExperiment && onAct(openExperiment, "dismiss-cleanup")}
@@ -204,10 +213,13 @@ export function ExperimentBoard({
               </p>
             )}
           </div>
-          <Button className="bg-[#111] text-white hover:bg-[#2a2a2a]" onClick={onRun} disabled={running || !state.configured}>
-            {running ? <Loader2 className="animate-spin" /> : <Play />}
-            Create New Experiment
-          </Button>
+          <div className="flex shrink-0 gap-2">
+            <Button variant="outline" onClick={() => setCreating(true)}>Create experiment</Button>
+            <Button className="bg-[#111] text-white hover:bg-[#2a2a2a]" onClick={onRun} disabled={running || !state.configured}>
+              {running ? <Loader2 className="animate-spin" /> : <Play />}
+              Check for suggestions
+            </Button>
+          </div>
         </div>
         <div className="mt-4 flex gap-6 border-b border-[#e6e8ec] text-sm">
           <button type="button" onClick={() => setTab("overview")} className={tab === "overview" ? "border-b-2 border-brand pb-2 font-medium text-brand" : "pb-2 text-[#6b7280]"}>Overview</button>
@@ -328,7 +340,73 @@ export function ExperimentBoard({
         </table>
         )}
       </div>
+      <CreateExperimentDialog open={creating} busy={busy === "create"} onOpenChange={setCreating} onCreate={onCreate} />
     </div>
+  );
+}
+
+function CreateExperimentDialog({
+  open,
+  busy,
+  onOpenChange,
+  onCreate,
+}: {
+  open: boolean;
+  busy: boolean;
+  onOpenChange: (open: boolean) => void;
+  onCreate: (input: { title: string; change: string; page: string }) => Promise<void>;
+}) {
+  const [title, setTitle] = useState("");
+  const [change, setChange] = useState("");
+  const [page, setPage] = useState("");
+  const [error, setError] = useState("");
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setError("");
+    try {
+      await onCreate({ title: title.trim(), change: change.trim(), page: page.trim() });
+      setTitle("");
+      setChange("");
+      setPage("");
+      onOpenChange(false);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not create the experiment.");
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg gap-0 p-0">
+        <form onSubmit={(event) => void submit(event)}>
+          <div className="border-b border-[#eef0f3] px-5 py-4">
+            <h2 className="text-base font-medium text-[#111]">Create experiment</h2>
+          </div>
+          <div className="space-y-4 px-5 py-4">
+            <label className="block text-sm">
+              <span className="text-[#374151]">Name</span>
+              <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Homepage banner" className="mt-1 h-9 w-full rounded-md border border-[#e1e4e8] px-3 text-sm outline-none focus:border-[#111]" />
+            </label>
+            <label className="block text-sm">
+              <span className="text-[#374151]">What should change</span>
+              <textarea value={change} onChange={(event) => setChange(event.target.value)} required rows={4} placeholder="Showing items you may like on the homepage banner will increase purchases" className="mt-1 w-full resize-none rounded-md border border-[#e1e4e8] px-3 py-2 text-sm outline-none focus:border-[#111]" />
+            </label>
+            <label className="block text-sm">
+              <span className="text-[#6b7280]">Page, if you know it</span>
+              <input value={page} onChange={(event) => setPage(event.target.value)} placeholder="/home" className="mt-1 h-9 w-full rounded-md border border-[#e1e4e8] px-3 text-sm outline-none focus:border-[#111]" />
+            </label>
+            {error && <p className="text-sm text-destructive">{error}</p>}
+          </div>
+          <div className="flex justify-end gap-2 border-t border-[#eef0f3] px-5 py-3">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
+            <Button type="submit" className="bg-[#111] text-white hover:bg-[#2a2a2a]" disabled={busy || change.trim().length < 8}>
+              {busy && <Loader2 className="animate-spin" />}
+              Create experiment
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 

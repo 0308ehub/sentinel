@@ -56,6 +56,7 @@ export type ExperimentStatus =
   | "queued"
   | "running"
   | "awaiting_rollout"
+  | "rolling_out"
   | "rolled_out"
   | "stopped"
   | "rejected"
@@ -143,6 +144,10 @@ export interface Experiment {
   treatment: string;
   changeSummary: ChangeSummary | null;
   flag: string;
+  /** deterministic: the same visitor sees the same change. stochastic: a prompt or model can differ on each request. */
+  mode: "deterministic" | "stochastic";
+  /** Phased ship after a win. Each phase is the percent of visitors who see the new version. */
+  rollout: { at: string; pass: number }[] | null;
   status: ExperimentStatus;
   rejectedBy: "person" | "kismet" | null;
   branch: string | null;

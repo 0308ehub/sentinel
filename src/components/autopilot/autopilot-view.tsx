@@ -63,6 +63,24 @@ export function AutopilotView() {
     }
   }
 
+  async function createExperiment(input: { title: string; change: string; page: string }) {
+    setBusy("create");
+    setMessage("Writing the experiment. This usually takes under a minute.");
+    try {
+      const response = await fetch("/api/autopilot/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      const body = (await response.json()) as { message?: string; error?: string };
+      if (!response.ok) throw new Error(body.error || "Could not create the experiment.");
+      setMessage(body.message ?? "Created.");
+      await load();
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function testSignal(signal: Signal) {
     if (state?.experiments.some((experiment) => experiment.status === "building")) {
       setMessage("Kismet is already writing a change. It is listed in the table.");
@@ -105,6 +123,24 @@ export function AutopilotView() {
     }
   }
 
+  async function scheduleRollout(experiment: Experiment, phases: { at: string; pass: number }[]) {
+    setBusy(experiment.id + "schedule");
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/autopilot/experiments/${experiment.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "schedule", phases }),
+      });
+      const body = (await res.json()) as { message?: string; error?: string };
+      if (!res.ok) throw new Error(body.error || "Could not schedule the rollout.");
+      setMessage(body.message ?? "Scheduled.");
+      await load();
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function act(
     experiment: Experiment,
     action: "approve" | "reject" | "cancel" | "rollout" | "stop" | "approve-cleanup" | "dismiss-cleanup",
@@ -128,7 +164,7 @@ export function AutopilotView() {
   if (!state) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading experiments…
+        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading dashboard…
       </div>
     );
   }
@@ -145,6 +181,8 @@ export function AutopilotView() {
       onDismiss={(signal) => void dismissSignal(signal)}
       onAct={(experiment, action) => void act(experiment, action)}
       onRated={() => void load()}
+      onSchedule={scheduleRollout}
+      onCreate={createExperiment}
     />
   );
 }

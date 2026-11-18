@@ -6,14 +6,12 @@ import { compactText, seePage } from "@/lib/work-context";
 
 const PAGE_LABELS: [string, string][] = [
   ["/ai", "Chat"],
-  ["/dashboard", "Dashboard"],
-  ["/explorer", "Explorer"],
-  ["/features", "Features"],
-  ["/timeline", "Timeline"],
+  ["/experiments", "Dashboard"],
+  ["/timeline", "Experiment timeline"],
   ["/graph", "Graph"],
+  ["/design", "Design"],
   ["/analytics", "Analytics"],
-  ["/experiments", "Experiments"],
-  ["/decisions", "Decisions"],
+  ["/features", "Feature"],
   ["/settings", "Settings"],
 ];
 

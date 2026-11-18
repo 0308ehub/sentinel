@@ -8,12 +8,13 @@ import {
   Code2,
   Folder,
   Hash,
+  History,
   Loader2,
-  Maximize2,
   PanelLeftClose,
   PanelLeftOpen,
   Paperclip,
   Plus,
+  SquareArrowOutUpRight,
   X,
 } from "lucide-react";
 import { chipQuery, matchingChips, pullChips, pullChipsForSend } from "@/lib/chat-chips";
@@ -27,6 +28,7 @@ import {
   greetingFor,
   openThread,
   pickChip,
+  prepareChatTab,
   removeChip,
   removeFile,
   removeFolder,
@@ -53,6 +55,13 @@ import { readOnboarding } from "@/lib/onboarding";
 import { fileBugFromChat } from "@/lib/issues/file-from-chat";
 import { useUIStore } from "@/stores/ui-store";
 import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useAccount } from "@/lib/auth/use-account";
 import { GettingStarted } from "@/components/onboarding/getting-started";
 import { CodeThread } from "@/components/ai/code-thread";
@@ -64,12 +73,16 @@ export function ChatPane({ variant, onClose }: { variant: "page" | "dock"; onClo
   const state = useChatState();
   const thread = activeThread(state);
   const pending = threadPending(state.activeId);
-  const [list, setList] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(true);
   // Read after hydration so the server and client render the same greeting first.
   const draftName = useSyncExternalStore(noSubscribe, () => readOnboarding().name, () => "");
   const bottomRef = useRef<HTMLDivElement>(null);
   const empty = !thread || thread.messages.length === 0;
+  useEffect(() => {
+    if (variant !== "page") return;
+    const id = new URLSearchParams(window.location.search).get("chat");
+    if (id) openThread(id);
+  }, [variant]);
   const [codeRepo, setCodeRepo] = useState<string | null>(null);
   const fullName = account?.name || draftName || (CURRENT_USER.name === "You" ? "" : CURRENT_USER.name);
   const firstName = fullName.trim().split(/\s+/)[0] ?? "";
@@ -115,7 +128,6 @@ export function ChatPane({ variant, onClose }: { variant: "page" | "dock"; onClo
   const history = (
     <ChatHistory
       compact={variant === "dock"}
-      onPick={() => setList(false)}
       onCollapse={variant === "page" ? () => setHistoryOpen(false) : undefined}
     />
   );
@@ -123,22 +135,9 @@ export function ChatPane({ variant, onClose }: { variant: "page" | "dock"; onClo
   if (variant === "dock") {
     return (
       <div className="flex h-full flex-col bg-background">
-        <div className="flex items-center gap-2 border-b border-border px-3 py-2">
-          <button type="button" onClick={() => setList((open) => !open)} className="text-sm font-medium">
-            {list ? "Chat" : "Chats"}
-          </button>
-          <button type="button" onClick={() => { startNewChat(); setList(false); }} className="text-muted-foreground" aria-label="New chat">
-            <Plus className="h-4 w-4" />
-          </button>
-          <Link href="/ai" className="ml-auto text-muted-foreground" aria-label="Open the full chat" onClick={onClose}>
-            <Maximize2 className="h-3.5 w-3.5" />
-          </Link>
-          <button type="button" onClick={onClose} className="text-muted-foreground" aria-label="Minimize chat" title="Minimize">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        {list ? <div className="min-h-0 flex-1">{history}</div> : transcript}
-        {!list && !empty && (
+        <ChatSidebarHeader title={thread?.title?.trim() || "New chat"} onClose={onClose} />
+        {transcript}
+        {!empty && (
           <div className="border-t border-border p-2">
             <Composer />
           </div>
@@ -174,6 +173,76 @@ export function ChatPane({ variant, onClose }: { variant: "page" | "dock"; onClo
         )}
       </div>
     </div>
+  );
+}
+
+function ChatSidebarHeader({ title, onClose }: { title: string; onClose?: () => void }) {
+  return (
+    <div className="flex h-11 shrink-0 items-center gap-1 border-b border-border px-2">
+      <p className="min-w-0 flex-1 truncate px-1 text-sm font-medium">{title}</p>
+      <button
+        type="button"
+        onClick={() => startNewChat()}
+        aria-label="New chat"
+        className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+      >
+        <Plus className="h-4 w-4" />
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          const id = prepareChatTab();
+          window.open(`/ai?chat=${encodeURIComponent(id)}`, "_blank", "noopener");
+        }}
+        aria-label="Open in a new tab"
+        title="Open in a new tab"
+        className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+      >
+        <SquareArrowOutUpRight className="h-4 w-4" />
+      </button>
+      <ChatHistoryMenu />
+      {onClose && (
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close chat"
+          className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function ChatHistoryMenu() {
+  const state = useChatState();
+  const threads = [...state.threads].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label="Chat history"
+          className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          <History className="h-4 w-4" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="max-h-80 w-72 overflow-y-auto">
+        <DropdownMenuLabel>History</DropdownMenuLabel>
+        {threads.length === 0 && <p className="px-2 py-3 text-xs text-muted-foreground">No chats yet.</p>}
+        {threads.map((thread) => (
+          <DropdownMenuItem
+            key={thread.id}
+            onClick={() => openThread(thread.id)}
+            className={thread.id === state.activeId ? "bg-accent" : undefined}
+          >
+            <span className="min-w-0 flex-1 truncate">{thread.title || "New chat"}</span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

@@ -1,13 +1,13 @@
 "use client";
 
-import { Bell, Search } from "lucide-react";
+import { Bell, MessageSquare, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useUIStore } from "@/stores/ui-store";
 import { useNotificationStore } from "@/stores/notification-store";
 import { NotificationPanel } from "@/components/layout/notification-panel";
 
 export function Header() {
-  const { setCommandPaletteOpen, notificationPanelOpen, setNotificationPanelOpen } =
+  const { setCommandPaletteOpen, notificationPanelOpen, setNotificationPanelOpen, chatDockOpen, setChatDockOpen } =
     useUIStore();
   const unreadCount = useNotificationStore(
     (s) => s.items.filter((n) => !n.read).length
@@ -30,6 +30,16 @@ export function Header() {
         </Button>
 
         <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            aria-label={chatDockOpen ? "Close chat" : "Open chat"}
+            aria-pressed={chatDockOpen}
+            onClick={() => setChatDockOpen(!chatDockOpen)}
+          >
+            <MessageSquare className="h-4 w-4" />
+          </Button>
           <Button
             variant="ghost"
             size="icon"

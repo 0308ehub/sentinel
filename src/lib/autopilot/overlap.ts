@@ -14,9 +14,9 @@ import type { Experiment } from "@/lib/autopilot/types";
 //                   experiment's effect differs depending on the other's version, the result is held.
 
 /** Experiments whose code is in flight or in the product, so their file is taken. */
-const HOLDS_FILE = new Set(["building", "awaiting_approval", "queued", "running", "awaiting_rollout"]);
+const HOLDS_FILE = new Set(["building", "awaiting_approval", "queued", "running", "awaiting_rollout", "rolling_out"]);
 /** Experiments that are (or are about to be) splitting traffic. */
-const LIVE = new Set(["running", "awaiting_rollout"]);
+const LIVE = new Set(["running", "awaiting_rollout", "rolling_out"]);
 const PENDING = new Set(["building", "awaiting_approval", "queued"]);
 
 /** The smallest share of a layer worth starting with; less would take too long to reach a result. */

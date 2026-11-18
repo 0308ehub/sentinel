@@ -66,6 +66,18 @@ function toEvidence(row: Row): Evidence {
   };
 }
 
+function parseRollout(value: unknown): { at: string; pass: number }[] | null {
+  if (!Array.isArray(value)) return null;
+  const phases = value.flatMap((row) => {
+    if (!row || typeof row !== "object") return [];
+    const at = String((row as { at?: unknown }).at ?? "");
+    const pass = Number((row as { pass?: unknown }).pass);
+    if (!at || Number.isNaN(new Date(at).getTime()) || !Number.isInteger(pass)) return [];
+    return [{ at, pass }];
+  });
+  return phases.length ? phases : null;
+}
+
 function toExperiment(row: Row): Experiment {
   return {
     id: String(row.id),
@@ -84,6 +96,8 @@ function toExperiment(row: Row): Experiment {
     treatment: String(row.treatment ?? ""),
     changeSummary: (row.change_summary as ChangeSummary | null) ?? null,
     flag: String(row.flag),
+    mode: row.mode === "stochastic" ? "stochastic" : "deterministic",
+    rollout: parseRollout(row.rollout),
     status: row.status as ExperimentStatus,
     rejectedBy: row.rejected_by === "person" || row.rejected_by === "kismet" ? row.rejected_by : null,
     branch: (row.branch as string | null) ?? null,
@@ -362,6 +376,7 @@ export async function experimentsNeedingLearnings(): Promise<Experiment[]> {
     where e.user_id = ${scopeUser()}
       and e.ended_at is not null
       and e.status in ('rolled_out', 'stopped', 'rejected')
+      and coalesce(e.kind, 'experiment') <> 'fix'
       and (e.status <> 'rejected' or e.rejected_by = 'person'
         or (e.rejected_by is null and coalesce(e.note, '') <> 'Its evidence went stale before it was built.'))
       -- Results measured mostly on simulated traffic teach nothing about real people.
@@ -455,17 +470,19 @@ export async function createExperiment(input: {
   flag: string;
   estimate?: ResultEstimate | null;
   kind?: Experiment["kind"];
+  mode?: "deterministic" | "stochastic";
   rationale?: Experiment["rationale"];
 }): Promise<string> {
   const sql = await db();
   const id = newId("exp");
   await sql`
     insert into kismet.experiments
-      (id, user_id, signal_id, version, kind, title, hypothesis, metric, metric_spec, guardrail_spec, page, guardrail, control, treatment, flag, estimate, rationale, status)
+      (id, user_id, signal_id, version, kind, title, hypothesis, metric, metric_spec, guardrail_spec, page, guardrail, control, treatment, flag, estimate, rationale, mode, status)
     values
       (${id}, ${scopeUser()}, ${input.signalId}, ${input.version}, ${input.kind ?? "test"}, ${input.title.slice(0, 200)}, ${input.hypothesis.slice(0, 1000)},
        ${input.metric.slice(0, 120)}, ${input.metricSpec ? sql.json(input.metricSpec) : null}, ${input.guardrailSpec ? sql.json(input.guardrailSpec) : null}, ${input.page.slice(0, 200)}, ${input.guardrail.slice(0, 300)}, ${input.control.slice(0, 500)},
-       ${input.treatment.slice(0, 500)}, ${input.flag}, ${input.estimate ? sql.json(input.estimate as never) : null}, ${input.rationale ? sql.json(input.rationale as never) : null}, 'building')
+       ${input.treatment.slice(0, 500)}, ${input.flag}, ${input.estimate ? sql.json(input.estimate as never) : null}, ${input.rationale ? sql.json(input.rationale as never) : null},
+       ${input.mode === "stochastic" ? "stochastic" : "deterministic"}, 'building')
   `;
   return id;
 }
@@ -500,6 +517,7 @@ export async function updateExperiment(
     endedAt: string | null;
     verifiedAt: string | null;
     verdict: "fixed" | "not_fixed" | null;
+    rollout: { at: string; pass: number }[] | null;
   }>
 ): Promise<void> {
   const sql = await db();
@@ -531,6 +549,7 @@ export async function updateExperiment(
   if (patch.endedAt !== undefined) columns.ended_at = patch.endedAt;
   if (patch.verifiedAt !== undefined) columns.verified_at = patch.verifiedAt;
   if (patch.verdict !== undefined) columns.verdict = patch.verdict;
+  if (patch.rollout !== undefined) columns.rollout = patch.rollout === null ? null : sql.json(patch.rollout as never);
   if (Object.keys(columns).length === 0) return;
   await sql`update kismet.experiments set ${sql(columns)} where user_id = ${scopeUser()} and id = ${id}`;
 }

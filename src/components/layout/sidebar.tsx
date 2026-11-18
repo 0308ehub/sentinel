@@ -6,15 +6,10 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
-  FolderTree,
-  Layers,
   Frame,
-  Columns3,
   Clock,
   GitBranch,
   BarChart3,
-  FlaskConical,
-  MessageSquare,
   Settings,
   User,
   LogOut,
@@ -22,7 +17,6 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
-  Boxes,
   CircleAlert,
   ChevronRight,
   Home,
@@ -48,25 +42,18 @@ import { BrandLogo } from "@/components/marketing/brand-logo";
 import { useAccount } from "@/lib/auth/use-account";
 import { ReportProblem } from "@/components/feedback/report-problem";
 
-type NavItem = { id: string; label: string; href: string; icon: typeof MessageSquare };
+type NavItem = { id: string; label: string; href: string; icon: typeof LayoutDashboard };
 
-// What a new user needs: talk to Kismet and see the experiments it runs.
+// The inbox of experiments and quick fixes is home. Chat lives in the right sidebar.
 const PRIMARY: NavItem[] = [
-  { id: "chat", label: "Chat", href: "/ai", icon: MessageSquare },
-  { id: "experiments", label: "Experiments", href: "/experiments", icon: FlaskConical },
-  { id: "features", label: "Features", href: "/features", icon: Layers },
+  { id: "experiments", label: "Dashboard", href: "/experiments", icon: LayoutDashboard },
+  { id: "timeline", label: "Timeline", href: "/timeline", icon: Clock },
   { id: "graph", label: "Graph", href: "/graph", icon: GitBranch },
+  { id: "design", label: "Design", href: "/design", icon: Frame },
 ];
 
-// Everything else stays one click away, and in the command palette.
 const MORE: NavItem[] = [
-  { id: "dashboard", label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { id: "analytics", label: "Analytics", href: "/analytics", icon: BarChart3 },
-  { id: "board", label: "Board", href: "/board", icon: Columns3 },
-  { id: "timeline", label: "Timeline", href: "/timeline", icon: Clock },
-  { id: "design", label: "Design", href: "/design", icon: Frame },
-  { id: "explorer", label: "Explorer", href: "/explorer", icon: FolderTree },
-  { id: "agents", label: "Agents", href: "/agents", icon: Boxes },
 ];
 
 const MORE_KEY = "kismet-nav-more-open";
@@ -140,7 +127,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const account = useAccount();
-  const { sidebarCollapsed, toggleSidebar } = useUIStore();
+  const { sidebarCollapsed, toggleSidebar, setChatDockOpen } = useUIStore();
   // Read after hydration so the server and client render the same first frame.
   const draftName = useSyncExternalStore(noSubscribe, () => readOnboarding().name, () => "");
   const draftEmail = useSyncExternalStore(noSubscribe, () => readOnboarding().email, () => "");
@@ -196,7 +183,7 @@ export function Sidebar() {
       )}
     >
       <div className={cn("flex items-center gap-1 px-2 py-2", sidebarCollapsed ? "flex-col" : "h-12 justify-between")}>
-        <Link href="/ai" className="min-w-0" aria-label="Kismet">
+        <Link href="/experiments" className="min-w-0" aria-label="Kismet">
           {sidebarCollapsed ? (
             <BrandLogo mark surface="app" priority className="h-7" />
           ) : (
@@ -219,18 +206,21 @@ export function Sidebar() {
 
       <ScrollArea className="min-h-0 flex-1">
         <nav className="flex flex-col gap-0.5 px-2 pb-2">
-          <Link
-            href="/ai"
-            onClick={() => startNewChat()}
-            title={sidebarCollapsed ? "New" : undefined}
+          <button
+            type="button"
+            onClick={() => {
+              startNewChat();
+              setChatDockOpen(true);
+            }}
+            title={sidebarCollapsed ? "New chat" : undefined}
             className={cn(
               "mb-1 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-sidebar-accent",
               sidebarCollapsed && "justify-center px-0",
             )}
           >
             <Plus className="h-4 w-4 shrink-0" />
-            {!sidebarCollapsed && <span>New</span>}
-          </Link>
+            {!sidebarCollapsed && <span>New chat</span>}
+          </button>
           {PRIMARY.filter((item) => !hiddenNav.has(item.id)).map((item) => (
             <NavLink key={item.href} item={item} pathname={pathname} collapsed={sidebarCollapsed} badge={0} />
           ))}

@@ -117,7 +117,7 @@ function VisualPreview({ experiment, changes, siteUrl, when, addedText }: {
   const startAttempted = useRef(false);
   const ownOrigin = changes.ownRepo && typeof window !== "undefined" ? window.location.origin : null;
   const liveOrigin = ownOrigin ?? siteUrl;
-  const isLive = ["running", "awaiting_rollout", "rolled_out", "stopped"].includes(experiment.status)
+  const isLive = ["running", "awaiting_rollout", "rolling_out", "rolled_out", "stopped"].includes(experiment.status)
     || changes.pull?.state === "merged";
   const hasSource = changes.source === "pull" || changes.source === "branch";
   const shouldAutoRender = Boolean(when.trim()) || !isLive;

@@ -105,6 +105,8 @@ alter table kismet.experiments add column if not exists build_url text;
 alter table kismet.experiments add column if not exists build_started_at timestamptz;
 alter table kismet.experiments add column if not exists estimate jsonb;
 alter table kismet.experiments add column if not exists rejected_by text;
+alter table kismet.experiments add column if not exists mode text not null default 'deterministic';
+alter table kismet.experiments add column if not exists rollout jsonb;
 alter table kismet.experiments add column if not exists change_summary jsonb;
 alter table kismet.experiments add column if not exists kind text not null default 'test';
 alter table kismet.experiments add column if not exists rationale jsonb;

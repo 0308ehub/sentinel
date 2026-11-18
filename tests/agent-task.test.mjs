@@ -27,6 +27,13 @@ test("external build task uses the window Kismet gate", () => {
   assert.doesNotMatch(task, /useVariant\("checkout-copy"\)/);
 });
 
+test("quick fix task ships the change without an experiment gate", () => {
+  const task = experimentTask({ ...experiment, kind: "fix" }, signal, false);
+  assert.match(task, /quick fix/);
+  assert.match(task, /data-kismet-fix="checkout-copy"/);
+  assert.doesNotMatch(task, /useVariant\("checkout-copy"\)/);
+});
+
 test("gateInPatch checks only supplied patches", () => {
   const files = [{ patch: '+ const variant = useVariant("checkout-copy");' }, { patch: "+ unrelated" }];
   assert.equal(gateInPatch(files, 'useVariant("checkout-copy")'), true);

@@ -263,10 +263,10 @@ export function GraphView() {
             {agents
               .filter((agent) => agent.focusNodeId === selectedNode.id)
               .map((agent) => (
-                <Link key={agent.id} href={`/agents?open=${agent.id}`} className="mt-2 flex items-center gap-2 rounded-md border border-border px-2 py-1.5 text-xs hover:bg-muted">
+                <div key={agent.id} className="mt-2 flex items-center gap-2 rounded-md border border-border px-2 py-1.5 text-xs">
                   <span className="h-2 w-2 rounded-full" style={{ background: agent.color }} />
                   <span className="min-w-0 truncate">{agent.name} · {agent.activity}</span>
-                </Link>
+                </div>
               ))}
           </div>
           <ScrollArea className="flex-1">

@@ -64,18 +64,12 @@ export interface WorkspaceSettings {
 }
 
 export const HIDEABLE_NAV = [
-  { id: "agents", label: "Agents", group: "Workspace" },
   { id: "autopilot", label: "Autopilot", group: "Workspace" },
-  { id: "dashboard", label: "Dashboard", group: "Workspace" },
-  { id: "explorer", label: "Explorer", group: "Workspace" },
-  { id: "features", label: "Features", group: "Workspace" },
   { id: "design", label: "Design", group: "Workspace" },
-  { id: "board", label: "Board", group: "Workspace" },
   { id: "timeline", label: "Timeline", group: "Workspace" },
   { id: "graph", label: "Graph", group: "Workspace" },
   { id: "analytics", label: "Analytics", group: "Measure" },
-  { id: "experiments", label: "Experiments", group: "Measure" },
-  { id: "decisions", label: "Decisions", group: "Measure" },
+  { id: "experiments", label: "Dashboard", group: "Measure" },
 ] as const;
 
 const HIDEABLE_IDS = new Set<string>(HIDEABLE_NAV.map((item) => item.id));

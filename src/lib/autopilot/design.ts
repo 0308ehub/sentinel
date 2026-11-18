@@ -13,17 +13,17 @@ import { formatPreferences } from "@/lib/autopilot/preferences";
 /** After this many attempts on one problem, Autopilot stops and leaves it to a person. */
 export const MAX_VERSIONS = 3;
 
-const ACTIVE = new Set(["building", "awaiting_approval", "queued", "running", "awaiting_rollout"]);
+const ACTIVE = new Set(["building", "awaiting_approval", "queued", "running", "awaiting_rollout", "rolling_out"]);
 
 async function productContext(): Promise<string> {
   const base = (
     process.env.AUTOPILOT_PRODUCT_CONTEXT?.trim() ||
     [
       "Kismet is a Next.js web app for product managers.",
-      "Pages: /ai (chat), /experiments, /dashboard, /explorer, /features (feature list), /features/[id], /board, /timeline, /graph,",
-      "/analytics, /decisions, /integrations, /settings, /settings/connectors/*.",
-      "The live /experiments page is a table: name, type, feature, environments, modified, created, and a Results button.",
-      "A black Create New Experiment button runs Kismet's loop. Suggested rows are grey, marked Suggested, until a person approves them.",
+      "Pages: /experiments (dashboard inbox), /timeline (experiment timeline), /graph, /design, /ai (chat), /analytics,",
+      "/integrations, /settings, /settings/connectors/*.",
+      "The live home is /experiments, titled Dashboard. It is an inbox of suggestions, each labeled Experiment or Quick fix.",
+      "Check for suggestions runs Kismet's loop. Create experiment opens a short form and starts one experiment from what the person wrote. Suggested rows stay grey until a person approves them.",
       "Opening a running experiment shows variations, conversions per visitor, improvement, a confidence interval, and visitors over time.",
       "Design a change to controls that are on the page today, or add one new control. Do not make a missing button more prominent.",
       "Creating a feature happens through the command palette item Propose feature…, whose submit button is Propose & open workspace.",
@@ -42,6 +42,8 @@ function slug(text: string): string {
 }
 
 interface DesignAnswer {
+  kind?: string;
+  mode?: string;
   title?: string;
   hypothesis?: string;
   control?: string;
@@ -124,8 +126,13 @@ function attemptsSummary(previous: Experiment[]): string {
  * personApproved: a person asked for this test. Kismet still tries once to make it conclude faster,
  * but builds it anyway with its estimate instead of snoozing it.
  */
-async function designCandidate(candidate: Signal, experiments: Experiment[], personApproved = false): Promise<string | null> {
-  if (candidate.kind === "bug") return designFix(candidate, experiments);
+async function designCandidate(
+  candidate: Signal,
+  experiments: Experiment[],
+  personApproved = false,
+  preferKind?: "experiment" | "fix",
+): Promise<string | null> {
+  if (candidate.kind === "bug" && preferKind !== "experiment") return designFix(candidate, experiments);
   const previous = experiments.filter((e) => e.signalId === candidate.id).sort((a, b) => a.version - b.version);
   if (previous.length >= MAX_VERSIONS) {
     await setSignalStatus(candidate.id, "dismissed");
@@ -143,16 +150,21 @@ async function designCandidate(candidate: Signal, experiments: Experiment[], per
     ? `${theme.people} people mentioned this ${theme.mentions} times (${theme.trend})${theme.quotes.length ? `\n${theme.quotes.map((quote) => `- “${quote.text}” — ${quote.source}${quote.author ? ` · ${quote.author}` : ""}`).join("\n")}` : ""}`
     : "No qualitative theme for this problem.";
   const system = [
-      "You are an autonomous product manager. Design one small, shippable A/B experiment that addresses the problem.",
-      "The change must be a UI change to one existing React component, safe to show to half of visitors.",
-      "Pick the metric as the outcome the user is trying to reach, which must be possible in BOTH versions,",
+      "You are an autonomous product manager. Design one small UI change to one existing React component that addresses the problem.",
+      "Set kind to \"fix\" when the change is a small, obvious correction that should ship to everyone: a color, label, spacing, or similar tweak people have already asked for, where splitting traffic would not teach anything.",
+      "Set kind to \"experiment\" when the outcome is uncertain. An experiment is safe to show to half of visitors and is measured.",
+      "Set mode to \"stochastic\" when the change is a prompt, model, ranking, or generated text that can differ on each request. Otherwise \"deterministic\".",
+      "A stochastic test still needs one metric both versions can produce. Do not score a single sample of the model's words.",
+      "Those rules are for experiments. A fix does not split traffic and may omit the metric.",
+      "For an experiment, pick the metric as the outcome the user is trying to reach, which must be possible in BOTH versions,",
       "never the new element itself (clicks on a button only the new version has would rig the test).",
       "Use one of:",
       '{"kind":"click","text":"<visible label of the button or link that completes the task in both versions, e.g. the submit button of a dialog>"}',
       'or {"kind":"visit","path":"/some/path"} (visitor reaches that page in either version).',
       "page is the route the change appears on, like /features or /settings/connectors.",
       "Optionally choose a guardrail outcome that must not get worse, using the same metric format; omit guardrailMetric if none fits.",
-      "Return JSON: {title, hypothesis, control, treatment, metric, page, guardrail, guardrailMetric}. Keep each text field to one or two sentences.",
+      "Return JSON: {kind, mode, title, hypothesis, control, treatment, metric, page, guardrail, guardrailMetric}. kind is \"experiment\" or \"fix\". mode is \"deterministic\" or \"stochastic\".",
+      "For a fix, metric may be omitted. Keep each field to one or two sentences.",
       "If earlier attempts failed or were rejected, try a meaningfully different idea.",
       "Build on LEARNINGS: repeat what won in new places, do not retry ideas that lost, were flat, or that a person rejected, unless you change them meaningfully and say how.",
       "Prefer one of the GOALS as the metric when the change can plausibly move it; otherwise use the closest outcome both versions share.",
@@ -168,28 +180,35 @@ async function designCandidate(candidate: Signal, experiments: Experiment[], per
       `EARLIER ATTEMPTS\n${attemptsSummary(previous)}${earlierLearnings.length ? `\nLearnings from this signal:\n${earlierLearnings.map((learning) => `- ${learning.outcome}: ${learning.learning}`).join("\n")}` : ""}`,
       `PREFERENCES\n${formatPreferences(ratings)}`,
     ].join("\n");
-  async function request(message: string): Promise<{ answer: DesignAnswer; spec: NonNullable<ReturnType<typeof parseMetricSpec>>; estimate: ResultEstimate }> {
+  async function request(message: string): Promise<{ answer: DesignAnswer; spec: NonNullable<ReturnType<typeof parseMetricSpec>>; estimate: ResultEstimate; kind: "experiment" | "fix"; mode: "deterministic" | "stochastic" }> {
     const text = await askForJson(system, message, false, undefined, "experiment");
     const answer = readJson<DesignAnswer>(text);
-    const spec = parseMetricSpec(answer.metric);
+    const kind = answer.kind === "fix" ? "fix" : "experiment";
+    const mode = kind === "experiment" && answer.mode === "stochastic" ? "stochastic" : "deterministic";
+    const page = answer.page?.trim().startsWith("/") ? answer.page.trim() : "/";
+    const spec = parseMetricSpec(answer.metric) ?? (kind === "fix" ? { kind: "visit" as const, path: page } : null);
     if (!answer.title || !answer.treatment || !spec) throw new Error("The experiment design was missing a title, change or metric.");
     const baseline = await metricBaseline(spec);
     const baselineRate = baseline.visitors ? baseline.conversions / baseline.visitors : 0;
     const relative = relativeMde();
     const result = daysToResult({ weeklyVisitors: baseline.weeklyVisitors, baselineRate, relativeMde: relative });
-    return { answer, spec, estimate: { baselineRate, weeklyVisitors: baseline.weeklyVisitors, relativeMde: relative, ...result, at: new Date().toISOString() } };
+    const estimate = { baselineRate, weeklyVisitors: baseline.weeklyVisitors, relativeMde: relative, ...result, at: new Date().toISOString() };
+    if (mode === "stochastic") estimate.days *= 2;
+    if (mode === "stochastic" && Number.isFinite(estimate.perArm)) estimate.perArm *= 2;
+    return { answer, spec, kind, mode, estimate };
   }
   let proposed = await request(user);
+  if (preferKind) proposed = { ...proposed, kind: preferKind, mode: preferKind === "fix" ? "deterministic" : proposed.mode };
   const maxDays = maxExperimentDays();
-  if (proposed.estimate.days > maxDays) {
+  if (proposed.kind === "experiment" && proposed.estimate.days > maxDays) {
     const days = Number.isFinite(proposed.estimate.days) ? proposed.estimate.days : "infinite";
     const feedback = `That test would need about ${days} days (${Math.round(proposed.estimate.weeklyVisitors)} visitors/week, ${(proposed.estimate.baselineRate * 100).toFixed(1)}% currently do ${describeMetric(proposed.spec)}). Redesign so it can conclude within ${maxDays} days: use a more common outcome (see GOALS and their baselines), a busier page, or a bolder change.`;
     proposed = await request(`${user}\n\nFEEDBACK\n${feedback}`);
   }
-  const { answer, spec, estimate } = proposed;
+  const { answer, spec, estimate, kind, mode } = proposed;
   const guardrailSpec = parseMetricSpec(answer.guardrailMetric);
   if (!answer.title || !answer.treatment || !spec) throw new Error("The experiment design was missing a title, change or metric.");
-  if (estimate.days > maxDays && !personApproved) {
+  if (kind === "experiment" && estimate.days > maxDays && !personApproved) {
     const journeys = await recentJourneys();
     const changeSystem = [
       "You are an autonomous product manager working in evidence-backed change mode.",
@@ -217,14 +236,13 @@ async function designCandidate(candidate: Signal, experiments: Experiment[], per
     const baselineRate = baseline.visitors ? baseline.conversions / baseline.visitors : 0;
     const relative = relativeMde();
     const result = daysToResult({ weeklyVisitors: baseline.weeklyVisitors, baselineRate, relativeMde: relative });
-    proposed = { answer: change, spec: changeSpec, estimate: { baselineRate, weeklyVisitors: baseline.weeklyVisitors, relativeMde: relative, ...result, at: new Date().toISOString() } };
     const version = previous.length + 1;
     await createExperiment({
       signalId: candidate.id, version, kind: "change", title: change.title, hypothesis: change.hypothesis ?? "",
       metric: describeMetric(changeSpec), metricSpec: changeSpec,
       page: change.page?.trim().startsWith("/") ? change.page.trim() : candidate.area,
       guardrail: change.guardrail ?? "", control: change.control ?? "", treatment: change.treatment,
-      flag: `ap-${slug(change.title)}-v${version}`, estimate: proposed.estimate,
+      flag: `ap-${slug(change.title)}-v${version}`, estimate: { baselineRate, weeklyVisitors: baseline.weeklyVisitors, relativeMde: relative, ...result, at: new Date().toISOString() },
       rationale: {
         reasoning: change.reasoning?.trim() ?? "", evidence: cited.map((item) => ({ source: item.source!.trim(), quote: item.quote!.trim() })),
         confidence: change.confidence, confidenceReason: change.confidenceReason?.trim() ?? "", risks: change.risks?.trim() ?? "",
@@ -246,16 +264,23 @@ async function designCandidate(candidate: Signal, experiments: Experiment[], per
     metric: describeMetric(spec),
     metricSpec: spec,
     page: answer.page?.trim().startsWith("/") ? answer.page.trim() : candidate.area,
-    guardrail: answer.guardrail ?? (guardrailSpec ? describeMetric(guardrailSpec) : ""),
+    guardrail: answer.guardrail?.trim() || (guardrailSpec ? describeMetric(guardrailSpec) : "Stop the test if the metric drops or errors rise."),
     guardrailSpec,
     control: answer.control ?? "",
     treatment: answer.treatment,
     flag,
     estimate,
+    kind: kind === "fix" ? "fix" : "test",
+    mode,
   });
   await setSignalStatus(candidate.id, "experimenting");
-  await log("design", `Designed “${answer.title}” for “${candidate.title}”.`, candidate.id);
-  return `Designed an experiment for “${candidate.title}”.`;
+  const designed = kind === "fix"
+    ? `Designed a quick fix “${answer.title}” for “${candidate.title}”.`
+    : mode === "stochastic"
+      ? `Designed “${answer.title}” for “${candidate.title}”. The output can differ each time, so it needs twice the usual traffic.`
+      : `Designed “${answer.title}” for “${candidate.title}”.`;
+  await log("design", designed, candidate.id);
+  return kind === "fix" ? `Designed a quick fix for “${candidate.title}”.` : `Designed an experiment for “${candidate.title}”.`;
 }
 
 /** Turns the strongest ready problem into an experiment brief. One per run keeps cost and noise down. */
@@ -273,7 +298,7 @@ export async function designNext(): Promise<string | null> {
 }
 
 /** Starts a test for one problem the person chose, including one that is still short of the evidence bar. */
-export async function designSignal(signalId: string): Promise<string> {
+export async function designSignal(signalId: string, preferKind?: "experiment" | "fix"): Promise<string> {
   const [signals, experiments] = await Promise.all([listSignals(), listExperiments()]);
   const candidate = signals.find((s) => s.id === signalId);
   if (!candidate || candidate.status === "dismissed" || candidate.status === "stale") throw new Error("That problem is not available.");
@@ -283,7 +308,7 @@ export async function designSignal(signalId: string): Promise<string> {
   if (experiments.some((e) => e.signalId === candidate.id && ACTIVE.has(e.status))) {
     throw new Error("Kismet is already testing this problem.");
   }
-  const message = await designCandidate(candidate, experiments, true);
+  const message = await designCandidate(candidate, experiments, true, preferKind);
   if (!message) throw new Error(`“${candidate.title}” needs a person after ${MAX_VERSIONS} attempts.`);
   return message;
 }

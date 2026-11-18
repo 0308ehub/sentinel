@@ -1,7 +1,7 @@
 import "server-only";
 
 import { askForJson, readJson } from "@/lib/ai/respond";
-import { codeRules, pullBody } from "@/lib/autopilot/agent-task";
+import { changeTitle, codeRules, fixMark, fixRules, pullBody } from "@/lib/autopilot/agent-task";
 import { agentBuildAvailable, startAgentBuild } from "@/lib/autopilot/agent-build";
 import { accountBuilder } from "@/lib/autopilot/builder-store";
 import { startDispatchBuild } from "@/lib/autopilot/dispatch-build";
@@ -53,11 +53,14 @@ async function writeChange(
   if (holder) throw new FileBusy(`Waiting for “${holder.title}” to finish: it changes ${primary.path}, which this needs too.`);
   const editable = files.filter((f) => /^\s*["']use client["']/.test(f.content) && !locked.has(f.path));
   if (editable.length === 0) throw new Error("None of the relevant files is a client component Kismet can edit.");
+  const fix = experiment.kind === "fix";
   const text = await askForJson(
     [
-      "Edit exactly one file to add an A/B experiment. Return JSON {path, content, summary}.",
+      fix
+        ? "Edit exactly one file to apply a quick fix that everyone should see. Return JSON {path, content, summary}."
+        : "Edit exactly one file to add an A/B experiment. Return JSON {path, content, summary}.",
       "path must be one of the files marked EDITABLE. content is the full new file. summary is one sentence for the pull request.",
-      codeRules(experiment.flag, external),
+      fix ? fixRules(experiment.flag) : codeRules(experiment.flag, external),
     ].join(" "),
     [
       `EXPERIMENT: ${experiment.title}`,
@@ -77,11 +80,13 @@ async function writeChange(
   const file = editable.find((f) => f.path === draft.path?.trim());
   const content = draft.content?.replace(/\r\n/g, "\n");
   if (!file || !content || content === file.content) throw new Error("The draft did not change an editable file.");
-  const gated = external
-    ? content.includes(`kismet.variant("${experiment.flag}")`)
-    : content.includes(`useVariant("${experiment.flag}")`) && content.includes("@/lib/autopilot/variant");
+  const gated = fix
+    ? content.includes(fixMark(experiment.flag))
+    : external
+      ? content.includes(`kismet.variant("${experiment.flag}")`)
+      : content.includes(`useVariant("${experiment.flag}")`) && content.includes("@/lib/autopilot/variant");
   if (!gated) {
-    throw new Error("The draft did not gate the change behind its experiment flag.");
+    throw new Error(fix ? "The draft did not mark the quick fix." : "The draft did not gate the change behind its experiment flag.");
   }
   if (content.length > 80_000) throw new Error("The edited file is too large.");
   return { file, content, summary: draft.summary?.trim().slice(0, 280) || experiment.treatment };
@@ -140,8 +145,8 @@ export async function buildNext(): Promise<string | null> {
       path: change.file.path,
       content: change.content,
       sha: change.file.sha,
-      title: `Experiment: ${experiment.title}`,
-      message: `Experiment: ${experiment.title}`,
+      title: changeTitle(experiment),
+      message: changeTitle(experiment),
       body: pullBody(experiment, signal, change.summary),
     });
     await updateExperiment(experiment.id, {

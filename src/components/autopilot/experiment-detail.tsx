@@ -5,7 +5,11 @@ import { ExternalLink, Loader2 } from "lucide-react";
 import { BuildLive } from "@/components/autopilot/build-live";
 import { CodeChange } from "@/components/autopilot/code-change";
 import { WhatChanges } from "@/components/autopilot/what-changes";
+import { RolloutScheduleDialog } from "@/components/autopilot/rollout-schedule";
 import { Button } from "@/components/ui/button";
+import { canLaunch, launchChecks } from "@/lib/autopilot/launch";
+import type { RolloutPhase } from "@/lib/autopilot/rollout-plan";
+import { maxExperimentDays } from "@/lib/autopilot/thresholds";
 import type { ArmResult, Experiment, Learning, Readout, Signal, SuggestionRating } from "@/lib/autopilot/types";
 
 const DECISION_VISITORS = 200;
@@ -57,6 +61,7 @@ export function ExperimentDetail({
   onReject,
   onCancel,
   onRollout,
+  onSchedule,
   onStop,
   onApproveCleanup,
   onDismissCleanup,
@@ -75,6 +80,7 @@ export function ExperimentDetail({
   onReject: () => void;
   onCancel: () => void;
   onRollout: () => void;
+  onSchedule: (phases: RolloutPhase[]) => Promise<void>;
   onStop: () => void;
   onApproveCleanup: () => void;
   onDismissCleanup: () => void;
@@ -93,15 +99,35 @@ export function ExperimentDetail({
   const status = experiment ? statusLabel(experiment.status) : "Suggested";
   const runningLook = !suggested && experiment != null;
   const names = armNames(experiment, signal);
+  const checks = experiment
+    ? launchChecks({
+        kind: experiment.kind,
+        mode: experiment.mode,
+        hypothesis: experiment.hypothesis,
+        metric: experiment.metric,
+        guardrail: experiment.guardrail,
+        control: experiment.control,
+        treatment: experiment.treatment,
+        page: experiment.page,
+        estimateDays: experiment.estimate?.days ?? null,
+        maxDays: maxExperimentDays(),
+        evidenceCount: signal?.distinctEvidence ?? 0,
+        sourceCount: signal?.sources.length ?? 0,
+      })
+    : [];
+  const readyToLaunch = canLaunch(checks);
+  const [scheduling, setScheduling] = useState(false);
   const decisions = (
     <Decisions
       experiment={experiment}
       signal={signal}
       busy={busy}
+      readyToLaunch={readyToLaunch}
       onApprove={onApprove}
       onReject={onReject}
       onCancel={onCancel}
       onRollout={onRollout}
+      onSchedule={() => setScheduling(true)}
       onStop={onStop}
       onApproveCleanup={onApproveCleanup}
       onDismissCleanup={onDismissCleanup}
@@ -130,12 +156,13 @@ export function ExperimentDetail({
     <div className="flex h-full min-h-0 bg-white text-[#1c1c1c]">
       <aside className="flex shrink-0 flex-col gap-4 overflow-auto px-4 py-4" style={{ width: panelWidth }}>
         <button type="button" onClick={onBack} className="text-left text-xs text-brand hover:underline">
-          ‹ Experiments
+          ‹ Dashboard
         </button>
         <div>
           <h1 className="text-xl leading-tight text-[#111827]">{title}</h1>
           <p className="mt-2 text-xs text-[#6b7280]">
-            {experiment?.kind === "fix" ? "Fix" : experiment?.kind === "change" ? "Change" : "A/B Test"} · <span className={status === "Running" ? "text-[#1f9d55]" : "text-[#374151]"}>{status}</span>
+            {experiment?.kind === "fix" ? "Fix" : experiment?.kind === "change" ? "Change" : experiment ? "A/B Test" : "Suggestion"}
+            {experiment?.mode === "stochastic" ? " · varies each request" : ""} · <span className={status === "Running" || status === "Rolling out" ? "text-[#1f9d55]" : "text-[#374151]"}>{status}</span>
           </p>
           {suggested && (
             <p className="mt-2 inline-flex rounded border border-[#c7d7fe] bg-[#eef4ff] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-brand">
@@ -145,6 +172,26 @@ export function ExperimentDetail({
         </div>
         <dl className="space-y-3 text-xs">
           <Fact label="Last publish" value={formatDay(experiment?.startedAt ?? experiment?.createdAt ?? signal?.updatedAt ?? null)} />
+          {experiment?.status === "awaiting_approval" && experiment.kind !== "fix" && (
+            <div className="space-y-1.5">
+              <p className="font-medium text-[#111827]">Before this can launch</p>
+              {checks.map((check) => (
+                <p key={check.label} className={check.ok ? "text-[#17663a]" : "text-[#9f2d2d]"}>{check.ok ? "Yes. " : "Not yet. "}{check.label}</p>
+              ))}
+            </div>
+          )}
+          {experiment?.status === "rolling_out" && experiment.rollout && (
+            <div className="space-y-1">
+              <p className="font-medium text-[#111827]">Rollout</p>
+              {experiment.rollout.map((phase, index) => (
+                <p key={phase.at}>{index === 0 ? "Now" : formatDay(phase.at)} · {phase.pass}% see the new version</p>
+              ))}
+            </div>
+          )}
+          {experiment?.kind === "fix" ? (
+            <Fact label="Ships" value={experiment.status === "rolled_out" ? "Everyone" : "Everyone, once you approve"} />
+          ) : (
+            <>
           <Fact label="Days running" value={daysRunning(experiment)} />
           <Fact label="Audiences" value="Everyone" />
           <Fact label="Experiment visitors" value={visitors ? visitors.toLocaleString("en-US") : "—"} />
@@ -155,6 +202,8 @@ export function ExperimentDetail({
                 {Math.round(experiment.estimate.weeklyVisitors).toLocaleString("en-US")} visitors a week, {(experiment.estimate.baselineRate * 100).toFixed(1)}% do this today, detects a {(experiment.estimate.relativeMde * 100).toFixed(0)}% change
               </p>
             </div>
+          )}
+            </>
           )}
         </dl>
         <Autonomous experiment={experiment} signal={signal} learning={learning} suggested={suggested} />
@@ -191,6 +240,14 @@ export function ExperimentDetail({
           decisions={decisions}
         />
       </div>
+      {experiment && (
+        <RolloutScheduleDialog
+          open={scheduling}
+          busy={busy === experiment.id + "schedule"}
+          onOpenChange={setScheduling}
+          onSave={onSchedule}
+        />
+      )}
     </div>
   );
 }
@@ -219,7 +276,7 @@ function MainPanel(props: {
   const { experiment, decisions, ...results } = props;
   const hasChange = hasCodeChange(experiment);
   const hasResults = Boolean(
-    experiment?.kind === "fix" || props.readout || experiment?.status === "running" || experiment?.status === "awaiting_rollout" || experiment?.endedAt,
+    experiment?.kind === "fix" || props.readout || experiment?.status === "running" || experiment?.status === "awaiting_rollout" || experiment?.status === "rolling_out" || experiment?.endedAt,
   );
   const change = experiment && hasChange ? (
     <section>
@@ -278,7 +335,7 @@ function Autonomous({
       {experiment?.metric && <p className="text-[#374151]">{experiment.metric}</p>}
       {experiment?.guardrail && <p className="text-[#374151]">Guardrail: {experiment.guardrail}</p>}
       {suggested && !experiment && (
-        <p className="text-[#374151]">Approving this lets Kismet design the change, the metric, and the guardrail.</p>
+        <p className="text-[#374151]">Approving this lets Kismet decide whether it is an experiment or a quick fix, then write the code.</p>
       )}
       {experiment?.status === "building" && (
         <p className="text-[#374151]">Kismet is writing the change. Approval waits until that pull request is ready.</p>
@@ -343,10 +400,12 @@ function Decisions({
   experiment,
   signal,
   busy,
+  readyToLaunch,
   onApprove,
   onReject,
   onCancel,
   onRollout,
+  onSchedule,
   onStop,
   onApproveCleanup,
   onDismissCleanup,
@@ -358,10 +417,12 @@ function Decisions({
   experiment: Experiment | null;
   signal: Signal | null;
   busy: string | null;
+  readyToLaunch: boolean;
   onApprove: () => void;
   onReject: () => void;
   onCancel: () => void;
   onRollout: () => void;
+  onSchedule: () => void;
   onStop: () => void;
   onApproveCleanup: () => void;
   onDismissCleanup: () => void;
@@ -386,7 +447,7 @@ function Decisions({
         )}
         {experiment?.status === "awaiting_approval" && (
           <>
-            <Button size="sm" className="bg-[#111] text-white hover:bg-[#2a2a2a]" onClick={onApprove} disabled={busy !== null}>
+            <Button size="sm" className="bg-[#111] text-white hover:bg-[#2a2a2a]" onClick={onApprove} disabled={busy !== null || (experiment.kind !== "fix" && !readyToLaunch)}>
               {busy === id + "approve" && <Loader2 className="animate-spin" />}
               {experiment.kind === "fix" ? "Approve & merge" : experiment.kind === "change" ? "Approve & ship to everyone" : "Approve & ship"}
             </Button>
@@ -400,10 +461,13 @@ function Decisions({
             Stop and discard
           </Button>
         )}
-        {experiment?.status === "awaiting_rollout" && (
+        {(experiment?.status === "awaiting_rollout" || experiment?.status === "rolling_out") && (
           <>
-            <Button size="sm" className="bg-[#111] text-white hover:bg-[#2a2a2a]" onClick={onRollout} disabled={busy !== null}>
-              Roll out to everyone
+            <Button size="sm" className="bg-[#111] text-white hover:bg-[#2a2a2a]" onClick={onSchedule} disabled={busy !== null}>
+              Schedule rollout
+            </Button>
+            <Button size="sm" variant="outline" onClick={onRollout} disabled={busy !== null}>
+              Ship to everyone now
             </Button>
             <Button size="sm" variant="outline" onClick={onStop} disabled={busy !== null}>
               Turn off
@@ -852,6 +916,7 @@ function statusLabel(status: Experiment["status"]): string {
   if (status === "building") return "Writing";
   if (status === "awaiting_approval") return "Suggested";
   if (status === "awaiting_rollout") return "Won";
+  if (status === "rolling_out") return "Rolling out";
   if (status === "rolled_out") return "Rolled out";
   if (status === "stopped") return "Stopped";
   if (status === "rejected") return "Rejected";

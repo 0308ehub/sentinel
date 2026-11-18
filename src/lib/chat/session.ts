@@ -241,9 +241,40 @@ export function setFolderFilter(folderId: string | null) {
 
 export function startNewChat() {
   const state = readStored();
-  write({ ...state, activeId: null });
+  const current = state.threads.find((thread) => thread.id === state.activeId);
+  if (current && current.messages.length === 0) {
+    setDraft({ text: "", chips: draft.chips, files: [] });
+    setNewChatMode("chat");
+    return;
+  }
+  const now = new Date().toISOString();
+  const thread: ChatThread = {
+    id: crypto.randomUUID(),
+    title: "New chat",
+    folderId: state.folderId,
+    createdAt: now,
+    updatedAt: now,
+    messages: [],
+  };
+  write({ ...state, activeId: thread.id, threads: [thread, ...state.threads] });
   setDraft({ text: "", chips: draft.chips, files: [] });
   setNewChatMode("chat");
+}
+
+/** Adds an empty chat and leaves the current thread selected, so a new tab can open it. */
+export function prepareChatTab(): string {
+  const state = readStored();
+  const now = new Date().toISOString();
+  const thread: ChatThread = {
+    id: crypto.randomUUID(),
+    title: "New chat",
+    folderId: state.folderId,
+    createdAt: now,
+    updatedAt: now,
+    messages: [],
+  };
+  write({ ...state, threads: [thread, ...state.threads] });
+  return thread.id;
 }
 
 export function openThread(id: string) {

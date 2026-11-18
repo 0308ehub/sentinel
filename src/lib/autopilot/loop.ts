@@ -16,7 +16,7 @@ import { workspaceEvidence } from "@/lib/autopilot/filed";
 import { analyticsFindings } from "@/lib/autopilot/findings";
 import { inferGoals } from "@/lib/autopilot/goals";
 import { goalFindings } from "@/lib/autopilot/goal-findings";
-import { startExperiment, startQueued } from "@/lib/autopilot/lifecycle";
+import { advanceRollouts, startExperiment, startQueued } from "@/lib/autopilot/lifecycle";
 import { measureRunning } from "@/lib/autopilot/measure";
 import { learnFromFinished } from "@/lib/autopilot/learn";
 import { sampleEvidenceCount } from "@/lib/autopilot/sample-data";
@@ -102,6 +102,7 @@ async function runScopedTick(): Promise<TickResult> {
       await step("follow", result, () => followPulls(startExperiment));
       await step("measure", result, measureRunning);
       await step("verify-fixes", result, verifyFixes);
+      await step("rollout", result, advanceRollouts);
       await step("learn", result, learnFromFinished);
       await step("queue", result, startQueued);
 

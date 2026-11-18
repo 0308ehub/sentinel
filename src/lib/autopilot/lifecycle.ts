@@ -3,7 +3,10 @@ import "server-only";
 import { autopilotDryRun, autopilotRepo } from "@/lib/autopilot/repo";
 import { isLocalSource } from "@/lib/autopilot/source";
 import { place } from "@/lib/autopilot/overlap";
-import { listExperiments, log, setFlag, setSignalStatus, updateExperiment } from "@/lib/autopilot/store";
+import { canLaunch, launchChecks } from "@/lib/autopilot/launch";
+import { duePhase, normalizePhases, type RolloutPhase } from "@/lib/autopilot/rollout-plan";
+import { listExperiments, listSignals, log, setFlag, setSignalStatus, updateExperiment } from "@/lib/autopilot/store";
+import { maxExperimentDays } from "@/lib/autopilot/thresholds";
 import type { Experiment } from "@/lib/autopilot/types";
 import { closePull, deleteBranch, mergePull } from "@/lib/github/client";
 
@@ -72,13 +75,33 @@ export async function startQueued(): Promise<string | null> {
 
 export async function approve(experiment: Experiment): Promise<string> {
   if (experiment.status !== "awaiting_approval") throw new Error("This experiment isn't waiting for approval.");
+  const signals = await listSignals();
+  const signal = signals.find((item) => item.id === experiment.signalId);
+  const checks = launchChecks({
+    kind: experiment.kind,
+    mode: experiment.mode,
+    hypothesis: experiment.hypothesis,
+    metric: experiment.metric,
+    guardrail: experiment.guardrail,
+    control: experiment.control,
+    treatment: experiment.treatment,
+    page: experiment.page,
+    estimateDays: experiment.estimate?.days ?? null,
+    maxDays: maxExperimentDays(),
+    evidenceCount: signal?.distinctEvidence ?? 0,
+    sourceCount: signal?.sources.length ?? 0,
+  });
+  if (!canLaunch(checks)) {
+    const missing = checks.filter((check) => !check.ok).map((check) => check.label);
+    throw new Error(missing.join(" "));
+  }
   if ((autopilotDryRun() || isLocalSource()) && !experiment.prNumber) {
     const started = await startExperiment(experiment);
     return started
       ? "Started (dry run: nothing was merged, so only synthetic traffic will see it)."
       : "Approved. It's queued behind an experiment on the same page and starts when that one finishes.";
   }
-  if (!experiment.prNumber) throw new Error("This experiment has no pull request yet.");
+  if (!experiment.prNumber) throw new Error(experiment.kind === "fix" ? "This fix has no pull request yet." : "This experiment has no pull request yet.");
   await mergePull(await autopilotRepo(), experiment.prNumber, experiment.kind === "fix" ? experiment.title : `Experiment: ${experiment.title}`);
   const started = await startExperiment(experiment);
   if (experiment.kind === "fix") return "Merged. Kismet is watching whether these complaints stop.";
@@ -98,9 +121,51 @@ export async function reject(experiment: Experiment): Promise<string> {
   return "Rejected. Kismet will try a different idea for this problem.";
 }
 
+export async function scheduleRollout(experiment: Experiment, phases: RolloutPhase[]): Promise<string> {
+  if (experiment.kind === "fix") throw new Error("A quick fix already ships to everyone.");
+  if (experiment.status !== "awaiting_rollout" && experiment.status !== "rolling_out") {
+    throw new Error("Schedule a rollout after the experiment has won.");
+  }
+  const plan = normalizePhases(phases);
+  if (typeof plan === "string") throw new Error(plan);
+  if (plan.length === 1 && plan[0].pass >= 100) return rollout(experiment);
+  const first = duePhase(plan) ?? plan[0];
+  await updateExperiment(experiment.id, {
+    status: "rolling_out",
+    rollout: plan,
+    endedAt: null,
+    note: `Rolling out. ${first.pass}% of visitors see the new version.`,
+  });
+  await setFlag(experiment.flag, "running", first.pass);
+  await log("gate", `Scheduled “${experiment.title}” to roll out. ${first.pass}% of visitors see it now.`, experiment.id);
+  return `Scheduled. ${first.pass}% of visitors see the new version now.`;
+}
+
+/** Moves each scheduled rollout to the phase whose time has arrived. */
+export async function advanceRollouts(): Promise<string | null> {
+  const rolling = (await listExperiments()).filter((experiment) => experiment.status === "rolling_out" && experiment.rollout?.length);
+  const notes: string[] = [];
+  for (const experiment of rolling) {
+    const phase = duePhase(experiment.rollout ?? []);
+    if (!phase) continue;
+    if (phase.pass >= 100) {
+      await rollout(experiment);
+      notes.push(`“${experiment.title}” reached everyone.`);
+      continue;
+    }
+    const note = `Rolling out. ${phase.pass}% of visitors see the new version.`;
+    if (experiment.note === note) continue;
+    await setFlag(experiment.flag, "running", phase.pass);
+    await updateExperiment(experiment.id, { note });
+    await log("gate", `“${experiment.title}” moved to ${phase.pass}%.`, experiment.id);
+    notes.push(`“${experiment.title}” is at ${phase.pass}%.`);
+  }
+  return notes.length ? notes.join(" ") : null;
+}
+
 export async function rollout(experiment: Experiment): Promise<string> {
   if (experiment.status === "rolled_out") throw new Error("This experiment is already rolled out.");
-  if (experiment.status !== "awaiting_rollout") throw new Error("This experiment hasn't won yet.");
+  if (experiment.status !== "awaiting_rollout" && experiment.status !== "rolling_out") throw new Error("This experiment hasn't won yet.");
   await setFlag(experiment.flag, "rolled_out", 100);
   await updateExperiment(experiment.id, { status: "rolled_out", endedAt: new Date().toISOString(), note: "Everyone sees the new version." });
   await setSignalStatus(experiment.signalId, "resolved");

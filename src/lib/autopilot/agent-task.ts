@@ -7,6 +7,8 @@ interface TaskExperiment {
   treatment: string;
   metric: string;
   guardrail: string;
+  kind?: "experiment" | "test" | "change" | "fix";
+  mode?: "deterministic" | "stochastic";
 }
 
 interface TaskSignal {
@@ -35,6 +37,27 @@ export function fixTask(experiment: TaskExperiment, signal: TaskSignal | undefin
     "If you cannot find a real bug supported by the complaints, say so plainly and do not push a branch.",
     `If you pushed the fix, end your final response with exactly: BRANCH: ${branch}`,
   ].filter(Boolean).join("\n\n");
+}
+
+/** A quick fix ships to everyone. The changed element is marked so the draft can be checked. */
+export function fixRules(flag: string): string {
+  return [
+    "Apply this change directly. Do not add a feature flag, useVariant, window.kismet, or a control and treatment split.",
+    "Everyone who loads the page should see the new version, including during server rendering.",
+    "The change must appear only where the request says, never on other pages.",
+    "Use only components and imports that already exist in the file or in the files shown. Match the existing style.",
+    `Add data-kismet-fix="${flag}" on the element you changed.`,
+    "Do not invent data, results, or claims.",
+  ].join(" ");
+}
+
+export function fixMark(flag: string): string {
+  return `data-kismet-fix="${flag}"`;
+}
+
+export function changeTitle(experiment: { kind?: string; title: string }): string {
+  const label = experiment.kind === "fix" ? "Quick fix" : "Experiment";
+  return `${label}: ${experiment.title}`.slice(0, 120);
 }
 
 export function codeRules(flag: string, external: boolean): string {
@@ -88,19 +111,27 @@ export function experimentTask(
 ): string {
   const evidence = signal?.evidence.slice(0, 5).map((item) => `- ${item.title}`) ?? [];
   const branch = experimentBranch(experiment.flag);
+  const fix = experiment.kind === "fix";
   return [
-    checkout ? "Build this A/B experiment in this repository." : "Build this A/B experiment in the repository at /workspace/repo.",
+    checkout
+      ? `Build this ${fix ? "quick fix" : "A/B experiment"} in this repository.`
+      : `Build this ${fix ? "quick fix" : "A/B experiment"} in the repository at /workspace/repo.`,
     `PROBLEM: ${signal?.title ?? ""} — ${signal?.problem ?? ""}`,
     evidence.length ? `EVIDENCE:\n${evidence.join("\n")}` : "",
     `EXPERIMENT: ${experiment.title}\nHYPOTHESIS: ${experiment.hypothesis}\nPAGE: ${experiment.page}`,
     `CONTROL: ${experiment.control}\nTREATMENT: ${experiment.treatment}`,
     `METRIC: ${experiment.metric}\nGUARDRAIL: ${experiment.guardrail}`,
-    `RULES: ${codeRules(experiment.flag, external)}`,
+    `RULES: ${fix ? fixRules(experiment.flag) : codeRules(experiment.flag, external)}`,
     checkout
-      ? `You are on branch ${branch}, which Kismet created for this experiment. Stay on it and change only what this experiment needs.`
-      : `Work on branch ${branch} from the default branch; change only what this experiment needs.`,
-    "Control must render exactly what it renders today.",
-    `Add data-track="${experiment.flag}" to the new element.`,
+      ? `You are on branch ${branch}, which Kismet created for this change. Stay on it and change only what this ${fix ? "fix" : "experiment"} needs.`
+      : `Work on branch ${branch} from the default branch; change only what this ${fix ? "fix" : "experiment"} needs.`,
+    fix
+      ? "Ship the new version to everyone. Do not leave the old version behind a flag."
+      : "Control must render exactly what it renders today.",
+    !fix && experiment.mode === "stochastic"
+      ? "This change can come out differently on each request. Do not cache one sample of the text. Keep the same inputs and let it run again for each visitor. The flag splits visitors, not one response."
+      : "",
+    fix ? `Add data-kismet-fix="${experiment.flag}" on the changed element.` : `Add data-track="${experiment.flag}" to the new element.`,
     checkout
       ? "Run the project's checks if they finish in a few minutes."
       : "Run the project's checks if they finish in a few minutes. Commit and push the change.",
@@ -113,6 +144,7 @@ export function experimentTask(
 export function pullBody(experiment: TaskExperiment, signal: TaskSignal | undefined, summary: string): string {
   const evidence = signal?.evidence ?? [];
   const synthetic = evidence.filter((item) => item.synthetic).length;
+  const fix = experiment.kind === "fix";
   return [
     `## ${experiment.title}`,
     "",
@@ -127,8 +159,10 @@ export function pullBody(experiment: TaskExperiment, signal: TaskSignal | undefi
     `### Why (${evidence.length} pieces of evidence${synthetic ? `, ${synthetic} synthetic` : ""})`,
     ...evidence.slice(0, 8).map((item) => `- ${item.synthetic ? "_(synthetic)_ " : ""}[${item.source}] ${item.title}`),
     "",
-    `The change is dark until Kismet starts the experiment (flag \`${experiment.flag}\`, 50/50 split).`,
-    "Approve it from Kismet's Experiments page, or merge this PR — merging is the approval.",
+    fix
+      ? "This is a quick fix. Approving it ships the change to everyone. There is no A/B split."
+      : `The change is dark until Kismet starts the experiment (flag \`${experiment.flag}\`, 50/50 split).`,
+    "Approve it from the Dashboard, or merge this PR — merging is the approval.",
     "",
     "_Opened by Kismet._",
   ].filter((line) => line !== "").join("\n");

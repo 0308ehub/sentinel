@@ -70,7 +70,7 @@ export const PRODUCT_DOCS: ProductDoc[] = [
         id: "where-you-land",
         heading: "Where you land",
         paragraphs: [
-          "After you sign in, you land in the chat. The rest of the workspace is in the sidebar: agents, analytics, experiments, and the product graph. The chat is where a question starts.",
+          "After you sign in, you land on the dashboard, an inbox of experiments and quick fixes. Chat opens from the header as a sidebar on the right. Past chats are in the clock menu at the top of that sidebar.",
         ],
       },
       {

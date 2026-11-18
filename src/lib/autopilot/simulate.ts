@@ -16,7 +16,7 @@ const PAGES: { page: string; clicks: [string, number][] }[] = [
   { page: "/ai", clicks: [["Send", 0.7], ["New chat", 0.2]] },
   { page: "/features", clicks: [["Board", 0.25], ["Export CSV", 0.006]] },
   { page: "/integrations", clicks: [["Connect", 0.35], ["Request a connector", 0.01]] },
-  { page: "/experiments", clicks: [["New experiment", 0.12]] },
+  { page: "/experiments", clicks: [["Check for suggestions", 0.12]] },
   { page: "/dashboard", clicks: [["Features", 0.3]] },
 ];
 

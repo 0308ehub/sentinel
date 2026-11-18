@@ -76,10 +76,11 @@ export async function finishBuild(
   const base = await repoDefaultBranch(repo);
   const files = await compareFiles(repo, base, branch);
   const external = repo !== defaultAutopilotRepo();
+  const fix = experiment.kind === "fix";
   const gate = external ? `kismet.variant("${experiment.flag}")` : `useVariant("${experiment.flag}")`;
-  if (experiment.kind !== "fix" && !gateInPatch(files, gate)) return failBuild(experiment, "the coding agent did not add the experiment gate");
-  const changed = experiment.kind === "fix" ? files.find((file) => file.patch) : files.find((file) => file.patch?.includes(gate));
-  if (!changed) return failBuild(experiment, experiment.kind === "fix" ? "the coding agent did not change any files" : "the gated file could not be found");
+  if (!fix && !gateInPatch(files, gate)) return failBuild(experiment, "the coding agent did not add the experiment gate");
+  const changed = fix ? files.find((file) => file.patch) : files.find((file) => file.patch?.includes(gate));
+  if (!changed) return failBuild(experiment, fix ? "the coding agent did not change any files" : "the gated file could not be found");
   const [draft, original] = await Promise.all([
     readFile(repo, changed.filename, branch),
     readFile(repo, changed.filename, base),
@@ -97,7 +98,7 @@ export async function finishBuild(
   await log("build", `Opened PR #${pull.number} for “${experiment.title}”.`, experiment.id);
   const summary = experiment.changeSummary;
   const codeIsLive = false;
-  if (summary?.kind === "ui" && (Boolean(summary.when.trim()) || !codeIsLive)) {
+  if (!fix && summary?.kind === "ui" && (Boolean(summary.when.trim()) || !codeIsLive)) {
     await startSnapshot(
       { ...experiment, status: "awaiting_approval", prUrl: pull.url, prNumber: pull.number, branch },
       summary,

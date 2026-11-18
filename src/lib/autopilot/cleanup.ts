@@ -18,6 +18,7 @@ const simulated = () => autopilotDryRun() || isLocalSource();
 
 /** The experiment's code reached the product, so there is a switch to remove. */
 function needsCleanup(experiment: Experiment): boolean {
+  if (experiment.kind === "fix") return false;
   if (experiment.cleanup && experiment.cleanup.status !== "building") return false;
   // "stopped" only follows an approval (a running, winning or queued experiment), so its code shipped.
   if (!experiment.draftPath) return false;
