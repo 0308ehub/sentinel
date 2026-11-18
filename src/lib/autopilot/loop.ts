@@ -41,6 +41,7 @@ import type { AutopilotState } from "@/lib/autopilot/types";
 import { buildThemes } from "@/lib/autopilot/themes";
 import { triageSignals } from "@/lib/autopilot/triage";
 import { verifyFixes } from "@/lib/autopilot/verify-fixes";
+import { notifySlack } from "@/lib/autopilot/notify";
 
 export interface TickResult {
   ran: boolean;
@@ -115,6 +116,8 @@ async function runScopedTick(): Promise<TickResult> {
       await step("dispatch-build", result, followDispatchBuilds);
       await step("build", result, buildNext);
     }
+
+    await step("notify", result, notifySlack);
 
     await log("tick", result.errors.length ? `Ran with ${result.errors.length} error(s).` : "Ran.");
     return result;

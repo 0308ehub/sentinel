@@ -171,6 +171,17 @@ export async function postSlackMessage(channelId: string, text: string, threadTs
   });
 }
 
+export async function postSlackBlocks(channelId: string, text: string, blocks: unknown[]): Promise<string> {
+  const response = await postSlack<SlackResponse & { ts?: string }>("chat.postMessage", {
+    channel: channelId,
+    text: text.slice(0, 3000),
+    blocks,
+    unfurl_links: false,
+  });
+  if (!response.ts) throw new SlackApiError("missing_ts", "Slack posted the message but did not return its timestamp.");
+  return response.ts;
+}
+
 export async function slackUserName(userId: string): Promise<string> {
   return (await resolveUser(userId)).name;
 }

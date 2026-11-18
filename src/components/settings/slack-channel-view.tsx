@@ -21,6 +21,7 @@ import { slackThreadNodeId, useGraphStore } from "@/lib/graph/graph-store";
 import { useUIStore } from "@/stores/ui-store";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import type { SlackApiErrorBody, SlackChannel, SlackMessage, SlackStatus } from "@/lib/slack/types";
+import { SlackNotifyCard } from "@/components/settings/slack-notify-card";
 
 const CHANNEL_STORAGE_KEY = "kismet-slack-channel";
 const REFRESH_INTERVAL_MS = 60_000;
@@ -210,6 +211,8 @@ export function SlackChannelView({ oauthError }: { oauthError?: string }) {
               </CardContent>
             </Card>
           )}
+
+          {channels && <SlackNotifyCard channels={channels} />}
 
           {error && (
             <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">

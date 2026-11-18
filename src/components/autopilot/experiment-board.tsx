@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Loader2, Play } from "lucide-react";
 import { ExperimentDetail } from "@/components/autopilot/experiment-detail";
 import { Button } from "@/components/ui/button";
@@ -51,6 +51,7 @@ export function ExperimentBoard({
   const [tab, setTab] = useState<"overview" | "learnings" | "themes">("overview");
   const [filter, setFilter] = useState<StatusFilter>("active");
   const [selected, setSelected] = useState<Selection | null>(null);
+  const initialExperiments = useRef(state.experiments);
   // Goals come from the server; a local copy only holds the result of an edit made here. (Keying the
   // whole board on goals instead remounted it and closed whatever experiment was open.)
   const [editedGoals, setGoals] = useState<Goal[] | null>(null);
@@ -60,6 +61,13 @@ export function ExperimentBoard({
   const [goalKind, setGoalKind] = useState<"click" | "visit">("click");
   const [goalValue, setGoalValue] = useState("");
   const variant = useVariant("ap-add-first-experiment-guidance-to-the-exp-v1");
+
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("experiment");
+    if (!id || !initialExperiments.current.some((experiment) => experiment.id === id)) return;
+    const frame = requestAnimationFrame(() => setSelected({ kind: "experiment", id }));
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   const taken = useMemo(
     () => new Set(state.experiments.filter((experiment) => ACTIVE_EXPERIMENT.has(experiment.status)).map((experiment) => experiment.signalId)),

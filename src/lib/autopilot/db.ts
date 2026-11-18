@@ -244,6 +244,24 @@ create table if not exists kismet.autopilot_builder (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists kismet.autopilot_notify_prefs (
+  user_id text primary key,
+  enabled boolean not null default false,
+  channel_id text not null default '',
+  channel_name text not null default '',
+  digest boolean not null default true,
+  baseline_at timestamptz,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists kismet.autopilot_notifications (
+  user_id text not null,
+  event_key text not null,
+  sent_at timestamptz not null default now(),
+  slack_ts text,
+  primary key (user_id, event_key)
+);
+
 -- One row per Slack mention, so accounts sharing a bot never both act on it.
 create table if not exists kismet.slack_mention_claims (
   mention_key text primary key,
