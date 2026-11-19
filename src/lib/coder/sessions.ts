@@ -87,6 +87,9 @@ export async function startCoderSession(userId: string, text: string): Promise<C
     }],
     initial_events: [{ type: "user.message", content: [{ type: "text", text }] }],
   });
+  await import("@/lib/autopilot/spend")
+    .then(({ recordAgentSession }) => recordAgentSession({ sessionId: session.id, userId, kind: "chat", title }))
+    .catch(() => {});
   await sql`
     insert into kismet.coder_sessions (session_id, user_id, repo, title)
     values (${session.id}, ${userId}, ${repo}, ${title})

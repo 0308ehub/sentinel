@@ -77,3 +77,12 @@ test("a running test shows how far the readout has gotten", () => {
   assert.equal(session.mark, "blue");
   assert.equal(session.bucket, "running");
 });
+
+test("a merged cleanup is no longer an active review session", () => {
+  const session = workSession(experiment({
+    status: "rolled_out",
+    cleanup: { status: "merged", prUrl: "https://github.com/acme/app/pull/13" },
+  }), now);
+  assert.equal(session.bucket, "quiet");
+  assert.equal(session.followUps, 0);
+});

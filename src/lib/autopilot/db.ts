@@ -38,6 +38,27 @@ function client(): Sql {
 const SCHEMA = `
 create schema if not exists kismet;
 
+create table if not exists kismet.ai_spend (
+  bucket text not null,
+  subject text not null,
+  cents integer not null default 0,
+  hits integer not null default 0,
+  primary key (bucket, subject)
+);
+
+create table if not exists kismet.agent_spend (
+  session_id text primary key,
+  user_id text not null,
+  kind text not null,
+  experiment_id text,
+  title text not null,
+  cents integer not null default 0,
+  settled boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists agent_spend_user_created_idx on kismet.agent_spend (user_id, created_at desc);
+
 create table if not exists kismet.evidence (
   id text primary key,
   source text not null,

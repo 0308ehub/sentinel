@@ -5,6 +5,7 @@ import { Check, ChevronDown, Loader2, MoreHorizontal, Play } from "lucide-react"
 import { BuilderMenu, useAccountBuilder } from "@/components/autopilot/builder-menu";
 import { ExperimentDetail } from "@/components/autopilot/experiment-detail";
 import { ExperimentSessions } from "@/components/autopilot/experiment-sessions";
+import { SpendOverview } from "@/components/autopilot/spend-overview";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
@@ -66,7 +67,7 @@ export function ExperimentBoard({
   onCreate: (input: { title: string; change: string; page: string; builder: Builder }) => Promise<void>;
 }) {
   const [query, setQuery] = useState("");
-  const [tab, setTab] = useState<"overview" | "learnings" | "themes" | "activity">("overview");
+  const [tab, setTab] = useState<"overview" | "learnings" | "themes" | "activity" | "spend">("overview");
   const [filter, setFilter] = useState<StatusFilter>("active");
   const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState<Selection | null>(null);
@@ -252,6 +253,7 @@ export function ExperimentBoard({
           <button type="button" onClick={() => setTab("learnings")} className={tab === "learnings" ? "border-b-2 border-brand pb-2 font-medium text-brand" : "pb-2 text-[#6b7280]"}>Learnings</button>
           <button type="button" onClick={() => setTab("themes")} className={tab === "themes" ? "border-b-2 border-brand pb-2 font-medium text-brand" : "pb-2 text-[#6b7280]"}>Themes</button>
           <button type="button" onClick={() => setTab("activity")} className={tab === "activity" ? "border-b-2 border-brand pb-2 font-medium text-brand" : "pb-2 text-[#6b7280]"}>Activity</button>
+          <button type="button" onClick={() => setTab("spend")} className={tab === "spend" ? "border-b-2 border-brand pb-2 font-medium text-brand" : "pb-2 text-[#6b7280]"}>Spend</button>
         </div>
         {(!state.configured || state.error) && (
           <p className="mt-4 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
@@ -307,6 +309,8 @@ export function ExperimentBoard({
             signals={state.signals}
             onOpen={setSelected}
           />
+        ) : tab === "spend" ? (
+          <SpendOverview />
         ) : (
         <table className="w-full border-collapse text-left text-sm">
           <thead>

@@ -5,6 +5,7 @@ import { db, newId } from "@/lib/autopilot/db";
 import { chosenAutopilotRepo } from "@/lib/autopilot/repo";
 import { sanitizeSnapshotHtml } from "@/lib/autopilot/snapshot-html";
 import { autopilotUser } from "@/lib/autopilot/scope";
+import { recordAgentSession } from "@/lib/autopilot/spend";
 import type { Experiment } from "@/lib/autopilot/types";
 import { client, managedSessionView } from "@/lib/coder/sessions";
 import { githubTokenFor } from "@/lib/github/app";
@@ -155,10 +156,11 @@ export async function startSnapshot(experiment: Experiment, summary: ChangeSumma
     select recipe, script from kismet.render_recipes where user_id = ${userId} and repo = ${repo} limit 1
   `;
   const recipe = recipeRows[0] ?? null;
+  const title = `Render: ${experiment.title}`.slice(0, 80);
   const session = await client().beta.sessions.create({
     agent: agentId,
     environment_id: process.env.KISMET_CODER_ENVIRONMENT_ID!,
-    title: `Render: ${experiment.title}`.slice(0, 80),
+    title,
     budget: { type: "limit", max_list_cost: { amount: SNAPSHOT_BUDGET_CENTS, currency: "USD" } },
     metadata: { kismet_user: userId, kismet_experiment: experiment.id, kismet_task: "snapshot" },
     resources: [{
@@ -170,6 +172,7 @@ export async function startSnapshot(experiment: Experiment, summary: ChangeSumma
     }],
     initial_events: [{ type: "user.message", content: [{ type: "text", text: renderMessage(experiment, summary, recipe) }] }],
   });
+  await recordAgentSession({ sessionId: session.id, userId, kind: "render", experimentId: experiment.id, title }).catch(() => {});
   const id = existing?.id ?? newId("snapshot");
   const rows = await sql<SnapshotDbRow[]>`
     insert into kismet.experiment_snapshots

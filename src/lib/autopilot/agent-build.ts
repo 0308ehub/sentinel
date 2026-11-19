@@ -5,6 +5,7 @@ import { SERVER_SDK_FILE } from "@/lib/sdk/kismet-server";
 import { cancelOutsideBuild } from "@/lib/autopilot/dispatch";
 import { autopilotDryRun, autopilotRepo, defaultAutopilotRepo } from "@/lib/autopilot/repo";
 import { autopilotUser } from "@/lib/autopilot/scope";
+import { recordAgentSession } from "@/lib/autopilot/spend";
 import { listExperiments, listSignals, log, setSignalStatus, snoozeSignal, updateExperiment } from "@/lib/autopilot/store";
 import { isLocalSource } from "@/lib/autopilot/source";
 import { startSnapshot } from "@/lib/autopilot/snapshots";
@@ -36,16 +37,19 @@ export async function startAgentBuild(experiment: Experiment, signal: Signal | u
   // from an older copy of the repository.
   const base = await repoDefaultBranch(repo);
   const head = await branchHeadSha(repo, base, token);
+  const title = experiment.kind === "fix" ? experiment.title.slice(0, 80) : `Experiment: ${experiment.title}`.slice(0, 80);
+  const userId = autopilotUser();
   const session = await client().beta.sessions.create({
     agent: process.env.KISMET_CODER_AGENT_ID!,
     environment_id: process.env.KISMET_CODER_ENVIRONMENT_ID!,
-    title: experiment.kind === "fix" ? experiment.title.slice(0, 80) : `Experiment: ${experiment.title}`.slice(0, 80),
+    title,
     budget: { type: "limit", max_list_cost: { amount: SESSION_BUDGET_CENTS, currency: "USD" } },
-    metadata: { kismet_user: autopilotUser(), kismet_experiment: experiment.id },
+    metadata: { kismet_user: userId, kismet_experiment: experiment.id },
     resources: [{ type: "github_repository", url: `https://github.com/${repo}`, authorization_token: token,
       mount_path: "/workspace/repo", checkout: { type: "commit", sha: head } }],
     initial_events: [{ type: "user.message", content: [{ type: "text", text: experiment.kind === "fix" ? fixTask(experiment, signal) : experimentTask(experiment, signal, external) }] }],
   });
+  await recordAgentSession({ sessionId: session.id, userId, kind: "build", experimentId: experiment.id, title }).catch(() => {});
   await updateExperiment(experiment.id, {
     coderSessionId: session.id,
     note: "Kismet's coding agent is building this change.",

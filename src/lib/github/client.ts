@@ -232,6 +232,37 @@ async function github<T>(path: string, init?: RequestInit, candidateToken?: stri
   return (await res.json()) as T;
 }
 
+export async function fileText(fullName: string, path: string, ref: string): Promise<string | null> {
+  const parsed = repoName(fullName);
+  if (!parsed) throw new GitHubApiError("bad_repo", "Use a repository like owner/name.", 400);
+  const resolvedToken = await token(fullName);
+  const res = await fetch(
+    `${API}/repos/${parsed.owner}/${parsed.repo}/contents/${path.split("/").map(encodeURIComponent).join("/")}?ref=${encodeURIComponent(ref)}`,
+    {
+      headers: {
+        Authorization: `Bearer ${resolvedToken}`,
+        Accept: "application/vnd.github.raw",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "kismet",
+      },
+      cache: "no-store",
+    },
+  );
+  if (res.status === 404) return null;
+  if (res.status === 401) {
+    throw new GitHubApiError(
+      "unauthorized",
+      "GitHub rejected the token. Create a new token at https://github.com/settings/tokens.",
+      401,
+    );
+  }
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { message?: string };
+    throw new GitHubApiError("github_error", body.message || "GitHub request failed.", res.status);
+  }
+  return res.text();
+}
+
 export async function githubAccount(candidateToken?: string): Promise<GitHubAccount> {
   const user = await github<{ login?: string; }>("/user", undefined, candidateToken);
   if (!user.login) throw new GitHubApiError("github_error", "GitHub did not return an account.", 502);

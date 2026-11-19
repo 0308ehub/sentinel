@@ -1,11 +1,12 @@
 import "server-only";
 
 import { askForJson, readJson } from "@/lib/ai/respond";
+import { codeAlreadyRemoved } from "@/lib/autopilot/cleanup-core";
 import { autopilotDryRun, autopilotRepo } from "@/lib/autopilot/repo";
 import { baseBranch, isLocalSource, readSourceFile } from "@/lib/autopilot/source";
 import { experimentDraft, listExperiments, log, updateExperiment } from "@/lib/autopilot/store";
 import type { Experiment } from "@/lib/autopilot/types";
-import { closePull, commitChecks, getPull, GitHubApiError, mergePull, openPullRequest } from "@/lib/github/client";
+import { closePull, commitChecks, fileText, getPull, GitHubApiError, mergePull, openPullRequest, pullChanges, repoDefaultBranch } from "@/lib/github/client";
 
 // Once an experiment is decided, its switch is dead code: everyone sees the winner (rolled out) or
 // the original (turned off). Cleanup removes the switch and the losing version so the codebase
@@ -164,20 +165,37 @@ export async function followCleanups(): Promise<string | null> {
   const waiting = (await listExperiments()).filter((e) => e.cleanup?.status === "awaiting" && e.cleanup.prNumber);
   const done: string[] = [];
   for (const experiment of waiting) {
-    const number = experiment.cleanup!.prNumber!;
-    const pull = await getPull(repo, number);
-    if (pull.merged) {
-      await updateExperiment(experiment.id, { cleanupStatus: "merged", cleanupNote: "Merged on GitHub. The experiment switch is gone." });
-      done.push(`Cleanup for “${experiment.title}” was merged.`);
-    } else if (pull.state === "closed") {
-      await updateExperiment(experiment.id, { cleanupStatus: "closed", cleanupNote: "Closed on GitHub. The switch stays in the code." });
-    } else if ((await commitChecks(repo, pull.headSha)) === "failure") {
-      await closePull(repo, number);
-      await updateExperiment(experiment.id, {
-        cleanupStatus: "failed",
-        cleanupNote: "The cleanup's preview build failed, so Kismet closed it. The switch stays in the code.",
-      });
-      await log("cleanup", `Cleanup build failed for “${experiment.title}”; closed PR #${number}.`, experiment.id);
+    try {
+      const number = experiment.cleanup!.prNumber!;
+      const pull = await getPull(repo, number);
+      if (pull.merged) {
+        await updateExperiment(experiment.id, { cleanupStatus: "merged", cleanupNote: "Merged on GitHub. The experiment switch is gone." });
+        done.push(`Cleanup for “${experiment.title}” was merged.`);
+      } else if (pull.state === "closed") {
+        await updateExperiment(experiment.id, { cleanupStatus: "closed", cleanupNote: "Closed on GitHub. The switch stays in the code." });
+      } else {
+        const [changes, branch] = await Promise.all([pullChanges(repo, number), repoDefaultBranch(repo)]);
+        const texts = await Promise.all(changes.files.map((file) => fileText(repo, file.filename, branch)));
+        if (codeAlreadyRemoved(experiment.flag, texts)) {
+          await closePull(repo, number);
+          await updateExperiment(experiment.id, {
+            cleanupStatus: "merged",
+            cleanupNote: "The experiment's code was already removed from the main branch, so Kismet closed this cleanup.",
+          });
+          await log("cleanup", `Closed cleanup PR #${number}, “${changes.title}”, because the experiment code was already removed.`, experiment.id);
+          done.push(`Cleanup for “${experiment.title}” was already complete.`);
+        } else if ((await commitChecks(repo, pull.headSha)) === "failure") {
+          await closePull(repo, number);
+          await updateExperiment(experiment.id, {
+            cleanupStatus: "failed",
+            cleanupNote: "The cleanup's preview build failed, so Kismet closed it. The switch stays in the code.",
+          });
+          await log("cleanup", `Cleanup build failed for “${experiment.title}”; closed PR #${number}.`, experiment.id);
+        }
+      }
+    } catch (error) {
+      // GitHub may be briefly unavailable. Leave this cleanup for the next tick.
+      console.error("[autopilot] could not follow cleanup", experiment.id, error);
     }
   }
   return done.length ? done.join(" ") : null;
