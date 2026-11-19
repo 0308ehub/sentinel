@@ -169,9 +169,11 @@ export function ExperimentDetail({
   return (
     <div className="flex h-full min-h-0 bg-white text-[#1c1c1c]">
       <aside
-        className={singleColumn ? "flex min-w-0 max-w-3xl flex-1 flex-col gap-4 overflow-auto px-4 py-4" : "flex shrink-0 flex-col gap-4 overflow-auto px-4 py-4"}
+        className={singleColumn ? "flex min-w-0 flex-1 flex-col overflow-auto px-6 py-4" : "flex shrink-0 flex-col gap-4 overflow-auto px-4 py-4"}
         style={singleColumn ? undefined : { width: panelWidth }}
       >
+        {/* One column fills the pane and scrolls at its edge; the text stays a readable width, centered. */}
+        <div className={singleColumn ? "mx-auto flex w-full max-w-4xl flex-col gap-4" : "contents"}>
         <div className="flex items-center justify-between gap-3">
           <button type="button" onClick={onBack} className="text-left text-xs text-brand hover:underline">
             ‹ Dashboard
@@ -233,6 +235,7 @@ export function ExperimentDetail({
         </dl>
         <Autonomous experiment={experiment} signal={signal} learning={learning} suggested={suggested} lastFailed={lastFailed} />
         {singleColumn && experiment && <FixFollowUp experiment={experiment} signal={signal} className="border-t border-[#e6e8ec] pt-3" />}
+        </div>
       </aside>
       {!singleColumn && (<>
       <div
