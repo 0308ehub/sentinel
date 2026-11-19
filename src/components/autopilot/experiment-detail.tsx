@@ -55,6 +55,7 @@ export function ExperimentDetail({
   signal,
   learning,
   suggested,
+  lastFailed = null,
   busy,
   onBack,
   onApprove,
@@ -74,6 +75,8 @@ export function ExperimentDetail({
   signal: Signal | null;
   learning: Learning | null;
   suggested: boolean;
+  /** Shown on a reopened problem: the latest attempt that failed. */
+  lastFailed?: Experiment | null;
   busy: string | null;
   onBack: () => void;
   onApprove: () => void;
@@ -206,7 +209,7 @@ export function ExperimentDetail({
             </>
           )}
         </dl>
-        <Autonomous experiment={experiment} signal={signal} learning={learning} suggested={suggested} />
+        <Autonomous experiment={experiment} signal={signal} learning={learning} suggested={suggested} lastFailed={lastFailed} />
       </aside>
       <div
         role="separator"
@@ -313,11 +316,13 @@ function Autonomous({
   signal,
   learning,
   suggested,
+  lastFailed,
 }: {
   experiment: Experiment | null;
   signal: Signal | null;
   learning: Learning | null;
   suggested: boolean;
+  lastFailed: Experiment | null;
 }) {
   return (
     <div className="space-y-3 border-t border-[#e6e8ec] pt-3 text-xs">
@@ -334,6 +339,16 @@ function Autonomous({
       {(experiment?.kind === "change" || experiment?.kind === "fix") && experiment.rationale && <ChangeRationaleBlock experiment={experiment} signal={signal} />}
       {experiment?.metric && <p className="text-[#374151]">{experiment.metric}</p>}
       {experiment?.guardrail && <p className="text-[#374151]">Guardrail: {experiment.guardrail}</p>}
+      {!experiment && signal?.kind && signal.kindReason && (
+        <p className="text-[#374151]">
+          <span className="font-medium">Kismet thinks this is {signal.kind === "bug" ? "a bug" : "an idea"}:</span> {signal.kindReason}
+        </p>
+      )}
+      {!experiment && lastFailed && (
+        <p className="rounded border border-red-200 bg-red-50 px-2.5 py-2 text-red-700">
+          Kismet&apos;s last attempt, &ldquo;{lastFailed.title}&rdquo;, did not finish. {lastFailed.note ?? "The build failed."}
+        </p>
+      )}
       {suggested && !experiment && (
         <p className="text-[#374151]">Approving this lets Kismet decide whether it is an experiment or a quick fix, then write the code.</p>
       )}

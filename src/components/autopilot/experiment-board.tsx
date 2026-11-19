@@ -158,6 +158,7 @@ export function ExperimentBoard({
         signal={openSignal}
         learning={openExperiment ? state.learnings.find((learning) => learning.experimentId === openExperiment.id) ?? null : null}
         suggested={suggested}
+        lastFailed={openExperiment ? null : lastFailedAttempt(state.experiments, openSignal?.id ?? null)}
         busy={busy}
         onBack={() => setSelected(null)}
         onApprove={() => openExperiment && onAct(openExperiment, "approve")}
@@ -476,6 +477,13 @@ function ActivityTable({
       </tbody>
     </table>
   );
+}
+
+/** The most recent attempt at this problem that failed, so a reopened problem can say why. */
+function lastFailedAttempt(experiments: Experiment[], signalId: string | null): Experiment | null {
+  if (!signalId) return null;
+  const failed = experiments.filter((experiment) => experiment.signalId === signalId && experiment.status === "failed");
+  return failed.sort((a, b) => Date.parse(b.endedAt ?? b.createdAt) - Date.parse(a.endedAt ?? a.createdAt))[0] ?? null;
 }
 
 function ratingForSelection(ratings: SuggestionRating[], selection: Selection): SuggestionRating | null {

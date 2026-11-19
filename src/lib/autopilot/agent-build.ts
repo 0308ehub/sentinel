@@ -85,14 +85,15 @@ export async function finishBuild(
     readFile(repo, changed.filename, branch),
     readFile(repo, changed.filename, base),
   ]);
-  if (!draft || !original) return failBuild(experiment, "the gated file could not be read");
+  // The before/after copies only feed Kismet's preview; readFile skips large files, so a big file still
+  // gets its pull request, just without the stored copies.
   const pull = await createPullFromBranch(
     repo, branch, base, experiment.kind === "fix" ? experiment.title : `Experiment: ${experiment.title}`,
     experiment.kind === "fix" ? fixPullBody(experiment, signal, agentReport) : pullBody(experiment, signal, experiment.treatment),
   );
   await updateExperiment(experiment.id, {
     status: "awaiting_approval", prUrl: pull.url, prNumber: pull.number, branch,
-    draftPath: changed.filename, draft: draft.content, original: original.content,
+    draftPath: changed.filename, draft: draft?.content ?? null, original: original?.content ?? null,
     note: `Built by ${by}. Waiting for the preview build.`,
   });
   await log("build", `Opened PR #${pull.number} for “${experiment.title}”.`, experiment.id);
