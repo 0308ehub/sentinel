@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   ReactFlow,
   Background,
@@ -16,7 +17,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { buildFlowGraph, getNodeColor, getNodeLabel } from "@/lib/graph";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -26,6 +27,47 @@ import { Filter } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
 import { useAgents, type FleetAgent } from "@/lib/agents/fleet";
+import { layoutMap, MAP_COLUMN_WIDTH, orientEdges, type AutopilotMap, type AutopilotMapNode } from "@/lib/autopilot/map-core";
+
+type MapNodeData = Omit<AutopilotMapNode["meta"], "kind"> & {
+  label: string;
+  nodeKind: AutopilotMapNode["kind"];
+  metaKind?: AutopilotMapNode["meta"]["kind"];
+};
+
+function mapNodeSubtitle(data: MapNodeData): string {
+  if (data.nodeKind === "page") return "Page";
+  if (data.nodeKind === "area") return "Area";
+  if (data.nodeKind === "goal") return "Goal";
+  if (data.nodeKind === "problem") {
+    const kind = data.metaKind;
+    const count = data.evidence ?? 0;
+    return `${kind === "bug" ? "Bug" : kind === "idea" ? "Idea" : "Problem"} · ${count} ${count === 1 ? "report" : "reports"}`;
+  }
+  const kind = data.metaKind === "test" ? "A/B test" : data.metaKind === "fix" ? "Fix" : "Change";
+  return `${kind} · ${data.outcome ?? data.status ?? "planned"}`.replaceAll("_", " ");
+}
+
+function MapNodeComponent({ data }: { data: MapNodeData }) {
+  const positive = data.outcome === "won" || data.outcome === "fixed" || data.status === "merged" || data.status === "rolled_out";
+  const negative = data.outcome === "lost" || data.outcome === "not fixed" || data.status === "failed";
+  return (
+    <div className="min-w-[164px] max-w-[210px] rounded-lg border border-border bg-background px-3 py-2 shadow-sm">
+      <Handle type="target" position={Position.Left} className="!h-1.5 !w-1.5 !border-0 !bg-border" />
+      <div className="truncate text-xs font-medium text-foreground">{data.label}</div>
+      <div className={`mt-0.5 text-[10px] capitalize ${positive ? "text-emerald-700" : negative ? "text-red-700/70" : "text-muted-foreground"}`}>
+        {mapNodeSubtitle(data)}
+      </div>
+      <Handle type="source" position={Position.Right} className="!h-1.5 !w-1.5 !border-0 !bg-border" />
+    </div>
+  );
+}
+
+function MapHeaderComponent({ data }: { data: { label: string } }) {
+  return <p className="w-[240px] text-[11px] font-medium uppercase tracking-wide text-[#9aa0a8]">{data.label}</p>;
+}
+
+const mapNodeTypes = { mapNode: MapNodeComponent, mapHeader: MapHeaderComponent };
 
 const FILTER_TYPES: NodeType[] = [
   "FEATURE",
@@ -137,7 +179,112 @@ function hopColor(source: string, target: string, agents: FleetAgent[]): string 
   return null;
 }
 
-export function GraphView() {
+function MapGraphView() {
+  const router = useRouter();
+  const query = useQuery({
+    queryKey: ["autopilot", "map"],
+    queryFn: async ({ signal }) => {
+      const response = await fetch("/api/autopilot/map", { cache: "no-store", signal });
+      const body = (await response.json().catch(() => ({}))) as AutopilotMap & { error?: string };
+      if (!response.ok) throw new Error(body.error || "Kismet could not load the map.");
+      return body;
+    },
+    staleTime: 60_000,
+  });
+  const initialNodes: Node[] = useMemo(() => {
+    // A page nothing points to adds noise, not information.
+    const linked = new Set((query.data?.edges ?? []).flatMap((edge) => [edge.source, edge.target]));
+    const mapNodes = (query.data?.nodes ?? []).filter((node) => (node.kind !== "page" && node.kind !== "area") || linked.has(node.id));
+    const positions = layoutMap(mapNodes, query.data?.edges ?? []);
+    const headers: Node[] = mapNodes.length
+      ? ["Where it was reported", "Problem", "What Kismet tried", "Goal"].map((label, column) => ({
+          id: `header:${column}`,
+          type: "mapHeader",
+          position: { x: column * MAP_COLUMN_WIDTH + 40, y: 40 },
+          data: { label },
+          draggable: false,
+          selectable: false,
+        }))
+      : [];
+    return [...headers, ...mapNodes.map((node) => ({
+      id: node.id,
+      type: "mapNode",
+      position: positions.get(node.id) ?? { x: 0, y: 0 },
+      data: {
+        label: node.label,
+        nodeKind: node.kind,
+        metaKind: node.meta.kind,
+        evidence: node.meta.evidence,
+        status: node.meta.status,
+        outcome: node.meta.outcome,
+        experimentId: node.meta.experimentId,
+      },
+    }))];
+  }, [query.data?.nodes, query.data?.edges]);
+  const initialEdges: Edge[] = useMemo(() => orientEdges(query.data?.nodes ?? [], query.data?.edges ?? []).map((edge) => ({
+    id: edge.id,
+    source: edge.source,
+    target: edge.target,
+    label: edge.label,
+    labelStyle: { fontSize: 9, fill: "#6b7280" },
+    style: { stroke: "#d1d5db", strokeWidth: 1.25 },
+    markerEnd: { type: MarkerType.ArrowClosed, width: 11, height: 11, color: "#d1d5db" },
+  })), [query.data?.nodes, query.data?.edges]);
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+  useEffect(() => {
+    setNodes(initialNodes);
+    setEdges(initialEdges);
+  }, [initialNodes, initialEdges, setNodes, setEdges]);
+
+  const openNode = (_event: React.MouseEvent, node: Node) => {
+    const data = node.data as MapNodeData;
+    if (data.nodeKind === "goal") router.push("/analytics");
+    if (data.nodeKind === "problem") router.push(data.experimentId ? `/experiments?experiment=${data.experimentId}` : "/experiments");
+    if (data.nodeKind === "change" && data.experimentId) router.push(`/experiments?experiment=${data.experimentId}`);
+  };
+
+  return (
+    <div className="relative h-full min-h-0 bg-background">
+      <div className="pointer-events-none absolute left-4 top-3 z-10 rounded-md bg-background/90 px-2 py-1 text-xs text-muted-foreground backdrop-blur-sm">
+        Where problems come from, what Kismet tried, and what it moved.
+        {query.data && query.data.counts.total > query.data.counts.showing ? ` Showing ${query.data.counts.showing} of ${query.data.counts.total}.` : ""}
+      </div>
+      {query.isLoading ? (
+        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Loading Kismet’s map…</div>
+      ) : query.isError ? (
+        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">{query.error.message}</div>
+      ) : nodes.length === 0 ? (
+        <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
+          Kismet’s map will appear as complaints become problems and changes.
+        </div>
+      ) : (
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onNodeClick={openNode}
+          nodeTypes={mapNodeTypes}
+          fitView
+          fitViewOptions={{ padding: 0.2 }}
+          minZoom={0.25}
+          maxZoom={2}
+          proOptions={{ hideAttribution: true }}
+        >
+          <Background gap={20} size={1} color="#e8eaed" />
+          <Controls showInteractive={false} />
+        </ReactFlow>
+      )}
+      <Link href="/graph?view=workspace" className="absolute bottom-3 left-3 z-10 rounded bg-background/90 px-2 py-1 text-[11px] text-muted-foreground underline-offset-4 hover:underline">
+        Workspace notes graph
+      </Link>
+    </div>
+  );
+}
+
+function WorkspaceGraphView() {
   const searchParams = useSearchParams();
   const agents = useAgents();
   const graphStateNodes = useGraphStore((s) => s.nodes);
@@ -146,15 +293,18 @@ export function GraphView() {
     graphStateNodes.find((n) => n.type === "PRODUCT")?.id ??
     graphStateNodes[0]?.id ??
     "";
-  const graphVersion = useGraphStore((s) => s.nodes.length);
+  const graphVersion = graphStateNodes.length;
   const [filterTypes, setFilterTypes] = useState<NodeType[]>([]);
 
   const { nodes: graphNodes, edges: graphEdges } = useMemo(
-    () =>
+    () => {
+      void graphVersion;
+      return (
       buildFlowGraph(
         centerNodeId,
         filterTypes.length > 0 ? filterTypes : undefined
-      ),
+      ));
+    },
     [centerNodeId, filterTypes, graphVersion]
   );
 
@@ -291,6 +441,18 @@ export function GraphView() {
       )}
     </div>
   );
+}
+
+export function GraphView() {
+  const searchParams = useSearchParams();
+  return searchParams.get("view") === "workspace" ? (
+    <div className="relative h-full min-h-0">
+      <WorkspaceGraphView />
+      <Link href="/graph" className="absolute bottom-3 left-3 z-20 rounded bg-background/90 px-2 py-1 text-[11px] text-muted-foreground underline-offset-4 hover:underline">
+        Back to Kismet map
+      </Link>
+    </div>
+  ) : <MapGraphView />;
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
