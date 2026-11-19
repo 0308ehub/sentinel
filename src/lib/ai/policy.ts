@@ -77,7 +77,7 @@ function preferredProvider(input: RouteInput): ProviderId {
   if (input.prefer) return input.prefer;
   if (input.policy === "claude") return "claude";
   if (input.policy === "openai") return "openai";
-  if (input.task === "chat" || input.task === "recommendations" || input.needsTools || input.deep) return "claude";
+  if (input.task === "chat" || input.task === "recommendations" || input.task === "experiment" || input.needsTools || input.deep) return "claude";
   return "openai";
 }
 
@@ -93,6 +93,7 @@ function reasonFor(input: RouteInput, preferred: ProviderId, actual: ProviderId)
   if (input.policy === "openai") return "KISMET_MODEL_POLICY is set to OpenAI.";
   if (input.task === "chat") return "Chat reads the workspace and can use tools.";
   if (input.task === "recommendations") return "Recommendations read Slack, Jira, and the warehouse.";
+  if (input.task === "experiment") return "Kismet's triage and design decisions held up best on Claude (npm run eval).";
   if (input.needsTools) return "This draft may query the warehouse.";
   return "This is a short structured draft.";
 }
