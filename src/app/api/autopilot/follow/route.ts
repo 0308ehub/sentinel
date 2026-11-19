@@ -9,7 +9,8 @@ import { runTick } from "@/lib/autopilot/loop";
 import { tickTriggerDue } from "@/lib/autopilot/tick-trigger-core";
 import { sourceLabel } from "@/lib/autopilot/source";
 import { postAccountAlert } from "@/lib/autopilot/notify";
-import { listConnectionUsers } from "@/lib/connections/store";
+import { postThreadUpdates } from "@/lib/autopilot/thread-updates";
+import { getConnection, listConnectionUsers } from "@/lib/connections/store";
 
 function bearerMatches(header: string | null, secret: string): boolean {
   const encoder = new TextEncoder();
@@ -39,6 +40,15 @@ export async function GET(request: Request) {
   let checked = 0;
   let ran = 0;
   for (const userId of [...new Set(users)]) {
+    if (await getConnection(userId, "slack").catch(() => null)) {
+      await withAutopilotUser(userId, async () => {
+        try {
+          await postThreadUpdates();
+        } catch (error) {
+          console.error("[autopilot] could not post reporter thread updates", error);
+        }
+      });
+    }
     await withAutopilotUser(userId, async () => {
       try {
         if (!(await sourceLabel())) return;

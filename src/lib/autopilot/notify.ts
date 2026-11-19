@@ -1,9 +1,9 @@
 import "server-only";
 
 import { db } from "@/lib/autopilot/db";
-import { buildDigest, deriveEvents, digestDue, reporterReplyKey, reporterReplyText, reporterThreads } from "@/lib/autopilot/notify-core";
+import { buildDigest, deriveEvents, digestDue } from "@/lib/autopilot/notify-core";
 import { autopilotUser } from "@/lib/autopilot/scope";
-import { listExperiments, listSignals, log } from "@/lib/autopilot/store";
+import { listExperiments } from "@/lib/autopilot/store";
 import { siteUrl } from "@/lib/site";
 import { postSlackBlocks, postSlackMessage, SlackApiError } from "@/lib/slack/client";
 
@@ -96,28 +96,9 @@ async function finish(eventKey: string, slackTs: string): Promise<void> {
 }
 
 export async function notifySlack(): Promise<string | null> {
-  const [experiments, signals] = await Promise.all([listExperiments(), listSignals()]);
-  const now = Date.now();
-  let reporterPosted = 0;
-  const recentFixes = experiments.filter((experiment) =>
-    experiment.kind === "fix" && experiment.status === "rolled_out" && experiment.prUrl && experiment.startedAt &&
-    Date.parse(experiment.startedAt) >= now - 7 * 86_400_000 && Date.parse(experiment.startedAt) <= now,
-  );
-  for (const experiment of recentFixes) {
-    const signal = signals.find((item) => item.id === experiment.signalId);
-    for (const thread of reporterThreads(signal?.evidence ?? [])) {
-      const key = reporterReplyKey(experiment.id, thread.channelId, thread.threadTs);
-      if (!(await claim(key))) continue;
-      try {
-        await postSlackMessage(thread.channelId, reporterReplyText(experiment.title, experiment.prUrl!), thread.threadTs);
-        reporterPosted += 1;
-      } catch (error) {
-        await release(key);
-        console.error("[autopilot] could not reply to Slack reporter", error);
-        await log("error", `Could not reply to a Slack reporter for “${experiment.title}”: ${readableSlackError(error).message}`, experiment.id).catch(() => {});
-      }
-    }
-  }
+  const { postThreadUpdates } = await import("@/lib/autopilot/thread-updates");
+  const reporterPosted = await postThreadUpdates();
+  const experiments = await listExperiments();
 
   const prefs = await getNotifyPrefs();
   if (!prefs.enabled || !prefs.channelId) return reporterPosted ? `notify: replied to ${reporterPosted} reporter${reporterPosted === 1 ? "" : "s"}` : null;
