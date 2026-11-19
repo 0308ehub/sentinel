@@ -74,6 +74,17 @@ export function utcDays(days: number, now = new Date()): string[] {
   return Array.from({ length: count }, (_, index) => new Date(end - (count - index - 1) * 86_400_000).toISOString().slice(0, 10));
 }
 
+/** The daily limit is counted per UTC day, so it resets at the next UTC midnight. */
+export function nextDailyReset(now = new Date()): Date {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+}
+
+export function formatCountdown(ms: number): string {
+  const minutes = Math.max(0, Math.ceil(ms / 60_000));
+  const hours = Math.floor(minutes / 60);
+  return hours ? `${hours}h ${minutes % 60}m` : `${minutes}m`;
+}
+
 export function spendTotal(amounts: SpendAmounts): number {
   return amounts.buildCents + amounts.renderCents + amounts.modelCents + amounts.chatCents;
 }
