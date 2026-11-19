@@ -33,3 +33,12 @@ test("stall decision retries stalled and overlong running sessions", () => {
   assert.equal(stallDecision({ status: "running", stageAt: "2026-11-19T12:39:00.000Z", startedAt: "2026-11-19T12:00:00.000Z", attempts: 0, now }), "give_up");
   assert.equal(stallDecision({ status: "running", stageAt: "2026-11-19T12:28:00.000Z", startedAt: "2026-11-19T12:00:00.000Z", attempts: MAX_ATTEMPTS, now }), "give_up");
 });
+
+test("shell-only agents still move through the stages", () => {
+  const bash = (command) => ({ kind: "step", tool: "bash", summary: `Ran \`${command.split("\n")[0].slice(0, 40)}\``, isError: false, command });
+  assert.equal(buildStage([bash("cd /workspace/repo && cat -n src/lib/autopilot/spend-core.ts")], { hasBranch: false }), "reading");
+  assert.equal(buildStage([bash("cd /workspace/repo && python3 - <<'EOF'\nopen('a.ts','w').write('x')\nEOF")], { hasBranch: false }), "writing");
+  assert.equal(buildStage([bash("cd /workspace/repo && sed -i '' 's/a/b/' src/x.tsx")], { hasBranch: false }), "writing");
+  assert.equal(buildStage([bash("cd /workspace/repo && timeout 280 npm ci --ignore-scripts >/tmp/ci.log 2>&1; npx tsc --noEmit -p .")], { hasBranch: false }), "checking");
+  assert.equal(buildStage([bash("cd /workspace/repo && git add -A && git commit -m fix && git push -u origin kismet/x")], { hasBranch: false }), "pushing");
+});

@@ -62,11 +62,18 @@ export function BuildLive({ experimentId }: { experimentId: string }) {
         {error && <p className="text-xs text-destructive">{error}</p>}
       </div>
       <p className="flex items-center gap-2 border-t border-border px-3 py-2 text-xs text-muted-foreground">
-        {working && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-        {working ? "Working…" : "The coding agent stopped."}
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        {footerText(view, working)}
       </p>
     </div>
   );
+}
+
+/** After the agent stops, Kismet still has work to do; say what it is instead of just "stopped". */
+function footerText(view: CoderView | null, working: boolean): string {
+  if (working) return "Working…";
+  if (view?.branch) return `The agent pushed ${view.branch}. Kismet is checking the change and opening the pull request…`;
+  return "The agent finished without pushing a branch. Kismet is reading its answer…";
 }
 
 function BuildItem({ item }: { item: CoderItem }) {

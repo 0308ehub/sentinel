@@ -1,7 +1,7 @@
 export type CoderItem =
   | { kind: "user"; text: string }
   | { kind: "agent"; text: string }
-  | { kind: "step"; tool: string; summary: string; isError: boolean }
+  | { kind: "step"; tool: string; summary: string; isError: boolean; command?: string }
   | { kind: "error"; text: string };
 
 export interface CoderView {
@@ -90,7 +90,9 @@ export function toCoderView(events: readonly InputEvent[], session: InputSession
       if (text) items.push({ kind: "agent", text });
     } else if (event.type === "agent.tool_use" && event.id && event.name) {
       const summary = toolSummary(event.name, event.input);
-      items.push({ kind: "step", tool: event.name, summary, isError: results.get(event.id) ?? false });
+      // The full shell command (capped) lets Kismet tell reading from writing and checks; the summary is cut short.
+      const command = event.name === "bash" && typeof event.input?.command === "string" ? event.input.command.slice(0, 4000) : undefined;
+      items.push({ kind: "step", tool: event.name, summary, isError: results.get(event.id) ?? false, ...(command ? { command } : {}) });
       if (event.evaluated_permission === "ask" && !answered.has(event.id)) {
         pendingApproval = { toolUseId: event.id, tool: event.name, summary };
       }

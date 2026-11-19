@@ -10,6 +10,8 @@ const READ_TOOL = /(?:^|_)(?:read|view|glob|grep|search|find|ls)(?:$|_)/i;
 const WRITE_TOOL = /(?:^|_)(?:edit|write|str_replace|replace|patch|create)(?:$|_)/i;
 const CHECK_COMMAND = /(?:npm\s+(?:test|run\s+(?:test|lint|build|typecheck))|pnpm\s+(?:test|run\s+(?:test|lint|build|typecheck))|yarn\s+(?:test|(?:run\s+)?(?:test|lint|build|typecheck))|\btsc\b|\beslint\b|\bnext\s+build\b|\bnode\s+--test\b|\bvitest\b|\bjest\b)/i;
 const PUSH_COMMAND = /\bgit\s+(?:commit|push)\b/i;
+// Shell edits: scripts that write files, in-place sed, redirects into source files, patches.
+const WRITE_COMMAND = /(?:\bpython3?\s+-\s*<<|\bnode\s+-e\b|\bsed\s+-i\b|\bperl\s+-pi\b|\btee\s|\bapply_patch\b|\bgit\s+apply\b|\bpatch\s+-p|>\s*\S+\.(?:tsx?|jsx?|mjs|css|json|md)\b|write_text\(|writeFileSync\()/i;
 
 export function buildStage(items: readonly CoderItem[], options: { hasBranch: boolean }): BuildStage {
   if (options.hasBranch) return "opening_pr";
@@ -20,8 +22,11 @@ export function buildStage(items: readonly CoderItem[], options: { hasBranch: bo
     if (READ_TOOL.test(tool)) stage = "reading";
     else if (WRITE_TOOL.test(tool)) stage = "writing";
     else if (tool.toLowerCase() === "bash") {
-      if (PUSH_COMMAND.test(item.summary)) stage = "pushing";
-      else if (CHECK_COMMAND.test(item.summary)) stage = "checking";
+      // One command often does several things; the furthest step it reaches wins.
+      const command = item.command ?? item.summary;
+      if (PUSH_COMMAND.test(command)) stage = "pushing";
+      else if (CHECK_COMMAND.test(command)) stage = "checking";
+      else if (WRITE_COMMAND.test(command)) stage = "writing";
       else if (stage === "starting") stage = "reading";
     }
   }

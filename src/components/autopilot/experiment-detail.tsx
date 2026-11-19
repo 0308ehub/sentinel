@@ -191,7 +191,7 @@ export function ExperimentDetail({
               Suggested
             </p>
           )}
-          {experiment?.status === "building" && experiment.buildStage && <BuildProgress experiment={experiment} />}
+          {experiment && showBuildProgress(experiment) && <BuildProgress experiment={experiment} />}
         </div>
         {!experiment && signal && <BuilderMenu value={writer} onChange={setPickedWriter} />}
         <dl className="space-y-3 text-xs">
@@ -290,19 +290,35 @@ function BuildProgress({ experiment }: { experiment: Experiment }) {
     { stage: "checking", label: "Checks" },
     { stage: "pushing", label: "Pushing" },
     { stage: "opening_pr", label: "PR" },
+    { stage: "preview", label: "Preview build" },
   ] as const;
-  const current = experiment.buildStage === "starting" ? "reading" : experiment.buildStage;
+  const current = experiment.status === "awaiting_approval"
+    ? "preview"
+    : experiment.buildStage === "starting" ? "reading" : experiment.buildStage;
+  const currentIndex = stages.findIndex((item) => item.stage === current);
+  const since = experiment.status === "awaiting_approval"
+    ? null
+    : ageLabel(experiment.buildStageAt ?? experiment.buildStartedAt ?? experiment.createdAt);
   return (
     <div className="mt-2 flex items-center gap-1 overflow-x-auto whitespace-nowrap text-xs text-[#6b7280]">
       {stages.map((item, index) => (
         <span key={item.stage} className="contents">
           {index > 0 && <span className="text-[#c4c8cf]">→</span>}
-          <span className={item.stage === current ? "font-medium text-[#111827]" : "text-[#6b7280]"}>{item.label}</span>
+          <span className={index < currentIndex ? "text-[#17663a]" : index === currentIndex ? "font-medium text-[#111827]" : "text-[#9aa0a8]"}>
+            {index < currentIndex ? "✓ " : ""}{item.label}
+          </span>
         </span>
       ))}
-      <span className="ml-1 text-[#9aa0a8]">· last activity {ageLabel(experiment.buildStageAt ?? experiment.buildStartedAt ?? experiment.createdAt)} ago</span>
+      {since && <span className="ml-1 text-[#9aa0a8]">· last activity {since} ago</span>}
     </div>
   );
+}
+
+/** While the agent works, and after its PR opens until the preview build finishes. */
+function showBuildProgress(experiment: Experiment): boolean {
+  if (experiment.status === "building") return Boolean(experiment.buildStage);
+  return experiment.status === "awaiting_approval" && Boolean(experiment.buildStage) &&
+    (experiment.note ?? "").includes("Waiting for the preview build");
 }
 
 /** True when there is code to look at: a pull request, a pushed branch, or a stored draft. */

@@ -19,7 +19,7 @@ test("projects messages, tool steps, errors, and status", () => {
   ], session);
   assert.deepEqual(view.items, [
     { kind: "user", text: "Fix the tests" },
-    { kind: "step", tool: "bash", summary: "Ran `npm test`", isError: true },
+    { kind: "step", tool: "bash", summary: "Ran `npm test`", isError: true, command: "npm test\necho done" },
     { kind: "error", text: "Sandbox stopped." },
   ]);
   assert.equal(view.stopReason, "end_turn");
