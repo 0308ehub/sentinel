@@ -636,6 +636,11 @@ function Links({ experiment }: { experiment: Experiment | null }) {
   const cleanup = experiment.cleanup;
   return (
     <div className="space-y-1 text-brand">
+      {experiment.startedAt && (
+        <a className="block text-xs hover:underline" href={`/analytics?experiment=${encodeURIComponent(experiment.id)}`}>
+          See in Analytics →
+        </a>
+      )}
       {experiment.buildUrl && (
         <a className="flex items-center gap-1 hover:underline" href={experiment.buildUrl} target="_blank" rel="noreferrer">
           Watch the build <ExternalLink className="h-3 w-3" />

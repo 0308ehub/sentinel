@@ -11,13 +11,17 @@ import { ExploreView } from "@/components/analytics/explore-view";
 import type { ExploreSpec } from "@/lib/analytics/explore-types";
 import { useAnalyticsLibrary } from "@/stores/analytics-store";
 import { FunnelsView } from "@/components/analytics/funnels-view";
-import { ChartSpline, Database, Filter, LayoutDashboard, LineChart, Shapes, Terminal } from "lucide-react";
+import { KismetMeasureView } from "@/components/analytics/kismet-measure-view";
+import { Activity, ChartSpline, Database, Filter, LayoutDashboard, LineChart, Shapes, Terminal } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type AnalyticsTab = "boards" | "funnels" | "explore" | "definitions" | "charts" | "query" | "sources";
+type AnalyticsTab = "kismet" | "boards" | "funnels" | "explore" | "definitions" | "charts" | "query" | "sources";
 
 export function AnalyticsView() {
-  const [tab, setTab] = useState<AnalyticsTab>("boards");
+  const [tab, setTab] = useState<AnalyticsTab>("kismet");
+  const [experimentId, setExperimentId] = useState<string | null>(() =>
+    typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("experiment"),
+  );
   const [preset, setPreset] = useState<ExploreSpec | null>(null);
   const importShared = useAnalyticsLibrary((state) => state.importShared);
   const { createTab, saveQueryFromAI } = useQueryEditorStore();
@@ -26,29 +30,33 @@ export function AnalyticsView() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const token = params.get("board");
-    if (token && importShared(token)) {
-      setTab("boards");
-      return;
-    }
-    const notebook = params.get("notebook");
-    if (notebook) {
-      openSavedNotebook(notebook);
-      setTab("query");
-      return;
-    }
-    const requested = params.get("tab");
-    if (
-      requested === "boards" ||
-      requested === "funnels" ||
-      requested === "explore" ||
-      requested === "definitions" ||
-      requested === "charts" ||
-      requested === "query" ||
-      requested === "sources"
-    ) {
-      setTab(requested);
-    }
+    let active = true;
+    queueMicrotask(() => {
+      if (!active) return;
+      const token = params.get("board");
+      if (token && importShared(token)) {
+        setTab("boards");
+        return;
+      }
+      const notebook = params.get("notebook");
+      if (notebook) {
+        openSavedNotebook(notebook);
+        setTab("query");
+        return;
+      }
+      const requested = params.get("tab");
+      if (
+        requested === "kismet" ||
+        requested === "boards" ||
+        requested === "funnels" ||
+        requested === "explore" ||
+        requested === "definitions" ||
+        requested === "charts" ||
+        requested === "query" ||
+        requested === "sources"
+      ) setTab(requested);
+    });
+    return () => { active = false; };
   }, [importShared, openSavedNotebook]);
 
   const insertQueryFromAI = (sql: string, name?: string) => {
@@ -65,6 +73,7 @@ export function AnalyticsView() {
         <div className="flex min-w-0 items-center gap-4">
           <h1 className="py-3 text-sm font-semibold">Analytics</h1>
           <div className="flex gap-1 overflow-x-auto">
+            <TabButton active={tab === "kismet"} onClick={() => { setExperimentId(null); setTab("kismet"); }} icon={Activity} label="Kismet" />
             <TabButton active={tab === "boards"} onClick={() => setTab("boards")} icon={LayoutDashboard} label="Boards" />
             <TabButton active={tab === "funnels"} onClick={() => setTab("funnels")} icon={Filter} label="Funnels" />
             <TabButton active={tab === "explore"} onClick={() => setTab("explore")} icon={ChartSpline} label="Explore" />
@@ -91,7 +100,9 @@ export function AnalyticsView() {
         </div>
       </div>
 
-      {tab === "sources" ? (
+      {tab === "kismet" ? (
+        <KismetMeasureView experimentId={experimentId} />
+      ) : tab === "sources" ? (
         <div className="flex-1 overflow-hidden">
           <DataSourcesPanel onInsertQuery={insertQueryFromAI} />
         </div>

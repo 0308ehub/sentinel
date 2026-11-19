@@ -1012,6 +1012,59 @@ export async function visitorSeries(flag: string, since: string): Promise<DailyV
   return [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day));
 }
 
+export interface DailyMetricCount {
+  day: string;
+  series: string;
+  visitors: number;
+  conversions: number;
+}
+
+/** Daily distinct visitors and converters, grouped in SQL and bounded to the requested window. */
+export async function dailyMetricCounts(
+  spec: MetricSpec,
+  from: string,
+  to: string,
+  options: { flag?: string; splitAt?: string } = {},
+): Promise<DailyMetricCount[]> {
+  const sql = await db();
+  const userId = scopeUser();
+  const flag = options.flag ?? null;
+  const splitAt = options.splitAt ?? null;
+  const rows = await sql`
+    with mode as (
+      select not exists (
+        select 1 from kismet.events where user_id = ${userId} and at >= ${from} and at < ${to} and synthetic = false
+      ) as include_synthetic
+    ), eligible as (
+      select e.* from kismet.events e, mode
+      where e.user_id = ${userId} and e.at >= ${from} and e.at < ${to}
+        and (not e.synthetic or mode.include_synthetic)
+    ), audience as (
+      select at::date as day, visitor,
+        case when ${flag}::text is not null then arms ->> ${flag}
+             when at < ${splitAt}::timestamptz then 'before' else 'after' end as series
+      from eligible
+      where (${flag}::text is null or arms ? ${flag})
+      group by 1, 2, 3
+    ), converted as (
+      select at::date as day, visitor,
+        case when ${flag}::text is not null then arms ->> ${flag}
+             when at < ${splitAt}::timestamptz then 'before' else 'after' end as series
+      from eligible
+      where (${flag}::text is null or arms ? ${flag}) and ${converts(sql, spec)}
+      group by 1, 2, 3
+    )
+    select to_char(a.day, 'YYYY-MM-DD') as day, a.series,
+      count(*)::int as visitors, count(c.visitor)::int as conversions
+    from audience a left join converted c using (day, visitor, series)
+    where a.series is not null
+    group by 1, 2 order by 1, 2
+  `;
+  return rows.map((row) => ({
+    day: String(row.day), series: String(row.series), visitors: Number(row.visitors), conversions: Number(row.conversions),
+  }));
+}
+
 export interface CrossCount {
   arm: Arm;
   otherArm: Arm;
