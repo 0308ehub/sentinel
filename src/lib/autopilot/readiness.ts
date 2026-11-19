@@ -16,9 +16,10 @@ export function signalIsReady(input: ReadinessInput): boolean {
       input.evidence
         .filter((item) => item.source !== "analytics")
         .map((item) => item.author.trim().toLowerCase())
-        .filter((author) => author.length > 0 && author !== "kismet analytics"),
+        .filter((author) => author.length > 0 && author !== "kismet analytics" && author !== "slack"),
     );
-    return qualitativePeople.size >= 2 ||
+    // One person reporting a bug is enough: design can still conclude no change is needed.
+    return qualitativePeople.size >= 1 ||
       (input.distinctEvidence >= 3 && input.distinctSources >= 1 && input.evidence.some((item) => item.source === "ticket"));
   }
   if (input.distinctEvidence < input.minEvidence || input.distinctSources < input.minSources) return false;

@@ -16,8 +16,8 @@ test("signals with analytics retain the existing readiness thresholds", () => {
   assert.equal(signalIsReady({ ...base, distinctEvidence: 4, evidence: [{ source: "analytics", author: "Kismet analytics" }] }), false);
 });
 
-test("bugs are ready from two reporters or three items including a ticket", () => {
-  assert.equal(signalIsReady({ ...base, kind: "bug", distinctEvidence: 2, distinctSources: 1, evidence: [{ source: "slack", author: "Ada" }, { source: "slack", author: "Ben" }] }), true);
-  assert.equal(signalIsReady({ ...base, kind: "bug", distinctEvidence: 3, distinctSources: 1, evidence: [{ source: "ticket", author: "Ada" }] }), true);
-  assert.equal(signalIsReady({ ...base, kind: "bug", distinctEvidence: 3, distinctSources: 2, evidence: [{ source: "slack", author: "Ada" }, { source: "analytics", author: "Kismet analytics" }] }), false);
+test("a bug is ready from one named reporter, or three items including a ticket", () => {
+  assert.equal(signalIsReady({ ...base, kind: "bug", distinctEvidence: 1, distinctSources: 1, evidence: [{ source: "slack", author: "U123" }] }), true);
+  assert.equal(signalIsReady({ ...base, kind: "bug", distinctEvidence: 3, distinctSources: 1, evidence: [{ source: "ticket", author: "" }] }), true);
+  assert.equal(signalIsReady({ ...base, kind: "bug", distinctEvidence: 2, distinctSources: 2, evidence: [{ source: "slack", author: "Slack" }, { source: "analytics", author: "Kismet analytics" }] }), false);
 });
