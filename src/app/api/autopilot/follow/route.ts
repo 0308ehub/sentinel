@@ -4,7 +4,9 @@ import { followAgentBuilds } from "@/lib/autopilot/agent-build";
 import { followDispatchBuilds } from "@/lib/autopilot/dispatch-build";
 import { withAutopilotUser } from "@/lib/autopilot/scope";
 import { listExperiments, withTickLock } from "@/lib/autopilot/store";
-import { lastRunAt } from "@/lib/autopilot/store";
+import { hasUnsortedEvidenceSince, lastRunAt } from "@/lib/autopilot/store";
+import { runTick } from "@/lib/autopilot/loop";
+import { tickTriggerDue } from "@/lib/autopilot/tick-trigger-core";
 import { sourceLabel } from "@/lib/autopilot/source";
 import { postAccountAlert } from "@/lib/autopilot/notify";
 import { listConnectionUsers } from "@/lib/connections/store";
@@ -35,6 +37,7 @@ export async function GET(request: Request) {
     return [];
   });
   let checked = 0;
+  let ran = 0;
   for (const userId of [...new Set(users)]) {
     await withAutopilotUser(userId, async () => {
       try {
@@ -47,6 +50,22 @@ export async function GET(request: Request) {
         console.error("[autopilot] could not check missed runs", error);
       }
     });
+    // A Slack message that arrived while a run was finishing would otherwise wait for the next hourly run.
+    const caughtUp = await withAutopilotUser(userId, async () => {
+      try {
+        if (!(await sourceLabel())) return false;
+        const last = await lastRunAt();
+        if (!tickTriggerDue(last, new Date()) || !(await hasUnsortedEvidenceSince(last))) return false;
+        return (await runTick(userId)).ran;
+      } catch (error) {
+        console.error("[autopilot] could not run for new evidence", error);
+        return false;
+      }
+    });
+    if (caughtUp) {
+      ran += 1;
+      continue;
+    }
     // Check without the lock first, so an idle account never holds it and blocks the hourly run.
     const didCheck = await withAutopilotUser(userId, async () => {
       if (!(await hasActiveBuild())) return false;
@@ -59,5 +78,5 @@ export async function GET(request: Request) {
     });
     if (didCheck) checked += 1;
   }
-  return Response.json({ checked, users: users.length });
+  return Response.json({ checked, ran, users: users.length });
 }

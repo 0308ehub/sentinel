@@ -593,6 +593,15 @@ export async function listActivity(limit = 100): Promise<Activity[]> {
   }));
 }
 
+/** True when evidence arrived after the last run and has not been sorted into a problem yet. */
+export async function hasUnsortedEvidenceSince(at: string | null): Promise<boolean> {
+  const sql = await db();
+  const rows = at
+    ? await sql`select 1 from kismet.evidence where user_id = ${scopeUser()} and signal_id is null and created_at > ${at} limit 1`
+    : await sql`select 1 from kismet.evidence where user_id = ${scopeUser()} and signal_id is null limit 1`;
+  return rows.length > 0;
+}
+
 export async function lastRunAt(): Promise<string | null> {
   const sql = await db();
   const rows = await sql`select max(at) as at from kismet.activity where user_id = ${scopeUser()} and kind = 'tick'`;
