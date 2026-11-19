@@ -94,6 +94,11 @@ export function workSession(experiment: Experiment, now = Date.now()): WorkSessi
     };
   }
 
+  // A merged fix stays in the list while Kismet watches whether the complaints stop.
+  if (experiment.kind === "fix" && experiment.status === "rolled_out" && !experiment.verdict) {
+    return { ...base, mark: "blue", line: { text: "Merged · watching for complaints", tone: "green" }, age: ageLabel(experiment.startedAt || base.updated, now), clock: false, canStop: false, bucket: "running" };
+  }
+
   if (experiment.status === "awaiting_rollout") {
     return { ...base, mark: "blue", line: { text: "Review result", tone: "orange" }, age: ageLabel(base.updated, now), clock: false, canStop: false, bucket: "review" };
   }

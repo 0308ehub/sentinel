@@ -161,6 +161,9 @@ export function ExperimentBoard({
     selected?.kind === "signal"
       ? state.experiments.find((experiment) => experiment.signalId === selected.id && ACTIVE_EXPERIMENT.has(experiment.status)) ?? null
       : null;
+  // Once a suggestion becomes an experiment, follow the experiment itself, so it stays open after it merges
+  // or ends instead of falling back to the (now resolved) suggestion.
+  if (createdFromSignal && selected?.kind === "signal") setSelected({ kind: "experiment", id: createdFromSignal.id });
   const selection: Selection | null = createdFromSignal ? { kind: "experiment", id: createdFromSignal.id } : selected;
   const openExperiment = selection?.kind === "experiment" ? state.experiments.find((experiment) => experiment.id === selection.id) ?? null : null;
   const openSignal =

@@ -102,3 +102,12 @@ test("a Kismet rejection is shown as no change needed", () => {
   assert.deepEqual(session.line, { text: "No change needed", tone: "muted" });
   assert.equal(session.bucket, "quiet");
 });
+
+test("a merged fix stays listed while Kismet watches for complaints", () => {
+  const now = Date.parse("2026-11-19T20:30:00.000Z");
+  const session = workSession(experiment({ kind: "fix", status: "rolled_out", startedAt: "2026-11-19T20:15:00.000Z", verdict: null }), now);
+  assert.deepEqual(session.line, { text: "Merged · watching for complaints", tone: "green" });
+  assert.equal(session.bucket, "running");
+  const verified = workSession(experiment({ kind: "fix", status: "rolled_out", startedAt: "2026-11-01T00:00:00.000Z", verdict: "fixed" }), now);
+  assert.equal(verified.bucket, "quiet");
+});
