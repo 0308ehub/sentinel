@@ -42,6 +42,7 @@ export function SlackChannelView({ oauthError }: { oauthError?: string }) {
   const [channelId, setChannelId] = useState<string>("");
   const [messages, setMessages] = useState<SlackMessage[] | null>(null);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [waitingForSlack, setWaitingForSlack] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -103,10 +104,17 @@ export function SlackChannelView({ oauthError }: { oauthError?: string }) {
 
     const sync = async () => {
       try {
-        const { messages } = await getJson<{ messages: SlackMessage[] }>(
+        const { messages, waiting } = await getJson<{ messages: SlackMessage[]; waiting?: boolean }>(
           `/api/slack/messages?channel=${encodeURIComponent(channelId)}&limit=50`
         );
         if (!current) return;
+        // Slack asked to wait and there is nothing cached yet: keep what is shown and try again shortly.
+        if (waiting) {
+          setWaitingForSlack(true);
+          window.setTimeout(() => current && setRefreshKey((k) => k + 1), 20_000);
+          return;
+        }
+        setWaitingForSlack(false);
         setMessages(messages);
         setLastSyncedAt(new Date());
         setError(null);
@@ -238,7 +246,9 @@ export function SlackChannelView({ oauthError }: { oauthError?: string }) {
                 {!messages ? (
                   <div className="flex items-center gap-2 px-4 py-8 text-sm text-muted-foreground">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Loading messages…
+                    {waitingForSlack
+                      ? "Slack only lets Kismet read a channel about once a minute. Loading shortly…"
+                      : "Loading messages…"}
                   </div>
                 ) : messages.length === 0 ? (
                   <p className="px-4 py-8 text-sm text-muted-foreground">No messages in this channel yet.</p>

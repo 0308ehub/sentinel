@@ -314,7 +314,23 @@ function ConnectorForm({
   const [waiting, setWaiting] = useState(false);
   const popupCleanup = useRef<(() => void) | null>(null);
   const appFirst = isGitHub && appAvailable && !live?.connected;
-  const showFields = !appFirst || tokenOpen;
+  // Slack works the same way: "Add to Slack" is the main way in when Kismet's Slack app is configured.
+  const isSlack = connector.live === "slack";
+  const [slackAppAvailable, setSlackAppAvailable] = useState(false);
+  const slackFirst = isSlack && slackAppAvailable && !live?.connected;
+  const showFields = (!appFirst && !slackFirst) || tokenOpen;
+
+  useEffect(() => {
+    if (!isSlack) return;
+    let active = true;
+    fetch("/api/slack/oauth/available", { cache: "no-store" })
+      .then((response) => response.json() as Promise<{ available?: boolean }>)
+      .then((body) => active && setSlackAppAvailable(Boolean(body.available)))
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [isSlack]);
 
   useEffect(() => {
     if (!isGitHub) return;
@@ -423,6 +439,21 @@ function ConnectorForm({
           )}
         </div>
       )}
+      {slackFirst && (
+        <div className="space-y-2">
+          <Button asChild size="sm">
+            <a href="/api/slack/oauth/start?return=/settings/connectors">Add to Slack</a>
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            Slack asks which workspace to add Kismet to. Then invite the Kismet bot to the channels it should read.
+          </p>
+          {!tokenOpen && (
+            <button type="button" className="text-xs text-muted-foreground underline" onClick={() => setTokenOpen(true)}>
+              Use a bot token instead
+            </button>
+          )}
+        </div>
+      )}
       <div className={cn("space-y-3", !showFields && "hidden")}>
         {connector.fields.map((field) => (
           <Field
@@ -444,7 +475,7 @@ function ConnectorForm({
           <span />
         )}
         <div className="flex gap-2">
-          {connector.setupHref && (
+          {connector.setupHref && !slackFirst && (
             <Button asChild variant={connector.fields.length === 0 ? "default" : "outline"} size="sm">
               <Link href={connector.setupHref} onClick={onClose}>
                 {live?.connected ? "View" : "Workspace setup"}
