@@ -11,7 +11,7 @@ import { startSnapshot } from "@/lib/autopilot/snapshots";
 import type { Experiment, Signal } from "@/lib/autopilot/types";
 import { client, coderConfigured, managedSessionView, SESSION_BUDGET_CENTS } from "@/lib/coder/sessions";
 import { githubTokenFor } from "@/lib/github/app";
-import { closePull, compareFiles, createPullFromBranch, deleteBranch, readFile, repoDefaultBranch } from "@/lib/github/client";
+import { branchHeadSha, closePull, compareFiles, createPullFromBranch, deleteBranch, readFile, repoDefaultBranch } from "@/lib/github/client";
 
 async function githubToken(repo?: string): Promise<string> {
   return githubTokenFor(autopilotUser(), repo);
@@ -32,6 +32,10 @@ export async function startAgentBuild(experiment: Experiment, signal: Signal | u
   const token = await githubToken(repo);
   if (!token) return null;
   const external = repo !== defaultAutopilotRepo();
+  // Pin the mount to the default branch's head right now; left unpinned, the session can start
+  // from an older copy of the repository.
+  const base = await repoDefaultBranch(repo);
+  const head = await branchHeadSha(repo, base, token);
   const session = await client().beta.sessions.create({
     agent: process.env.KISMET_CODER_AGENT_ID!,
     environment_id: process.env.KISMET_CODER_ENVIRONMENT_ID!,
@@ -39,7 +43,7 @@ export async function startAgentBuild(experiment: Experiment, signal: Signal | u
     budget: { type: "limit", max_list_cost: { amount: SESSION_BUDGET_CENTS, currency: "USD" } },
     metadata: { kismet_user: autopilotUser(), kismet_experiment: experiment.id },
     resources: [{ type: "github_repository", url: `https://github.com/${repo}`, authorization_token: token,
-      mount_path: "/workspace/repo" }],
+      mount_path: "/workspace/repo", checkout: { type: "commit", sha: head } }],
     initial_events: [{ type: "user.message", content: [{ type: "text", text: experiment.kind === "fix" ? fixTask(experiment, signal) : experimentTask(experiment, signal, external) }] }],
   });
   await updateExperiment(experiment.id, {

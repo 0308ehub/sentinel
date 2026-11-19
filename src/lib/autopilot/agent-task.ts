@@ -37,6 +37,7 @@ export function fixTask(experiment: TaskExperiment, signal: TaskSignal | undefin
     `INTENDED FIX: ${experiment.treatment}`,
     "Reproduce or locate the bug by reading the code and cite the relevant path:line in your final response. Make the smallest correct fix of the root cause.",
     "Add or update a test when the repository has tests nearby. Run the project's relevant checks. Never add a feature flag, variant, experiment gate, or A/B test.",
+    "Before changing anything, run `git fetch origin` and start from the latest remote default branch, never a stale local copy.",
     `Work on branch ${branch} from the default branch. Never touch unrelated code. Commit and push the change, but do not open or merge a pull request.`,
     "If you cannot find a real bug supported by the complaints, say so plainly and do not push a branch.",
     `If you pushed the fix, end your final response with exactly: BRANCH: ${branch}`,
@@ -162,7 +163,7 @@ export function experimentTask(
     `RULES: ${fix ? fixRules(experiment.flag) : codeRules(experiment.flag, external)}`,
     checkout
       ? `You are on branch ${branch}, which Kismet created for this change. Stay on it and change only what this ${fix ? "fix" : "experiment"} needs.`
-      : `Work on branch ${branch} from the default branch; change only what this ${fix ? "fix" : "experiment"} needs.`,
+      : `Run \`git fetch origin\` first, then work on branch ${branch} from the latest remote default branch; change only what this ${fix ? "fix" : "experiment"} needs.`,
     fix
       ? "Ship the new version to everyone. Do not leave the old version behind a flag."
       : "Control must render exactly what it renders today.",
