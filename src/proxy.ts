@@ -32,9 +32,11 @@ function bearerMatches(header: string | null, secret: string): boolean {
   return got.length === expected.length && timingSafeEqual(got, expected);
 }
 
+const CRON_PATHS = new Set(["/api/autopilot/tick", "/api/autopilot/follow"]);
+
 function isCronRequest(request: NextRequest): boolean {
   const secret = process.env.CRON_SECRET?.trim();
-  return Boolean(secret) && request.nextUrl.pathname === "/api/autopilot/tick" && bearerMatches(request.headers.get("authorization"), secret!);
+  return Boolean(secret) && CRON_PATHS.has(request.nextUrl.pathname) && bearerMatches(request.headers.get("authorization"), secret!);
 }
 
 const clerkProxy = clerkMiddleware(
