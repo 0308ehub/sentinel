@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { activitySummary, formatDollars, spendTotal, type ActivityCount, type SpendAmounts } from "@/lib/autopilot/spend-core";
+import { activitySummary, formatCountdown, formatDollars, nextDailyReset, spendTotal, type ActivityCount, type SpendAmounts } from "@/lib/autopilot/spend-core";
 
 interface SpendDay extends SpendAmounts {
   day: string;
@@ -109,6 +109,14 @@ export function SpendOverview() {
 }
 
 function TodayMeter({ today }: { today: Overview["today"] }) {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
+  const reset = nextDailyReset(now);
+  const localTime = reset.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const utcTime = reset.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", timeZone: "UTC", timeZoneName: "short" });
   return <div>
     <div className="flex items-center justify-between text-xs">
       <span className="font-medium text-[#374151]">Today {formatDollars(today.cents)} of {formatDollars(today.limitCents)}</span>
@@ -117,6 +125,7 @@ function TodayMeter({ today }: { today: Overview["today"] }) {
     <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[#eef0f3]">
       <div className="h-full rounded-full bg-orange-500" style={{ width: `${Math.min(100, today.limitCents ? (today.cents / today.limitCents) * 100 : 100)}%` }} />
     </div>
+    <p className="mt-1.5 text-xs text-[#6b7280]" title={utcTime}>Resets daily at {localTime} (in {formatCountdown(reset.getTime() - now.getTime())})</p>
   </div>;
 }
 
