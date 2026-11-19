@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { experimentGate, experimentTask, gateInPatch } from "../src/lib/autopilot/agent-task.ts";
+import { experimentGate, experimentTask, fixTask, gateInPatch } from "../src/lib/autopilot/agent-task.ts";
 
 const experiment = {
   flag: "checkout-copy", title: "Clearer checkout", hypothesis: "More people finish", page: "/checkout",
@@ -32,6 +32,13 @@ test("quick fix task ships the change without an experiment gate", () => {
   assert.match(task, /quick fix/);
   assert.match(task, /data-kismet-fix="checkout-copy"/);
   assert.doesNotMatch(task, /useVariant\("checkout-copy"\)/);
+});
+
+test("agent tasks forbid marker-only branches and define the no-change response", () => {
+  for (const task of [experimentTask(experiment, signal, false), fixTask({ ...experiment, kind: "fix" }, signal)]) {
+    assert.match(task, /NO CHANGE NEEDED: <one sentence why>/);
+    assert.match(task, /only change is a data-kismet-fix or data-track attribute/);
+  }
 });
 
 test("an event metric tells the agent to track it in both versions", () => {

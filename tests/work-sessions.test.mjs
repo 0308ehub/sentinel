@@ -38,6 +38,11 @@ test("a build in progress is working", () => {
   assert.equal(session.canStop, true);
 });
 
+test("a build in progress names the coding agent stage", () => {
+  const session = workSession(experiment({ buildStage: "checking" }), now);
+  assert.equal(session.line.text, "Running checks · 56 min");
+});
+
 test("an open pull request still waiting on its preview is ready", () => {
   const session = workSession(experiment({
     status: "awaiting_approval",
@@ -85,4 +90,15 @@ test("a merged cleanup is no longer an active review session", () => {
   }), now);
   assert.equal(session.bucket, "quiet");
   assert.equal(session.followUps, 0);
+});
+
+test("a Kismet rejection is shown as no change needed", () => {
+  const session = workSession(experiment({
+    status: "rejected",
+    rejectedBy: "kismet",
+    note: "No change needed: the request was only a test.",
+    endedAt: "2026-11-18T19:30:00.000Z",
+  }), now);
+  assert.deepEqual(session.line, { text: "No change needed", tone: "muted" });
+  assert.equal(session.bucket, "quiet");
 });

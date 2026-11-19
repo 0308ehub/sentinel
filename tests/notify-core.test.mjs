@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildDigest, deriveEvents, digestDue } from "../src/lib/autopilot/notify-core.ts";
+import { buildDigest, deriveEvents, digestDue, reporterReplyKey, reporterReplyText, reporterThreads } from "../src/lib/autopilot/notify-core.ts";
 
 function experiment(overrides = {}) {
   return {
@@ -139,4 +139,29 @@ test("buildDigest summarizes recent activity and waiting work", () => {
   assert.match(digest.text, /Won: 1/);
   assert.match(digest.text, /Fixes verified: 1/);
   assert.match(digest.text, /Waiting on you: 1/);
+});
+
+test("picks and deduplicates up to five Slack reporter threads", () => {
+  const evidence = [
+    { source: "slack", url: "slack://C1/111.1" },
+    { source: "slack", url: "slack://C1/111.1" },
+    { source: "ticket", url: "slack://C2/222.2" },
+    { source: "slack", url: "https://example.com" },
+    ...[2, 3, 4, 5, 6].map((value) => ({ source: "slack", url: `slack://C${value}/${value}.0` })),
+  ];
+  assert.deepEqual(reporterThreads(evidence), [
+    { channelId: "C1", threadTs: "111.1" },
+    { channelId: "C2", threadTs: "2.0" },
+    { channelId: "C3", threadTs: "3.0" },
+    { channelId: "C4", threadTs: "4.0" },
+    { channelId: "C5", threadTs: "5.0" },
+  ]);
+});
+
+test("builds the reporter reply and stable dedupe key", () => {
+  assert.equal(reporterReplyKey("exp_1", "C1", "111.1"), "reporter_reply:exp_1:C1:111.1");
+  assert.equal(
+    reporterReplyText("Fix checkout", "https://github.com/acme/app/pull/7"),
+    "Thanks for flagging this. A fix is live: Fix checkout (https://github.com/acme/app/pull/7). Kismet will keep an eye out for new reports.",
+  );
 });

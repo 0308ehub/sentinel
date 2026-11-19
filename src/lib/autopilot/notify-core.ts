@@ -1,6 +1,34 @@
 import type { Experiment } from "./types.ts";
+import type { Evidence } from "./types.ts";
 
 export const DIGEST_UTC_HOUR = 16;
+
+export interface ReporterThread { channelId: string; threadTs: string }
+
+/** Picks up to five distinct Slack threads from a signal's evidence. */
+export function reporterThreads(evidence: Evidence[]): ReporterThread[] {
+  const seen = new Set<string>();
+  const threads: ReporterThread[] = [];
+  for (const item of evidence) {
+    if (item.source !== "slack" || !item.url?.startsWith("slack://")) continue;
+    const match = item.url.match(/^slack:\/\/([^/]+)\/([^/]+)$/);
+    if (!match) continue;
+    const key = `${match[1]}:${match[2]}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    threads.push({ channelId: match[1], threadTs: match[2] });
+    if (threads.length === 5) break;
+  }
+  return threads;
+}
+
+export function reporterReplyText(prTitle: string, prUrl: string): string {
+  return `Thanks for flagging this. A fix is live: ${prTitle} (${prUrl}). Kismet will keep an eye out for new reports.`;
+}
+
+export function reporterReplyKey(experimentId: string, channelId: string, threadTs: string): string {
+  return `reporter_reply:${experimentId}:${channelId}:${threadTs}`;
+}
 
 export type NotifyEvent = {
   key: string;

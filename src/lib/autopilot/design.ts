@@ -3,7 +3,8 @@ import "server-only";
 import { askForJson, readJson } from "@/lib/ai/respond";
 import { describeMetric, parseMetricSpec } from "@/lib/autopilot/assign";
 import { relevantLearnings } from "@/lib/autopilot/learning-core";
-import { createExperiment, interviewContext, listExperiments, listGoals, listLearnings, listRatings, listSignals, log, metricBaseline, popularUsage, recentJourneys, setSignalStatus, snoozeSignal } from "@/lib/autopilot/store";
+import { createExperiment, getExperiment, interviewContext, listExperiments, listGoals, listLearnings, listRatings, listSignals, log, metricBaseline, popularUsage, recentJourneys, setSignalStatus, snoozeSignal } from "@/lib/autopilot/store";
+import { recordNoChange } from "@/lib/autopilot/no-change";
 import { daysToResult, type ResultEstimate } from "@/lib/autopilot/power";
 import { maxExperimentDays, relativeMde } from "@/lib/autopilot/thresholds";
 import type { Builder } from "@/lib/autopilot/builders";
@@ -44,6 +45,7 @@ function slug(text: string): string {
 
 interface DesignAnswer {
   kind?: string;
+  reason?: string;
   mode?: string;
   title?: string;
   hypothesis?: string;
@@ -53,6 +55,27 @@ interface DesignAnswer {
   page?: string;
   guardrail?: string;
   guardrailMetric?: unknown;
+}
+
+async function createNoChangeExperiment(candidate: Signal, previous: Experiment[], reason: string, buildWith?: Builder | null): Promise<string> {
+  const version = previous.length + 1;
+  const id = await createExperiment({
+    signalId: candidate.id,
+    version,
+    kind: "fix",
+    title: candidate.title,
+    hypothesis: "",
+    metric: "",
+    page: candidate.area,
+    guardrail: "",
+    control: "",
+    treatment: "",
+    flag: `no-change-${slug(candidate.title)}-v${version}`,
+    buildWith,
+  });
+  const experiment = await getExperiment(id);
+  if (!experiment) throw new Error("The no-change record could not be loaded.");
+  return recordNoChange(experiment, reason);
 }
 
 interface ChangeAnswer extends DesignAnswer {
@@ -68,7 +91,9 @@ async function designFix(candidate: Signal, experiments: Experiment[], buildWith
   const previous = experiments.filter((experiment) => experiment.signalId === candidate.id);
   const version = previous.length + 1;
   const system = [
-    "You are fixing a reported bug. Explain what is most likely broken given the evidence, the fix, and what could go wrong.",
+    "Decide first whether this reported bug actually calls for a product change.",
+    'If it is a test message, asks not to change anything, is praise or a question, describes already-working behavior, or has no concrete problem in the evidence, return only {"kind":"none","reason":"<one sentence>"}. This is a normal first-class outcome, not a last resort.',
+    "Otherwise explain what is most likely broken given the evidence, the fix, and what could go wrong.",
     "Do not propose experiments, flags, variants, or A/B tests.",
     "Return JSON: {title,hypothesis,control,treatment,page,reasoning,evidence:[{source,quote}],confidence,confidenceReason,risks}.",
     "title is a short description without a Fix prefix. hypothesis says what is broken. treatment is the intended fix in one or two sentences.",
@@ -79,6 +104,10 @@ async function designFix(candidate: Signal, experiments: Experiment[], buildWith
     complaints: candidate.evidence.slice(0, 15).map((item) => ({ source: item.source, author: item.author, title: item.title, body: item.body })),
   });
   const answer = readJson<ChangeAnswer>(await askForJson(system, user, false, undefined, "experiment"));
+  if (answer.kind === "none") {
+    if (!answer.reason?.trim()) throw new Error("The no-change design was missing a reason.");
+    return createNoChangeExperiment(candidate, previous, answer.reason, buildWith);
+  }
   const cited = (answer.evidence ?? []).filter((item) => item.source?.trim() && item.quote?.trim()).slice(0, 6);
   if (!answer.title?.trim() || !answer.treatment?.trim() || !answer.reasoning?.trim() || !answer.confidence || answer.confidence === "low" || !cited.length) {
     throw new Error("The fix design was missing a title, fix, reasoning, confidence, or complaint.");
@@ -157,6 +186,7 @@ async function designCandidate(
     : "No qualitative theme for this problem.";
   const system = [
       "You are an autonomous product manager. Design one small UI change to one existing React component that addresses the problem.",
+      'First decide whether the problem calls for any product change. If it is a test message, asks not to change anything, is praise or a question, describes already-working behavior, or has no concrete problem in the evidence, return only {"kind":"none","reason":"<one sentence>"}. This is a normal first-class outcome, not a last resort.',
       "Set kind to \"fix\" when the change is a small, obvious correction that should ship to everyone: a color, label, spacing, or similar tweak people have already asked for, where splitting traffic would not teach anything.",
       "Set kind to \"experiment\" when the outcome is uncertain. An experiment is safe to show to half of visitors and is measured.",
       "Set mode to \"stochastic\" when the change is a prompt, model, ranking, or generated text that can differ on each request. Otherwise \"deterministic\".",
@@ -171,7 +201,7 @@ async function designCandidate(
       "When a TRACKED EVENT is the real outcome the change is meant to move, prefer it over a click or a visit.",
       "page is the route the change appears on, like /features or /settings/connectors.",
       "Optionally choose a guardrail outcome that must not get worse, using the same metric format; omit guardrailMetric if none fits.",
-      "Return JSON: {kind, mode, title, hypothesis, control, treatment, metric, page, guardrail, guardrailMetric}. kind is \"experiment\" or \"fix\". mode is \"deterministic\" or \"stochastic\".",
+      "Otherwise return JSON: {kind, mode, title, hypothesis, control,treatment, metric, page, guardrail, guardrailMetric}. kind is \"experiment\" or \"fix\". mode is \"deterministic\" or \"stochastic\".",
       "For a fix, metric may be omitted. Keep each field to one or two sentences.",
       "If earlier attempts failed or were rejected, try a meaningfully different idea.",
       "Build on LEARNINGS: repeat what won in new places, do not retry ideas that lost, were flat, or that a person rejected, unless you change them meaningfully and say how.",
@@ -189,9 +219,16 @@ async function designCandidate(
       `EARLIER ATTEMPTS\n${attemptsSummary(previous)}${earlierLearnings.length ? `\nLearnings from this signal:\n${earlierLearnings.map((learning) => `- ${learning.outcome}: ${learning.learning}`).join("\n")}` : ""}`,
       `PREFERENCES\n${formatPreferences(ratings)}`,
     ].join("\n");
-  async function request(message: string): Promise<{ answer: DesignAnswer; spec: NonNullable<ReturnType<typeof parseMetricSpec>>; estimate: ResultEstimate; kind: "experiment" | "fix"; mode: "deterministic" | "stochastic" }> {
+  async function request(message: string): Promise<
+    | { answer: DesignAnswer; kind: "none"; reason: string }
+    | { answer: DesignAnswer; spec: NonNullable<ReturnType<typeof parseMetricSpec>>; estimate: ResultEstimate; kind: "experiment" | "fix"; mode: "deterministic" | "stochastic" }
+  > {
     const text = await askForJson(system, message, false, undefined, "experiment");
     const answer = readJson<DesignAnswer>(text);
+    if (answer.kind === "none") {
+      if (!answer.reason?.trim()) throw new Error("The no-change design was missing a reason.");
+      return { answer, kind: "none", reason: answer.reason.trim() };
+    }
     const kind = answer.kind === "fix" ? "fix" : "experiment";
     const mode = kind === "experiment" && answer.mode === "stochastic" ? "stochastic" : "deterministic";
     const page = answer.page?.trim().startsWith("/") ? answer.page.trim() : "/";
@@ -207,12 +244,14 @@ async function designCandidate(
     return { answer, spec, kind, mode, estimate };
   }
   let proposed = await request(user);
-  if (preferKind) proposed = { ...proposed, kind: preferKind, mode: preferKind === "fix" ? "deterministic" : proposed.mode };
+  if (preferKind && proposed.kind !== "none") proposed = { ...proposed, kind: preferKind, mode: preferKind === "fix" ? "deterministic" : proposed.mode };
+  if (proposed.kind === "none") return createNoChangeExperiment(candidate, previous, proposed.reason, buildWith);
   const maxDays = maxExperimentDays();
   if (proposed.kind === "experiment" && proposed.estimate.days > maxDays) {
     const days = Number.isFinite(proposed.estimate.days) ? proposed.estimate.days : "infinite";
     const feedback = `That test would need about ${days} days (${Math.round(proposed.estimate.weeklyVisitors)} visitors/week, ${(proposed.estimate.baselineRate * 100).toFixed(1)}% currently do ${describeMetric(proposed.spec)}). Redesign so it can conclude within ${maxDays} days: use a more common outcome (see GOALS and their baselines), a busier page, or a bolder change.`;
     proposed = await request(`${user}\n\nFEEDBACK\n${feedback}`);
+    if (proposed.kind === "none") return createNoChangeExperiment(candidate, previous, proposed.reason, buildWith);
   }
   const { answer, spec, estimate, kind, mode } = proposed;
   const guardrailSpec = parseMetricSpec(answer.guardrailMetric);

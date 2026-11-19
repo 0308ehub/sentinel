@@ -116,6 +116,10 @@ function toExperiment(row: Row): Experiment {
     buildRef: (row.build_ref as string | null) ?? null,
     buildUrl: (row.build_url as string | null) ?? null,
     buildStartedAt: isoOrNull(row.build_started_at),
+    buildStage: (row.build_stage as Experiment["buildStage"]) ?? null,
+    buildStageAt: isoOrNull(row.build_stage_at),
+    buildSteps: row.build_steps == null ? null : Number(row.build_steps),
+    buildAttempts: Number(row.build_attempts ?? 0),
     cleanup: row.cleanup_status
       ? {
           status: row.cleanup_status as CleanupStatus,
@@ -507,6 +511,10 @@ export async function updateExperiment(
     buildRef: string | null;
     buildUrl: string | null;
     buildStartedAt: string | null;
+    buildStage: Experiment["buildStage"];
+    buildStageAt: string | null;
+    buildSteps: number | null;
+    buildAttempts: number;
     draft: string | null;
     original: string | null;
     cleanupStatus: CleanupStatus | null;
@@ -539,6 +547,10 @@ export async function updateExperiment(
   if (patch.buildRef !== undefined) columns.build_ref = patch.buildRef;
   if (patch.buildUrl !== undefined) columns.build_url = patch.buildUrl;
   if (patch.buildStartedAt !== undefined) columns.build_started_at = patch.buildStartedAt;
+  if (patch.buildStage !== undefined) columns.build_stage = patch.buildStage;
+  if (patch.buildStageAt !== undefined) columns.build_stage_at = patch.buildStageAt;
+  if (patch.buildSteps !== undefined) columns.build_steps = patch.buildSteps;
+  if (patch.buildAttempts !== undefined) columns.build_attempts = patch.buildAttempts;
   if (patch.draft !== undefined) columns.draft = patch.draft;
   if (patch.original !== undefined) columns.original = patch.original;
   if (patch.cleanupStatus !== undefined) columns.cleanup_status = patch.cleanupStatus;

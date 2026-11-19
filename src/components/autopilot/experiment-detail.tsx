@@ -12,6 +12,7 @@ import { BUILDER_NAME, type Builder } from "@/lib/autopilot/builders";
 import { canLaunch, launchChecks } from "@/lib/autopilot/launch";
 import type { RolloutPhase } from "@/lib/autopilot/rollout-plan";
 import { maxExperimentDays } from "@/lib/autopilot/thresholds";
+import { ageLabel } from "@/lib/autopilot/work-sessions";
 import type { ArmResult, Experiment, Learning, Readout, Signal, SuggestionRating } from "@/lib/autopilot/types";
 
 const DECISION_VISITORS = 200;
@@ -188,6 +189,7 @@ export function ExperimentDetail({
               Suggested
             </p>
           )}
+          {experiment?.status === "building" && experiment.buildStage && <BuildProgress experiment={experiment} />}
         </div>
         {!experiment && signal && <BuilderMenu value={writer} onChange={setPickedWriter} />}
         <dl className="space-y-3 text-xs">
@@ -210,7 +212,9 @@ export function ExperimentDetail({
             </div>
           )}
           {experiment?.kind === "fix" ? (
-            <Fact label="Ships" value={experiment.status === "rolled_out" ? "Everyone" : "Everyone, once you approve"} />
+            experiment.status === "rejected" && experiment.rejectedBy === "kismet"
+              ? <Fact label="Decision" value="No change needed" />
+              : <Fact label="Ships" value={experiment.status === "rolled_out" ? "Everyone" : "Everyone, once you approve"} />
           ) : (
             <>
           {!suggested && <Fact label="Days running" value={daysRunning(experiment)} />}
@@ -272,6 +276,28 @@ export function ExperimentDetail({
           onSave={onSchedule}
         />
       )}
+    </div>
+  );
+}
+
+function BuildProgress({ experiment }: { experiment: Experiment }) {
+  const stages = [
+    { stage: "reading", label: "Reading" },
+    { stage: "writing", label: "Writing" },
+    { stage: "checking", label: "Checks" },
+    { stage: "pushing", label: "Pushing" },
+    { stage: "opening_pr", label: "PR" },
+  ] as const;
+  const current = experiment.buildStage === "starting" ? "reading" : experiment.buildStage;
+  return (
+    <div className="mt-2 flex items-center gap-1 overflow-x-auto whitespace-nowrap text-xs text-[#6b7280]">
+      {stages.map((item, index) => (
+        <span key={item.stage} className="contents">
+          {index > 0 && <span className="text-[#c4c8cf]">→</span>}
+          <span className={item.stage === current ? "font-medium text-[#111827]" : "text-[#6b7280]"}>{item.label}</span>
+        </span>
+      ))}
+      <span className="ml-1 text-[#9aa0a8]">· last activity {ageLabel(experiment.buildStageAt ?? experiment.buildStartedAt ?? experiment.createdAt)} ago</span>
     </div>
   );
 }
@@ -637,7 +663,9 @@ function FixFollowUp({ experiment, signal, className = "border-b border-[#e6e8ec
   const complaints = experiment.startedAt
     ? signal?.evidence.filter((item) => item.source !== "analytics" && Date.parse(item.occurredAt) > Date.parse(experiment.startedAt!)).length ?? 0
     : 0;
-  const text = experiment.verifiedAt
+  const text = experiment.status === "rejected" && experiment.rejectedBy === "kismet"
+    ? experiment.note
+    : experiment.verifiedAt
     ? experiment.note
     : experiment.startedAt
       ? `Watching since ${formatDay(experiment.startedAt)}: ${complaints} new complaint${complaints === 1 ? "" : "s"} so far.`

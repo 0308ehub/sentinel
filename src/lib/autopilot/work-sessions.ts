@@ -1,4 +1,5 @@
 import type { Experiment } from "@/lib/autopilot/types";
+import { stageLabel } from "./build-stage-core.ts";
 
 export type WorkMark = "blue" | "dashed" | "dot";
 export type WorkTone = "green" | "orange" | "muted";
@@ -39,10 +40,13 @@ export function workSession(experiment: Experiment, now = Date.now()): WorkSessi
   };
 
   if (experiment.status === "building" || experiment.cleanup?.status === "building") {
+    const working = experiment.status === "building" && experiment.buildStage
+      ? stageLabel(experiment.buildStage)
+      : "Working";
     return {
       ...base,
       mark: "dashed",
-      line: { text: `Working · ${ageLabel(since, now)}`, tone: "muted" },
+      line: { text: `${working} · ${ageLabel(since, now)}`, tone: "muted" },
       age: ageLabel(since, now),
       clock: true,
       canStop: experiment.status === "building" || experiment.status === "awaiting_approval",
@@ -92,6 +96,10 @@ export function workSession(experiment: Experiment, now = Date.now()): WorkSessi
 
   if (experiment.status === "awaiting_rollout") {
     return { ...base, mark: "blue", line: { text: "Review result", tone: "orange" }, age: ageLabel(base.updated, now), clock: false, canStop: false, bucket: "review" };
+  }
+
+  if (experiment.status === "rejected" && experiment.rejectedBy === "kismet" && experiment.note?.startsWith("No change needed:")) {
+    return { ...base, mark: "dot", line: { text: "No change needed", tone: "muted" }, age: ageLabel(base.updated, now), clock: false, canStop: false, bucket: "quiet" };
   }
 
   return {

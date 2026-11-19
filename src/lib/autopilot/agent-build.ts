@@ -9,6 +9,9 @@ import { recordAgentSession } from "@/lib/autopilot/spend";
 import { listExperiments, listSignals, log, setSignalStatus, snoozeSignal, updateExperiment } from "@/lib/autopilot/store";
 import { isLocalSource } from "@/lib/autopilot/source";
 import { startSnapshot } from "@/lib/autopilot/snapshots";
+import { markerOnlyPatch, noChangeReason } from "@/lib/autopilot/no-change-core";
+import { recordNoChange } from "@/lib/autopilot/no-change";
+import { MAX_ATTEMPTS, buildStage, stallDecision } from "@/lib/autopilot/build-stage-core";
 import type { Experiment, Signal } from "@/lib/autopilot/types";
 import { client, coderConfigured, managedSessionView, SESSION_BUDGET_CENTS } from "@/lib/coder/sessions";
 import { githubTokenFor } from "@/lib/github/app";
@@ -50,12 +53,43 @@ export async function startAgentBuild(experiment: Experiment, signal: Signal | u
     initial_events: [{ type: "user.message", content: [{ type: "text", text: experiment.kind === "fix" ? fixTask(experiment, signal) : experimentTask(experiment, signal, external) }] }],
   });
   await recordAgentSession({ sessionId: session.id, userId, kind: "build", experimentId: experiment.id, title }).catch(() => {});
+  const now = new Date().toISOString();
   await updateExperiment(experiment.id, {
     coderSessionId: session.id,
+    buildStartedAt: experiment.buildAttempts > 0 && experiment.buildStartedAt ? experiment.buildStartedAt : now,
+    buildStage: "starting",
+    buildStageAt: now,
+    buildSteps: 0,
     note: "Kismet's coding agent is building this change.",
   });
   await log("build", `Kismet's coding agent started building “${experiment.title}”.`, experiment.id);
   return `Kismet's coding agent started building “${experiment.title}”.`;
+}
+
+function buildBranches(experiment: Experiment, reported: string | null): Set<string> {
+  const fixBranch = `kismet/${experiment.flag.replace(/-v\d+$/, "")}`;
+  return new Set([reported, experiment.branch, experimentBranch(experiment.flag), fixBranch].filter((name): name is string => Boolean(name)));
+}
+
+async function removePartialBranches(experiment: Experiment, reported: string | null): Promise<void> {
+  const repo = await autopilotRepo().catch(() => "");
+  if (!repo) return;
+  for (const branch of buildBranches(experiment, reported)) await deleteBranch(repo, branch).catch(() => {});
+}
+
+async function restartBuild(
+  experiment: Experiment,
+  signal: Signal | undefined,
+  sessionId: string,
+  branch: string | null,
+  message: string,
+): Promise<string | null> {
+  await client().beta.sessions.events.send(sessionId, { events: [{ type: "user.interrupt" }] }).catch(() => {});
+  const attempts = experiment.buildAttempts + 1;
+  await updateExperiment(experiment.id, { coderSessionId: null, buildAttempts: attempts });
+  await removePartialBranches(experiment, branch);
+  await log("build", message, experiment.id);
+  return startAgentBuild({ ...experiment, coderSessionId: null, buildAttempts: attempts }, signal);
 }
 
 /** Records a build that produced no usable change, whichever agent ran it, and reopens the problem. */
@@ -88,6 +122,10 @@ export async function finishBuild(
   const fix = experiment.kind === "fix";
   const gate = experimentGate(experiment.flag, external);
   if (!fix && !gateInPatch(files, gate)) return failBuild(experiment, "the coding agent did not add the experiment gate");
+  if (fix && markerOnlyPatch(files.map((file) => file.patch), experiment.flag)) {
+    await deleteBranch(repo, branch).catch(() => {});
+    return recordNoChange(experiment, "the change only added Kismet's marker");
+  }
   const changed = fix ? files.find((file) => file.patch) : files.find((file) => file.patch?.includes(gate));
   if (!changed) return failBuild(experiment, fix ? "the coding agent did not change any files" : "the gated file could not be found");
   const [draft, original] = await Promise.all([
@@ -120,22 +158,55 @@ export async function finishBuild(
 }
 
 async function followOne(experiment: Experiment, signal: Signal | undefined): Promise<string | null> {
-  const view = await managedSessionView(experiment.coderSessionId!);
+  const sessionId = experiment.coderSessionId!;
+  const view = await managedSessionView(sessionId);
   if (view.stopReason === "requires_action" && view.pendingApproval) {
-    await client().beta.sessions.events.send(experiment.coderSessionId!, { events: [{
+    await client().beta.sessions.events.send(sessionId, { events: [{
       type: "user.tool_confirmation", tool_use_id: view.pendingApproval.toolUseId, result: "deny",
       deny_message: "Nobody is watching this build; skip steps that need approval and finish without them.",
     }] });
     await log("build", `Denied an unattended approval while building “${experiment.title}”.`, experiment.id);
     return null;
   }
-  if (view.status === "running" || view.status === "rescheduling") return null;
+  const steps = view.items.filter((item) => item.kind === "step").length;
+  const stage = buildStage(view.items, { hasBranch: Boolean(view.branch) });
+  const changed = stage !== experiment.buildStage || steps !== experiment.buildSteps;
+  const now = new Date().toISOString();
+  if (changed) {
+    await updateExperiment(experiment.id, { buildStage: stage, buildSteps: steps, buildStageAt: now });
+  }
+  if (view.status === "running" || view.status === "rescheduling") {
+    const decision = stallDecision({
+      status: view.status,
+      stageAt: changed ? now : experiment.buildStageAt,
+      startedAt: experiment.buildStartedAt,
+      attempts: experiment.buildAttempts,
+      now,
+    });
+    if (decision === "ok") return null;
+    if (decision === "give_up") {
+      await client().beta.sessions.events.send(sessionId, { events: [{ type: "user.interrupt" }] }).catch(() => {});
+      await removePartialBranches(experiment, view.branch);
+      return failBuild(experiment, "the coding agent stopped making progress");
+    }
+    const activityAt = changed ? now : experiment.buildStageAt ?? experiment.buildStartedAt ?? now;
+    const inactiveMinutes = Math.max(0, Math.floor((Date.parse(now) - Date.parse(activityAt)) / 60_000));
+    return restartBuild(
+      experiment,
+      signal,
+      sessionId,
+      view.branch,
+      `Restarted the coding agent for “${experiment.title}”: no progress for ${inactiveMinutes} min.`,
+    );
+  }
   const said = [...view.items].reverse().find((item) => item.kind === "agent" && item.text);
   const agentReport = said?.kind === "agent" ? said.text : "";
   if (view.status === "idle" && view.stopReason === "end_turn" && view.branch) {
     return finishBuild(experiment, signal, view.branch, "Kismet's coding agent", agentReport);
   }
   const explanation = said && said.kind === "agent" ? said.text.split("\n").map((line) => line.trim()).find(Boolean)?.slice(0, 240) : "";
+  const explicitNoChange = noChangeReason(agentReport);
+  if (!view.branch && explicitNoChange) return recordNoChange(experiment, explicitNoChange);
   const reason = view.status === "terminated" ? "the coding session terminated" :
     view.stopReason === "budget_reached" ? "the coding session reached its budget" :
       view.branch ? "the coding session did not finish normally" :
@@ -148,6 +219,15 @@ async function followOne(experiment: Experiment, signal: Signal | undefined): Pr
     await snoozeSignal(experiment.signalId);
     await log("build", `${note}. Kismet will look again in 7 days.`, experiment.id);
     return note;
+  }
+  if (!view.branch && experiment.buildAttempts < MAX_ATTEMPTS) {
+    return restartBuild(
+      experiment,
+      signal,
+      sessionId,
+      null,
+      `Restarted the coding agent for “${experiment.title}”: the session ended without a branch.`,
+    );
   }
   return failBuild(experiment, reason);
 }
@@ -177,7 +257,7 @@ export async function cancelBuild(experiment: Experiment): Promise<string> {
   const repo = await autopilotRepo().catch(() => "");
   if (repo && experiment.builder && experiment.buildRef) await cancelOutsideBuild(experiment, repo).catch(() => {});
   if (repo && experiment.prNumber) await closePull(repo, experiment.prNumber).catch(() => {});
-  const branches = new Set([branch, experimentBranch(experiment.flag)].filter((name): name is string => Boolean(name)));
+  const branches = buildBranches(experiment, branch);
   if (repo) {
     for (const name of branches) await deleteBranch(repo, name).catch(() => {});
   }

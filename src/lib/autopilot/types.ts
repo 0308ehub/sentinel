@@ -169,6 +169,10 @@ export interface Experiment {
   buildRef: string | null;
   buildUrl: string | null;
   buildStartedAt: string | null;
+  buildStage: "starting" | "reading" | "writing" | "checking" | "pushing" | "opening_pr" | null;
+  buildStageAt: string | null;
+  buildSteps: number | null;
+  buildAttempts: number;
   cleanup: Cleanup | null;
   createdAt: string;
   startedAt: string | null;

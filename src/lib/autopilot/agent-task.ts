@@ -37,9 +37,12 @@ export function fixTask(experiment: TaskExperiment, signal: TaskSignal | undefin
     `INTENDED FIX: ${experiment.treatment}`,
     "Reproduce or locate the bug by reading the code and cite the relevant path:line in your final response. Make the smallest correct fix of the root cause.",
     "Add or update a test when the repository has tests nearby. Run the project's relevant checks. Never add a feature flag, variant, experiment gate, or A/B test.",
+    "Work quickly. Read only the files you need. Check your work with the fastest relevant checks (type-check and lint the files you changed, run the tests that cover them). Do not run a full production build, do not reinstall dependencies unless a check fails because they are missing, and do not explore unrelated parts of the repo.",
     "Before changing anything, run `git fetch origin` and start from the latest remote default branch, never a stale local copy.",
     `Work on branch ${branch} from the default branch. Never touch unrelated code. Commit and push the change, but do not open or merge a pull request.`,
     "If you cannot find a real bug supported by the complaints, say so plainly and do not push a branch.",
+    "If the request does not actually need a code change (for example it asks you not to change anything, or nothing in the code is wrong), do not push a branch. End your final response with exactly: NO CHANGE NEEDED: <one sentence why>",
+    "Never push a branch whose only change is a data-kismet-fix or data-track attribute.",
     `If you pushed the fix, end your final response with exactly: BRANCH: ${branch}`,
   ].filter(Boolean).join("\n\n");
 }
@@ -173,6 +176,9 @@ export function experimentTask(
     fix ? "" : trackRules(experiment.metricSpec, external),
     !fix && external ? serverRules(experiment.flag) : "",
     fix ? `Add data-kismet-fix="${experiment.flag}" on the changed element.` : `If the change adds a visible element, add data-track="${experiment.flag}" to it.`,
+    "Work quickly. Read only the files you need. Check your work with the fastest relevant checks (type-check and lint the files you changed, run the tests that cover them). Do not run a full production build, do not reinstall dependencies unless a check fails because they are missing, and do not explore unrelated parts of the repo.",
+    "If the request does not actually need a code change (for example it asks you not to change anything, or nothing in the code is wrong), do not push a branch. End your final response with exactly: NO CHANGE NEEDED: <one sentence why>",
+    "Never push a branch whose only change is a data-kismet-fix or data-track attribute.",
     checkout
       ? "Run the project's checks if they finish in a few minutes."
       : "Run the project's checks if they finish in a few minutes. Commit and push the change.",

@@ -1,7 +1,9 @@
 import { after } from "next/server";
 
-import { addEvidence, knownEvidenceUrls, log } from "@/lib/autopilot/store";
+import { runTick } from "@/lib/autopilot/loop";
+import { addEvidence, knownEvidenceUrls, lastRunAt, log } from "@/lib/autopilot/store";
 import { withAutopilotUser } from "@/lib/autopilot/scope";
+import { tickTriggerDue } from "@/lib/autopilot/tick-trigger-core";
 import { listUsersForSlackTeam } from "@/lib/connections/store";
 import { slackChannelName } from "@/lib/slack/client";
 import { messageEvidence, verifySlackSignature } from "@/lib/slack/events-core";
@@ -17,23 +19,25 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-async function fileEventForUser(userId: string, event: SlackEnvelope["event"]): Promise<void> {
-  await withAutopilotUser(userId, async () => {
+async function fileEventForUser(userId: string, event: SlackEnvelope["event"]): Promise<boolean> {
+  return withAutopilotUser(userId, async () => {
     try {
-      if (!event || typeof event !== "object") return;
+      if (!event || typeof event !== "object") return false;
       const channel = "channel" in event && typeof event.channel === "string" ? event.channel : "";
-      if (!channel) return;
+      if (!channel) return false;
 
       const channelName = await slackChannelName(channel).catch(() => channel);
       const evidence = messageEvidence(event, channelName);
-      if (!evidence) return;
+      if (!evidence) return false;
       const known = await knownEvidenceUrls([evidence.url]);
-      if (known.has(evidence.url)) return;
+      if (known.has(evidence.url)) return false;
 
       await addEvidence([{ ...evidence, synthetic: false }]);
       await log("listen", `Filed a Slack message from #${channelName}.`);
+      return tickTriggerDue(await lastRunAt(), new Date());
     } catch (error) {
       await log("error", `Could not file a Slack message: ${errorMessage(error)}`).catch(() => {});
+      return false;
     }
   });
 }
@@ -42,12 +46,14 @@ async function fileSlackEvent(teamId: string, event: SlackEnvelope["event"]): Pr
   try {
     const userIds = await listUsersForSlackTeam(teamId);
     for (const userId of userIds) {
-      await fileEventForUser(userId, event);
+      if (await fileEventForUser(userId, event)) await runTick(userId);
     }
   } catch {
     // Slack has already received its acknowledgement. Background failures must never escape after().
   }
 }
+
+export const maxDuration = 300;
 
 export async function POST(request: Request) {
   const body = await request.text();

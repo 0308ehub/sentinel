@@ -9,6 +9,8 @@ import { autopilotDryRun, autopilotRepo, defaultAutopilotRepo } from "@/lib/auto
 import { listExperiments, listSignals, log, setSignalStatus, updateExperiment } from "@/lib/autopilot/store";
 import type { Experiment, Signal } from "@/lib/autopilot/types";
 import { lockedFiles } from "@/lib/autopilot/overlap";
+import { recordNoChange } from "@/lib/autopilot/no-change";
+import { markerOnlyContent } from "@/lib/autopilot/no-change-core";
 import { baseBranch, isLocalSource, listSourceFiles, readSourceFile } from "@/lib/autopilot/source";
 import { closePull, commitChecks, getPull, GitHubApiError, openPullRequest, type GitHubFile } from "@/lib/github/client";
 
@@ -39,6 +41,8 @@ async function pickFiles(base: string, experiment: Experiment, signal: Signal | 
 
 /** Raised when the only files this change could edit are in use by another experiment. */
 class FileBusy extends Error {}
+
+export class NoChangeNeeded extends Error {}
 
 async function writeChange(
   experiment: Experiment,
@@ -87,6 +91,11 @@ async function writeChange(
       : content.includes(`useVariant("${experiment.flag}")`) && content.includes("@/lib/autopilot/variant");
   if (!gated) {
     throw new Error(fix ? "The draft did not mark the quick fix." : "The draft did not gate the change behind its experiment flag.");
+  }
+  if (fix) {
+    if (markerOnlyContent(file.content, content, experiment.flag)) {
+      throw new NoChangeNeeded("the change only added Kismet's marker");
+    }
   }
   if (content.length > 80_000) throw new Error("The edited file is too large.");
   return { file, content, summary: draft.summary?.trim().slice(0, 280) || experiment.treatment };
@@ -162,6 +171,9 @@ export async function buildNext(): Promise<string | null> {
     await log("build", `Opened PR #${pull.number} for “${experiment.title}”.`, experiment.id);
     return `Opened a pull request for “${experiment.title}”.`;
   } catch (error) {
+    if (error instanceof NoChangeNeeded) {
+      return recordNoChange(experiment, "the change only added Kismet's marker");
+    }
     if (error instanceof FileBusy) {
       await updateExperiment(experiment.id, { overlap: error.message, note: null });
       return null;
