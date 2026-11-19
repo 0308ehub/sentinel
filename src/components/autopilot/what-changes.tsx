@@ -222,35 +222,40 @@ function SnapshotChoice({ experiment, changes, liveOrigin, isLive, when, addedTe
     <PreviewBody experiment={experiment} changes={changes} liveOrigin={liveOrigin} isLive={isLive} when={when} addedText={addedText} />
   );
   if (!ready) return live;
+  // A change that only shows in some states (an empty list, a first visit) usually looks identical on
+  // the person's own account, so the sample is the only useful comparison there.
+  const offerAccount = isLive && !when.trim();
+  const showSample = shownAs === "sample" || !offerAccount;
+  const scenario = snapshot.scenario || "Sample data";
   return (
     <div>
-      <div className="mb-2 flex items-center gap-2 text-xs text-[#6b7280]">
-        <span>Shown as</span>
-        <div className="inline-flex rounded-md bg-[#f1f3f5] p-0.5" role="group" aria-label="Which data to show">
-          <button
-            type="button"
-            aria-pressed={shownAs === "sample"}
-            onClick={() => { chosen.current = true; setShownAs("sample"); }}
-            className={`rounded px-2.5 py-1 ${shownAs === "sample" ? "bg-white font-medium text-[#111827] shadow-sm" : "hover:text-[#374151]"}`}
-          >
-            Sample: {snapshot.scenario || "Sample data"}
-          </button>
-          {isLive && (
+      {offerAccount ? (
+        <div className="mb-2 flex items-center gap-2 text-xs text-[#6b7280]">
+          <span className="shrink-0">Shown with</span>
+          <div className="inline-flex shrink-0 rounded-md bg-[#f1f3f5] p-0.5" role="group" aria-label="Which data to show">
+            <button
+              type="button"
+              aria-pressed={shownAs === "sample"}
+              onClick={() => { chosen.current = true; setShownAs("sample"); }}
+              className={`whitespace-nowrap rounded px-2.5 py-1 ${shownAs === "sample" ? "bg-white font-medium text-[#111827] shadow-sm" : "hover:text-[#374151]"}`}
+            >
+              Sample data
+            </button>
             <button
               type="button"
               aria-pressed={shownAs === "account"}
               onClick={() => { chosen.current = true; setShownAs("account"); }}
-              className={`rounded px-2.5 py-1 ${shownAs === "account" ? "bg-white font-medium text-[#111827] shadow-sm" : "hover:text-[#374151]"}`}
+              className={`whitespace-nowrap rounded px-2.5 py-1 ${shownAs === "account" ? "bg-white font-medium text-[#111827] shadow-sm" : "hover:text-[#374151]"}`}
             >
               Your account
             </button>
-          )}
+          </div>
         </div>
-      </div>
-      {shownAs === "sample" ? (
+      ) : null}
+      {showSample ? (
         <>
           <PreviewSwitcher control={snapshot.controlHtml!} treatment={snapshot.treatmentHtml!} when={when} addedText={[]} sample />
-          <p className="mt-2 text-xs text-[#6b7280]">Sample data · rendered by Kismet&apos;s coding agent</p>
+          <p className="mt-2 text-xs text-[#6b7280]">Sample data: {scenario} · rendered by Kismet&apos;s coding agent</p>
           {!isLive && <div className="mt-3">{live}</div>}
         </>
       ) : live}
@@ -399,7 +404,7 @@ function PreviewSwitcher({ control, treatment, when, addedText, sample = false }
     && comparison.onlyInControl.length === 0;
   return (
     <div>
-      <div className="mb-2 flex items-center justify-between text-xs">
+      <div className={pagesMatch ? "hidden" : "mb-2 flex items-center justify-between text-xs"}>
         <div className="inline-flex rounded-md bg-[#f1f3f5] p-0.5" role="group" aria-label="Which version to show">
           {option("control", "Current")}
           {option("treatment", "New version")}
@@ -414,7 +419,7 @@ function PreviewSwitcher({ control, treatment, when, addedText, sample = false }
       {pagesMatch && (
         <div className="mb-2 rounded border border-[#f59e0b] bg-[#fffbeb] p-3 text-xs text-[#78350f]">
           <p className="font-medium text-[#92400e]">
-            These look the same on your account{when ? ` because the new version only appears ${normalizePreviewCondition(when)}` : ""}.
+            You won&apos;t see this change on your account{when ? ` because it only appears ${normalizePreviewCondition(when)}` : " right now"}.
           </p>
           {addedText.length ? (
             <div className="mt-2 border-t border-[#fcd34d] pt-2">
@@ -428,7 +433,8 @@ function PreviewSwitcher({ control, treatment, when, addedText, sample = false }
           )}
         </div>
       )}
-      <div ref={box} className="relative overflow-hidden rounded border border-[#e1e4e8] bg-white" style={{ aspectRatio: `${FRAME_WIDTH} / ${FRAME_HEIGHT}` }}>
+      {/* Both frames stay mounted so the comparison can run; once they match there is nothing to show. */}
+      <div ref={box} className={`relative overflow-hidden rounded border border-[#e1e4e8] bg-white${pagesMatch ? " hidden" : ""}`} style={{ aspectRatio: `${FRAME_WIDTH} / ${FRAME_HEIGHT}` }}>
         {([["control", control], ["treatment", treatment]] as const).map(([value, url]) => (
           <iframe
             key={value}
