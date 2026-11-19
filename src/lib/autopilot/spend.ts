@@ -177,7 +177,13 @@ export async function spendOverview(days = 30): Promise<SpendOverview> {
   };
 
   return {
-    today: { cents: todayCents, limitCents: accountDailyLimitCents(), paused: todayCents >= accountDailyLimitCents() },
+    // Show what was actually recorded today, matching the cards and chart. The limit check counts each
+    // session still running as at least $1, so pausing uses that (higher) figure.
+    today: {
+      cents: spendTotal(getDay(new Date().toISOString().slice(0, 10))),
+      limitCents: accountDailyLimitCents(),
+      paused: todayCents >= accountDailyLimitCents(),
+    },
     days: dayKeys.map((day) => getDay(day)),
     totals: { last7Days: totalFor(last7Start), thisMonth: totalFor(monthStart) },
     recent: recent.map((row) => ({
