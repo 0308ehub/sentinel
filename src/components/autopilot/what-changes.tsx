@@ -55,7 +55,8 @@ export function WhatChanges({ experiment }: { experiment: Experiment }) {
       setError(reason instanceof Error ? reason.message : "Could not load what changes.");
     });
     return () => controller.abort();
-  }, [experiment.id]);
+    // Reload when the change itself moves on: a branch is pushed, a PR opens, or the draft is replaced.
+  }, [experiment.id, experiment.branch, experiment.prNumber, experiment.draftPath, experiment.version]);
 
   return (
     <section className="border-b border-[#e6e8ec] px-4 py-4 text-[#374151]">

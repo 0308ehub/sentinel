@@ -1,32 +1,38 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { ExperimentBoard } from "@/components/autopilot/experiment-board";
 import type { Builder } from "@/lib/autopilot/builders";
 import type { AutopilotState, Experiment, Signal } from "@/lib/autopilot/types";
 
+/** Refresh quickly while Kismet is building something, and steadily otherwise. Hidden tabs pause. */
+const ACTIVE_REFRESH_MS = 4000;
+const IDLE_REFRESH_MS = 15000;
+
+function isActive(state: AutopilotState | undefined): boolean {
+  return Boolean(state?.experiments.some((experiment) =>
+    experiment.status === "building" || experiment.cleanup?.status === "building",
+  ));
+}
+
 export function AutopilotView() {
-  const [polling, setPolling] = useState(true);
   const query = useQuery({
     queryKey: ["autopilot"],
     queryFn: async () => {
       const res = await fetch("/api/autopilot", { cache: "no-store" });
       return (await res.json()) as AutopilotState;
     },
-    refetchInterval: polling ? 15000 : false,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchInterval: (current) => (isActive(current.state.data) ? ACTIVE_REFRESH_MS : IDLE_REFRESH_MS),
   });
   const state = query.data ?? null;
   const load = query.refetch;
   const [running, setRunning] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-
-  useEffect(() => {
-    const timeout = window.setTimeout(() => setPolling(false), 5 * 60 * 1000);
-    return () => window.clearTimeout(timeout);
-  }, []);
 
   async function runNow() {
     setRunning(true);
