@@ -191,7 +191,7 @@ export function ExperimentDetail({
         </div>
         {!experiment && signal && <BuilderMenu value={writer} onChange={setPickedWriter} />}
         <dl className="space-y-3 text-xs">
-          <Fact label="Last publish" value={formatDay(experiment?.startedAt ?? experiment?.createdAt ?? signal?.updatedAt ?? null)} />
+          {!suggested && <Fact label="Last publish" value={formatDay(experiment?.startedAt ?? experiment?.createdAt ?? null)} />}
           {writtenBy && <Fact label="Written by" value={BUILDER_NAME[writtenBy]} />}
           {experiment?.status === "awaiting_approval" && experiment.kind !== "fix" && (
             <div className="space-y-1.5">
@@ -213,9 +213,9 @@ export function ExperimentDetail({
             <Fact label="Ships" value={experiment.status === "rolled_out" ? "Everyone" : "Everyone, once you approve"} />
           ) : (
             <>
-          <Fact label="Days running" value={daysRunning(experiment)} />
+          {!suggested && <Fact label="Days running" value={daysRunning(experiment)} />}
           <Fact label="Audiences" value="Everyone" />
-          <Fact label="Experiment visitors" value={visitors ? visitors.toLocaleString("en-US") : "—"} />
+          {!suggested && <Fact label="Experiment visitors" value={visitors ? visitors.toLocaleString("en-US") : "—"} />}
           {experiment?.estimate && experiment.kind === "test" && (
             <div>
               <Fact label="Expected result" value={`~${experiment.estimate.days} days`} />
@@ -258,7 +258,7 @@ export function ExperimentDetail({
           control={control}
           treatment={treatment}
           names={names}
-          muted={!runningLook}
+          suggested={suggested}
           showChart={runningLook}
           decisions={decisions}
         />
@@ -293,11 +293,11 @@ function MainPanel(props: {
   control: ArmResult | null;
   treatment: ArmResult | null;
   names: { control: string; treatment: string };
-  muted: boolean;
+  suggested: boolean;
   showChart: boolean;
   decisions: React.ReactNode;
 }) {
-  const { experiment, decisions, ...results } = props;
+  const { experiment, decisions, suggested, ...results } = props;
   const hasChange = hasCodeChange(experiment);
   const hasResults = Boolean(
     experiment?.kind === "fix" || props.readout || experiment?.status === "running" || experiment?.status === "awaiting_rollout" || experiment?.status === "rolling_out" || experiment?.endedAt,
@@ -326,7 +326,7 @@ function MainPanel(props: {
   return (
     <div>
       {!change && decisions && <div className="flex justify-end border-b border-[#e6e8ec] px-4 py-3">{decisions}</div>}
-      {experiment?.kind === "fix" ? <FixFollowUp experiment={experiment} signal={props.signal} /> : experiment?.kind === "change" ? <ChangeFollowUp experiment={experiment} /> : <ResultsCanvas experiment={experiment} {...results} />}
+      {experiment?.kind === "fix" ? <FixFollowUp experiment={experiment} signal={props.signal} /> : experiment?.kind === "change" ? <ChangeFollowUp experiment={experiment} /> : suggested ? <NotPublishedYet /> : <ResultsCanvas experiment={experiment} {...results} />}
       {change && <div className="border-t border-[#e6e8ec]">{change}</div>}
     </div>
   );
@@ -649,6 +649,18 @@ function FixFollowUp({ experiment, signal, className = "border-b border-[#e6e8ec
   );
 }
 
+/** An unapproved suggestion has never been published, so there is nothing to measure yet. */
+function NotPublishedYet() {
+  return (
+    <section className="px-4 py-5 text-[#374151]">
+      <div className="rounded border border-dashed border-[#e1e4e8] px-4 py-8 text-center">
+        <h2 className="text-sm font-medium text-[#111827]">Not approved or published yet</h2>
+        <p className="mt-2 text-sm">This is a suggestion, not a live experiment. Kismet starts counting visitors and showing results after you approve it and it ships.</p>
+      </div>
+    </section>
+  );
+}
+
 function ResultsCanvas({
   experiment,
   signal,
@@ -656,7 +668,6 @@ function ResultsCanvas({
   control,
   treatment,
   names,
-  muted,
   showChart,
 }: {
   experiment: Experiment | null;
@@ -665,7 +676,6 @@ function ResultsCanvas({
   control: ArmResult | null;
   treatment: ArmResult | null;
   names: { control: string; treatment: string };
-  muted: boolean;
   showChart: boolean;
 }) {
   const compare = control && treatment ? rateInterval(control, treatment) : null;
@@ -677,7 +687,6 @@ function ResultsCanvas({
         <ToolbarLabel label="Segment" value="All visitors" />
         <ToolbarLabel label="Baseline" value={names.control} />
         <ToolbarLabel label="Metric" value={experiment?.metric || "Conversion"} />
-        {muted && <span className="ml-auto text-[11px]">Results stay hidden until this suggestion is approved.</span>}
       </div>
       <div className="px-4 py-4">
         <table className="w-full border-collapse text-left text-xs">
@@ -735,11 +744,6 @@ function ResultsCanvas({
         )}
       </div>
       {showChart && experiment && <VisitorChart experimentId={experiment.id} startedAt={experiment.startedAt} names={names} />}
-      {muted && (
-        <div className="mx-4 mb-6 rounded border border-dashed border-[#e1e4e8] px-4 py-8 text-center text-sm">
-          Kismet will start counting visitors after you approve this experiment.
-        </div>
-      )}
     </div>
   );
 }
