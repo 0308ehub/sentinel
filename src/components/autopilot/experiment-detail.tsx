@@ -161,12 +161,22 @@ export function ExperimentDetail({
     window.addEventListener("pointerup", finish);
   }
 
+  // A fix with no code yet has nothing for the right panel but buttons and one line of follow-up,
+  // so it reads as a single column instead of leaving a mostly empty pane.
+  const singleColumn = experiment?.kind === "fix" && !hasCodeChange(experiment);
+
   return (
     <div className="flex h-full min-h-0 bg-white text-[#1c1c1c]">
-      <aside className="flex shrink-0 flex-col gap-4 overflow-auto px-4 py-4" style={{ width: panelWidth }}>
-        <button type="button" onClick={onBack} className="text-left text-xs text-brand hover:underline">
-          ‹ Dashboard
-        </button>
+      <aside
+        className={singleColumn ? "flex min-w-0 max-w-3xl flex-1 flex-col gap-4 overflow-auto px-4 py-4" : "flex shrink-0 flex-col gap-4 overflow-auto px-4 py-4"}
+        style={singleColumn ? undefined : { width: panelWidth }}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <button type="button" onClick={onBack} className="text-left text-xs text-brand hover:underline">
+            ‹ Dashboard
+          </button>
+          {singleColumn && decisions}
+        </div>
         <div>
           <h1 className="text-xl leading-tight text-[#111827]">{title}</h1>
           <p className="mt-2 text-xs text-[#6b7280]">
@@ -218,7 +228,9 @@ export function ExperimentDetail({
           )}
         </dl>
         <Autonomous experiment={experiment} signal={signal} learning={learning} suggested={suggested} lastFailed={lastFailed} />
+        {singleColumn && experiment && <FixFollowUp experiment={experiment} signal={signal} className="border-t border-[#e6e8ec] pt-3" />}
       </aside>
+      {!singleColumn && (<>
       <div
         role="separator"
         aria-label="Resize details panel"
@@ -251,6 +263,7 @@ export function ExperimentDetail({
           decisions={decisions}
         />
       </div>
+      </>)}
       {experiment && (
         <RolloutScheduleDialog
           open={scheduling}
@@ -620,23 +633,19 @@ function ChangeFollowUp({ experiment }: { experiment: Experiment }) {
   );
 }
 
-function FixFollowUp({ experiment, signal }: { experiment: Experiment; signal: Signal | null }) {
+function FixFollowUp({ experiment, signal, className = "border-b border-[#e6e8ec] px-4 py-3" }: { experiment: Experiment; signal: Signal | null; className?: string }) {
   const complaints = experiment.startedAt
     ? signal?.evidence.filter((item) => item.source !== "analytics" && Date.parse(item.occurredAt) > Date.parse(experiment.startedAt!)).length ?? 0
     : 0;
+  const text = experiment.verifiedAt
+    ? experiment.note
+    : experiment.startedAt
+      ? `Watching since ${formatDay(experiment.startedAt)}: ${complaints} new complaint${complaints === 1 ? "" : "s"} so far.`
+      : "After merging, Kismet watches whether these complaints stop for 14 days.";
   return (
-    <section className="px-4 py-5 text-[#374151]">
-      <div className="rounded border border-[#e1e4e8] p-4">
-        <h2 className="text-sm font-medium text-[#111827]">Follow-up</h2>
-        {experiment.verifiedAt ? (
-          <p className="mt-3 text-sm">{experiment.note}</p>
-        ) : experiment.startedAt ? (
-          <p className="mt-3 text-sm">Watching since {formatDay(experiment.startedAt)}: {complaints} new complaint{complaints === 1 ? "" : "s"} so far.</p>
-        ) : (
-          <p className="mt-3 text-sm">After merging, Kismet watches whether these complaints stop for 14 days.</p>
-        )}
-      </div>
-    </section>
+    <p className={`${className} text-xs text-[#6b7280]`}>
+      <span className="font-medium text-[#111827]">Follow-up</span> · {text}
+    </p>
   );
 }
 
