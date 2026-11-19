@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
-import { Clock, ListFilter, MoreHorizontal, Plus, Trash2 } from "lucide-react";
+import { useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { Clock, ListFilter, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Plus, Trash2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +21,31 @@ const FILTERS: { id: SessionFilter; label: string }[] = [
   { id: "running", label: "Running" },
   { id: "ended", label: "Ended" },
 ];
+
+const COLLAPSED_KEY = "kismet-sessions-collapsed";
+const collapsedListeners = new Set<() => void>();
+
+function readCollapsed(): boolean {
+  try {
+    return localStorage.getItem(COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeCollapsed(collapsed: boolean) {
+  try {
+    localStorage.setItem(COLLAPSED_KEY, collapsed ? "1" : "0");
+  } catch {
+    // Storage can be blocked; the panel still toggles until the next reload.
+  }
+  collapsedListeners.forEach((listener) => listener());
+}
+
+function subscribeCollapsed(listener: () => void) {
+  collapsedListeners.add(listener);
+  return () => collapsedListeners.delete(listener);
+}
 
 const ORDER: WorkBucket[] = ["review", "ready", "working", "running", "quiet"];
 
@@ -54,6 +79,24 @@ export function ExperimentSessions({
       .filter(({ session }) => session.id === selectedId || matches(filter, session))
       .sort((a, b) => ORDER.indexOf(a.session.bucket) - ORDER.indexOf(b.session.bucket) || b.session.updated - a.session.updated);
   }, [experiments, filter, selectedId]);
+
+  const collapsed = useSyncExternalStore(subscribeCollapsed, readCollapsed, () => false);
+  const needsReview = rows.filter(({ session }) => session.bucket === "review" || session.bucket === "ready").length;
+
+  if (collapsed) {
+    return (
+      <aside className="flex w-11 shrink-0 flex-col items-center gap-1 border-r border-[#e7e7e7] bg-white pt-3">
+        <IconButton label="Show sessions" onClick={() => writeCollapsed(false)}>
+          <PanelLeftOpen className="h-4 w-4" />
+        </IconButton>
+        {needsReview > 0 && (
+          <span className="rounded-full bg-[#fdf1e4] px-1.5 text-[11px] font-medium text-[#e08a32]" title={`${needsReview} need review`}>
+            {needsReview}
+          </span>
+        )}
+      </aside>
+    );
+  }
 
   return (
     <aside className="flex w-[300px] shrink-0 flex-col border-r border-[#e7e7e7] bg-white">
@@ -95,6 +138,9 @@ export function ExperimentSessions({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        <IconButton label="Hide sessions" onClick={() => writeCollapsed(true)}>
+          <PanelLeftClose className="h-4 w-4" />
+        </IconButton>
       </div>
       <div className="min-h-0 flex-1 overflow-auto px-1.5 pb-3">
         {rows.length === 0 ? (
