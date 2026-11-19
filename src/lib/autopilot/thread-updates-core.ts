@@ -19,6 +19,7 @@ export interface ThreadUpdate {
   threadTs: string;
   text: string;
   stage: ThreadUpdateStage;
+  actionsFor?: string;
 }
 
 interface ThreadUpdatesInput {
@@ -127,7 +128,12 @@ export function threadUpdates({ signals, experiments, appUrl }: ThreadUpdatesInp
           : stage.stage === "merged" && experiment?.kind === "fix"
             ? `reporter_reply:${experiment.id}:${thread.channelId}:${thread.threadTs}`
             : `${stage.stage}:${experiment!.id}:${thread.channelId}:${thread.threadTs}`;
-        updates.push({ ...thread, ...stage, key });
+        updates.push({
+          ...thread,
+          ...stage,
+          key,
+          ...(stage.stage === "review" && experiment ? { actionsFor: experiment.id } : {}),
+        });
       }
     }
   }

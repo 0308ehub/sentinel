@@ -5,7 +5,8 @@ import { threadUpdates } from "@/lib/autopilot/thread-updates-core";
 import type { Experiment, Signal } from "@/lib/autopilot/types";
 import { listExperiments, listSignals, log } from "@/lib/autopilot/store";
 import { siteUrl } from "@/lib/site";
-import { postSlackMessage, SlackApiError } from "@/lib/slack/client";
+import { reviewActionBlocks } from "@/lib/slack/actions-core";
+import { postSlackBlocks, postSlackMessage, SlackApiError } from "@/lib/slack/client";
 
 // Retrying these never helps: the thread or channel is gone, or the bot is no longer in it.
 const FINAL_SLACK_ERRORS = new Set(["not_in_channel", "channel_not_found", "thread_not_found", "message_not_found", "is_archived", "cant_reply"]);
@@ -58,7 +59,11 @@ export async function postThreadUpdates(): Promise<number> {
     if (posted === 20) break;
     if (!(await claim(update.key))) continue;
     try {
-      await postSlackMessage(update.channelId, update.text, update.threadTs);
+      if (update.actionsFor) {
+        await postSlackBlocks(update.channelId, update.text, reviewActionBlocks(update.text, update.actionsFor), update.threadTs);
+      } else {
+        await postSlackMessage(update.channelId, update.text, update.threadTs);
+      }
       posted += 1;
     } catch (error) {
       if (error instanceof SlackApiError && FINAL_SLACK_ERRORS.has(error.code)) {

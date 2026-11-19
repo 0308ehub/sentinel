@@ -19,6 +19,7 @@ const isPublicRoute = createRouteMatcher([
   "/api/autopilot/flags",
   "/api/autopilot/events",
   "/api/slack/events",
+  "/api/slack/interactions",
   // The server SDK files a site downloads into its own repository.
   "/sdk/(.*)",
   "/api/coder/webhook",

@@ -9,6 +9,7 @@ interface SlackOAuthResponse {
   access_token?: string;
   bot_user_id?: string;
   team?: { id?: string; name?: string };
+  authed_user?: { id?: string };
 }
 
 export async function GET(request: Request) {
@@ -67,6 +68,7 @@ export async function GET(request: Request) {
         teamId: result.team?.id,
         teamName: result.team?.name,
         botUserId: result.bot_user_id,
+        installerUserId: result.authed_user?.id,
       },
     );
     return finish(undefined, true);

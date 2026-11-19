@@ -1,5 +1,6 @@
 import type { Experiment } from "./types.ts";
 import type { Evidence } from "./types.ts";
+import { reviewActionBlocks } from "../slack/actions-core.ts";
 
 export const DIGEST_UTC_HOUR = 16;
 
@@ -79,20 +80,19 @@ function message(
   if (experiment.prUrl) links.push(`<${experiment.prUrl}|Open PR>`);
   const context = escapeMrkdwn(experiment.title).slice(0, 700);
   const text = `${title}: ${detail} — ${experiment.title}`.slice(0, 3000);
+  const section = {
+    type: "section",
+    text: {
+      type: "mrkdwn",
+      text: `*${safeTitle}*\n${safeDetail}\n${context} · ${links.join(" · ")}`.slice(0, 3000),
+    },
+  };
   return {
     key,
     kind,
     experimentId: experiment.id,
     text,
-    blocks: [
-      {
-        type: "section",
-        text: {
-          type: "mrkdwn",
-          text: `*${safeTitle}*\n${safeDetail}\n${context} · ${links.join(" · ")}`.slice(0, 3000),
-        },
-      },
-    ],
+    blocks: kind === "approval" ? reviewActionBlocks(section.text.text, experiment.id) : [section],
   };
 }
 
