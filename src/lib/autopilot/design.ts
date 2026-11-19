@@ -11,7 +11,7 @@ import type { Builder } from "@/lib/autopilot/builders";
 import type { Experiment, Signal } from "@/lib/autopilot/types";
 import { buildThemes } from "@/lib/autopilot/themes";
 import { formatPreferences } from "@/lib/autopilot/preferences";
-import { classifyDesignAnswer, designSystemPrompt, designUserMessage, fixSystemPrompt, normalizeDesignAnswer } from "@/lib/autopilot/design-prompt-core";
+import { classifyDesignAnswer, designSystemPrompt, designUserMessage, fixSystemPrompt, normalizeDesignAnswer, cleanFixTitle, fixTitle } from "@/lib/autopilot/design-prompt-core";
 
 /** After this many attempts on one problem, Autopilot stops and leaves it to a person. */
 export const MAX_VERSIONS = 3;
@@ -105,12 +105,12 @@ async function designFix(candidate: Signal, experiments: Experiment[], buildWith
   if (!answer.title?.trim() || !answer.treatment?.trim() || !answer.reasoning?.trim() || !answer.confidence || answer.confidence === "low" || !cited.length) {
     throw new Error("The fix design was missing a title, fix, reasoning, confidence, or complaint.");
   }
-  const shortTitle = answer.title.trim().replace(/^fix:\s*/i, "");
+  const shortTitle = cleanFixTitle(answer.title);
   await createExperiment({
     signalId: candidate.id,
     version,
     kind: "fix",
-    title: `Fix: ${shortTitle}`,
+    title: fixTitle(shortTitle),
     hypothesis: answer.hypothesis?.trim() || candidate.problem,
     metric: "",
     metricSpec: null,

@@ -97,3 +97,14 @@ export function normalizeDesignAnswer<T extends object>(answer: T): T {
   }
   return next as T;
 }
+
+/** Drops a leading "Fix:" the model added; Kismet adds its own label. */
+export function cleanFixTitle(title: string): string {
+  return title.trim().replace(/^fix\s*(?::|\s[-–—])\s*/i, "").trim();
+}
+
+/** "Fix: <title>", unless the title already starts with the word fix (e.g. "Fix-experiment builds fail"). */
+export function fixTitle(shortTitle: string): string {
+  if (/^fix\b/i.test(shortTitle)) return shortTitle.charAt(0).toUpperCase() + shortTitle.slice(1);
+  return `Fix: ${shortTitle}`;
+}

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
 
-import { classifyDesignAnswer, designSystemPrompt, fixSystemPrompt, normalizeDesignAnswer } from "../src/lib/autopilot/design-prompt-core.ts";
+import { classifyDesignAnswer, cleanFixTitle, designSystemPrompt, fixSystemPrompt, fixTitle, normalizeDesignAnswer } from "../src/lib/autopilot/design-prompt-core.ts";
 
 test("classifyDesignAnswer recognizes production outcomes", () => {
   assert.equal(classifyDesignAnswer({ kind: "none", reason: "No problem." }), "none");
@@ -39,4 +39,11 @@ test("design answers with lists or numbers become text", () => {
   assert.equal(answer.confidenceReason, "3");
   assert.equal(answer.evidence[0].quote, "It doesn't say; when it resets");
   assert.equal(answer.title, "Show reset time");
+});
+
+test("fix titles never read Fix: Fix", () => {
+  assert.equal(fixTitle(cleanFixTitle("Fix: Spend tab hides the reset time")), "Fix: Spend tab hides the reset time");
+  assert.equal(fixTitle(cleanFixTitle("fix - Spend tab hides the reset time")), "Fix: Spend tab hides the reset time");
+  assert.equal(fixTitle(cleanFixTitle("Fix-experiment builds fail when the gated file can't be read")), "Fix-experiment builds fail when the gated file can't be read");
+  assert.equal(fixTitle(cleanFixTitle("Checkout button overlaps footer")), "Fix: Checkout button overlaps footer");
 });

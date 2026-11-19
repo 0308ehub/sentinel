@@ -524,6 +524,18 @@ create table if not exists kismet.webhook_events (
   id text primary key,
   received_at timestamptz not null default now()
 );
+
+-- Kismet's own Slack posts were once filed as complaints. Real Slack evidence is always authored by a
+-- Slack user id (U… or W…). Retire open problems built only from those posts, then remove the posts.
+-- Problems made with "Create experiment" have no evidence at all and are left alone.
+update kismet.signals s set status = 'dismissed', updated_at = now()
+where s.status = 'open'
+  and exists (select 1 from kismet.evidence e where e.signal_id = s.id
+    and e.source = 'slack' and not e.synthetic and e.author !~ '^[UW][A-Z0-9]+$')
+  and not exists (select 1 from kismet.evidence e where e.signal_id = s.id
+    and not (e.source = 'slack' and not e.synthetic and e.author !~ '^[UW][A-Z0-9]+$'));
+delete from kismet.evidence
+where source = 'slack' and not synthetic and author !~ '^[UW][A-Z0-9]+$';
 `;
 
 export async function db(): Promise<Sql> {
