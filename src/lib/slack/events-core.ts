@@ -39,11 +39,17 @@ export function slackMessageEvidence(input: SlackMessageInput, channelName: stri
   };
 }
 
+/** True for a message a person wrote: not a bot (including Kismet's own posts) and not a join or edit notice. */
+export function isPersonMessage(message: { botId?: unknown; subtype?: unknown; userId?: unknown }): boolean {
+  if (message.botId != null) return false;
+  if (message.subtype != null && message.subtype !== "thread_broadcast" && message.subtype !== "file_share") return false;
+  return typeof message.userId === "string" && message.userId.length > 0;
+}
+
 export function messageEvidence(event: SlackMessageEvent, channelName: string): FiledEvidence | null {
   if (event.type !== "message") return null;
   if (event.channel_type !== "channel" && event.channel_type !== "group") return null;
-  if (event.bot_id != null) return null;
-  if (event.subtype != null && event.subtype !== "thread_broadcast" && event.subtype !== "file_share") return null;
+  if (!isPersonMessage({ botId: event.bot_id, subtype: event.subtype, userId: event.user })) return null;
   if (typeof event.channel !== "string" || typeof event.ts !== "string" || typeof event.text !== "string") return null;
 
   return slackMessageEvidence(

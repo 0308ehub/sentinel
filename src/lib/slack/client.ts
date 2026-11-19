@@ -198,6 +198,8 @@ export interface SlackHistoryItem {
   userId?: string;
   text: string;
   threadTs?: string;
+  botId?: string;
+  subtype?: string;
 }
 
 export async function listRecentMessages(channelId: string, oldest?: string): Promise<SlackHistoryItem[]> {
@@ -212,6 +214,8 @@ export async function listRecentMessages(channelId: string, oldest?: string): Pr
     userId: message.user,
     text: message.text ?? "",
     threadTs: message.thread_ts,
+    botId: message.bot_id,
+    subtype: message.subtype,
   }));
 }
 

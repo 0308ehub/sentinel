@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import test from "node:test";
 
-import { messageEvidence, verifySlackSignature } from "../src/lib/slack/events-core.ts";
+import { isPersonMessage, messageEvidence, verifySlackSignature } from "../src/lib/slack/events-core.ts";
 
 const secret = "signing-secret";
 const timestamp = "1800000000";
@@ -74,4 +74,13 @@ test("caps Slack evidence title and body lengths", () => {
   const evidence = messageEvidence(event({ text: "word ".repeat(200) }), "long-channel-name");
   assert.equal(evidence.title.length, 180);
   assert.equal(evidence.body.length, 500);
+});
+
+test("history polling keeps only messages people wrote", () => {
+  assert.equal(isPersonMessage({ userId: "U1" }), true);
+  assert.equal(isPersonMessage({ userId: "U1", subtype: "thread_broadcast" }), true);
+  assert.equal(isPersonMessage({ botId: "B1", userId: "U1" }), false);
+  assert.equal(isPersonMessage({ subtype: "bot_message" }), false);
+  assert.equal(isPersonMessage({ userId: "U1", subtype: "channel_join" }), false);
+  assert.equal(isPersonMessage({}), false);
 });

@@ -28,7 +28,8 @@ export function reporterThreads(evidence: Evidence[]): ReporterThread[] {
   const seen = new Set<string>();
   const threads: ReporterThread[] = [];
   for (const item of evidence) {
-    if (item.source !== "slack" || !item.url?.startsWith("slack://")) continue;
+    // Evidence filed before bot messages were skipped has no person as its author; never reply to Kismet itself.
+    if (item.source !== "slack" || !item.url?.startsWith("slack://") || !/^[UW][A-Z0-9]+$/.test(item.author ?? "")) continue;
     const match = item.url.match(/^slack:\/\/([^/]+)\/([^/]+)$/);
     if (!match) continue;
     const key = `${match[1]}:${match[2]}`;

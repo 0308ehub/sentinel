@@ -5,7 +5,7 @@ import { evidenceFromGraph, type FiledEvidence } from "@/lib/autopilot/workspace
 import { actingUserId } from "@/lib/connections/current";
 import { listRecentIssues } from "@/lib/jira/client";
 import { listBotChannels, listRecentMessages, SlackApiError } from "@/lib/slack/client";
-import { slackMessageEvidence } from "@/lib/slack/events-core";
+import { isPersonMessage, slackMessageEvidence } from "@/lib/slack/events-core";
 import { loadStates } from "@/lib/workspace/state-store";
 
 /** Most new items filed per tick, newest first; the rest arrive on later ticks. */
@@ -59,6 +59,7 @@ async function slackEvidence(): Promise<FiledEvidence[]> {
     const channel = channels[Math.floor(Date.now() / 3_600_000) % channels.length];
     const messages = await listRecentMessages(channel.id);
     return messages
+      .filter(isPersonMessage)
       .map((message) => slackMessageEvidence({
         channelId: channel.id,
         ts: message.ts,

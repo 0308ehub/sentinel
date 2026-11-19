@@ -157,11 +157,11 @@ test("buildDigest summarizes recent activity and waiting work", () => {
 
 test("picks and deduplicates up to five Slack reporter threads", () => {
   const evidence = [
-    { source: "slack", url: "slack://C1/111.1" },
-    { source: "slack", url: "slack://C1/111.1" },
-    { source: "ticket", url: "slack://C2/222.2" },
-    { source: "slack", url: "https://example.com" },
-    ...[2, 3, 4, 5, 6].map((value) => ({ source: "slack", url: `slack://C${value}/${value}.0` })),
+    { source: "slack", author: "U1", url: "slack://C1/111.1" },
+    { source: "slack", author: "U1", url: "slack://C1/111.1" },
+    { source: "ticket", author: "U1", url: "slack://C2/222.2" },
+    { source: "slack", author: "U1", url: "https://example.com" },
+    ...[2, 3, 4, 5, 6].map((value) => ({ source: "slack", author: `U${value}`, url: `slack://C${value}/${value}.0` })),
   ];
   assert.deepEqual(reporterThreads(evidence), [
     { channelId: "C1", threadTs: "111.1" },
@@ -178,4 +178,12 @@ test("builds the reporter reply and stable dedupe key", () => {
     reporterReplyText("Fix checkout", "https://github.com/acme/app/pull/7"),
     "Thanks for flagging this. A fix is live: Fix checkout (https://github.com/acme/app/pull/7). Kismet will keep an eye out for new reports.",
   );
+});
+
+test("never replies to evidence Kismet's own Slack posts produced", () => {
+  assert.deepEqual(reporterThreads([
+    { source: "slack", author: "Slack", url: "slack://C1/1.0" },
+    { source: "slack", author: "", url: "slack://C1/2.0" },
+    { source: "slack", author: "U9", url: "slack://C1/3.0" },
+  ]), [{ channelId: "C1", threadTs: "3.0" }]);
 });
