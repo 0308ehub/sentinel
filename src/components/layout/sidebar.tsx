@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import * as AvatarPrimitive from "@radix-ui/react-avatar";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
@@ -18,7 +18,6 @@ import {
   PanelLeftOpen,
   Plus,
   CircleAlert,
-  ChevronRight,
   Home,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -50,38 +49,8 @@ const PRIMARY: NavItem[] = [
   { id: "timeline", label: "Timeline", href: "/timeline", icon: Clock },
   { id: "graph", label: "Graph", href: "/graph", icon: GitBranch },
   { id: "design", label: "Design", href: "/design", icon: Frame },
-];
-
-const MORE: NavItem[] = [
   { id: "analytics", label: "Analytics", href: "/analytics", icon: BarChart3 },
 ];
-
-const MORE_KEY = "kismet-nav-more-open";
-const moreListeners = new Set<() => void>();
-
-function readMoreOpen(): boolean {
-  try {
-    return localStorage.getItem(MORE_KEY) === "1";
-  } catch {
-    return false; // Storage blocked: start collapsed.
-  }
-}
-
-function writeMoreOpen(open: boolean) {
-  try {
-    localStorage.setItem(MORE_KEY, open ? "1" : "0");
-  } catch {
-    // Storage blocked: the choice lasts until reload.
-  }
-  moreListeners.forEach((listener) => listener());
-}
-
-function subscribeMore(listener: () => void) {
-  moreListeners.add(listener);
-  return () => {
-    moreListeners.delete(listener);
-  };
-}
 
 const noSubscribe = () => () => {};
 
@@ -134,30 +103,8 @@ export function Sidebar() {
   const profile = draftName
     ? { name: draftName, email: draftEmail, initials: initialsFor(draftName) }
     : { name: CURRENT_USER.name, email: CURRENT_USER.email, initials: CURRENT_USER.initials };
-  const moreStored = useSyncExternalStore(subscribeMore, readMoreOpen, () => false);
-  const [attention, setAttention] = useState(0);
-
-  useEffect(() => {
-    let stop = false;
-    async function load() {
-      const res = await fetch("/api/inbox/attention");
-      if (!res.ok) return;
-      const body = (await res.json()) as { count?: number };
-      if (!stop) setAttention(body.count ?? 0);
-    }
-    void load();
-    const timer = window.setInterval(() => void load(), 15000);
-    return () => {
-      stop = true;
-      window.clearInterval(timer);
-    };
-  }, [pathname]);
-
   const workspace = useWorkspaceSettings();
   const hiddenNav = new Set(workspace.hiddenNav);
-  const moreItems = MORE.filter((item) => !hiddenNav.has(item.id));
-  // The group opens on its own when you are on one of its pages.
-  const moreOpen = moreStored || moreItems.some((item) => isActive(item, pathname));
   const shownProfile = account
     ? {
         name: account.name || CURRENT_USER.name,
@@ -223,29 +170,6 @@ export function Sidebar() {
           </button>
           {PRIMARY.filter((item) => !hiddenNav.has(item.id)).map((item) => (
             <NavLink key={item.href} item={item} pathname={pathname} collapsed={sidebarCollapsed} badge={0} />
-          ))}
-          <button
-            type="button"
-            onClick={() => writeMoreOpen(!moreOpen)}
-            aria-expanded={moreOpen}
-            title={sidebarCollapsed ? "More" : undefined}
-            className={cn(
-              "relative mt-2 flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
-              sidebarCollapsed && "justify-center px-0",
-            )}
-          >
-            <ChevronRight className={cn("h-4 w-4 shrink-0 transition-transform", moreOpen && "rotate-90")} />
-            {!sidebarCollapsed && <span>More</span>}
-            {!moreOpen && attention > 0 && <CountBadge count={attention} collapsed={sidebarCollapsed} />}
-          </button>
-          {moreOpen && moreItems.map((item) => (
-            <NavLink
-              key={item.href}
-              item={item}
-              pathname={pathname}
-              collapsed={sidebarCollapsed}
-              badge={item.id === "agents" ? attention : 0}
-            />
           ))}
           <Link
             href="/settings"
