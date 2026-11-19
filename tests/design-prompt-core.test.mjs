@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
 
-import { classifyDesignAnswer, designSystemPrompt, fixSystemPrompt } from "../src/lib/autopilot/design-prompt-core.ts";
+import { classifyDesignAnswer, designSystemPrompt, fixSystemPrompt, normalizeDesignAnswer } from "../src/lib/autopilot/design-prompt-core.ts";
 
 test("classifyDesignAnswer recognizes production outcomes", () => {
   assert.equal(classifyDesignAnswer({ kind: "none", reason: "No problem." }), "none");
@@ -25,4 +25,18 @@ test("eval fixtures have unique ids and known stages", () => {
   assert.ok(cases.length >= 12);
   assert.equal(new Set(cases.map((item) => item.id)).size, cases.length);
   for (const item of cases) assert.ok(item.stage === "triage" || item.stage === "design", `${item.id} has an unknown stage`);
+});
+
+test("design answers with lists or numbers become text", () => {
+  const answer = normalizeDesignAnswer({
+    title: "Show reset time",
+    risks: ["Wrong timezone", "  ", "Layout shift"],
+    confidence: "high",
+    confidenceReason: 3,
+    evidence: [{ source: "slack", quote: ["It doesn't say", "when it resets"] }],
+  });
+  assert.equal(answer.risks, "Wrong timezone; Layout shift");
+  assert.equal(answer.confidenceReason, "3");
+  assert.equal(answer.evidence[0].quote, "It doesn't say; when it resets");
+  assert.equal(answer.title, "Show reset time");
 });

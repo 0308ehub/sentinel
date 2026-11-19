@@ -11,7 +11,7 @@ import type { Builder } from "@/lib/autopilot/builders";
 import type { Experiment, Signal } from "@/lib/autopilot/types";
 import { buildThemes } from "@/lib/autopilot/themes";
 import { formatPreferences } from "@/lib/autopilot/preferences";
-import { classifyDesignAnswer, designSystemPrompt, designUserMessage, fixSystemPrompt } from "@/lib/autopilot/design-prompt-core";
+import { classifyDesignAnswer, designSystemPrompt, designUserMessage, fixSystemPrompt, normalizeDesignAnswer } from "@/lib/autopilot/design-prompt-core";
 
 /** After this many attempts on one problem, Autopilot stops and leaves it to a person. */
 export const MAX_VERSIONS = 3;
@@ -96,7 +96,7 @@ async function designFix(candidate: Signal, experiments: Experiment[], buildWith
     problem: { title: candidate.title, description: candidate.problem, area: candidate.area },
     complaints: candidate.evidence.slice(0, 15).map((item) => ({ source: item.source, author: item.author, title: item.title, body: item.body })),
   });
-  const answer = readJson<ChangeAnswer>(await askForJson(system, user, false, undefined, "experiment"));
+  const answer = normalizeDesignAnswer(readJson<ChangeAnswer>(await askForJson(system, user, false, undefined, "experiment")));
   if (answer.kind === "none") {
     if (!answer.reason?.trim()) throw new Error("The no-change design was missing a reason.");
     return createNoChangeExperiment(candidate, previous, answer.reason, buildWith);
@@ -192,7 +192,7 @@ async function designCandidate(
     | { answer: DesignAnswer; spec: NonNullable<ReturnType<typeof parseMetricSpec>>; estimate: ResultEstimate; kind: "experiment" | "fix"; mode: "deterministic" | "stochastic" }
   > {
     const text = await askForJson(system, message, false, undefined, "experiment");
-    const answer = readJson<DesignAnswer>(text);
+    const answer = normalizeDesignAnswer(readJson<DesignAnswer>(text));
     const classification = classifyDesignAnswer(answer);
     if (classification === "none") {
       if (!answer.reason?.trim()) throw new Error("The no-change design was missing a reason.");
@@ -240,7 +240,7 @@ async function designCandidate(
       'Return JSON: {title, hypothesis, control, treatment, metric, page, guardrail, reasoning, evidence:[{source, quote}], confidence, confidenceReason, risks, question}.',
     ].join(" ");
     const changeText = await askForJson(changeSystem, `${user}\n\nJOURNEYS\n${journeys.length ? journeys.join("\n") : "No recent journeys."}`, false, undefined, "experiment");
-    const change = readJson<ChangeAnswer>(changeText);
+    const change = normalizeDesignAnswer(readJson<ChangeAnswer>(changeText));
     const changeSpec = parseMetricSpec(change.metric);
     const cited = (change.evidence ?? []).filter((item) => item.source?.trim() && item.quote?.trim()).slice(0, 6);
     if (!change.title || !change.treatment || !changeSpec) throw new Error("The evidence-backed change was missing a title, change or metric.");

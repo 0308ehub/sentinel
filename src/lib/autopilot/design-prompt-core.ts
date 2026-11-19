@@ -68,3 +68,32 @@ export function classifyDesignAnswer(answer: unknown): "none" | "fix" | "experim
   const kind = (answer as { kind?: unknown }).kind;
   return kind === "none" || kind === "fix" || kind === "experiment" ? kind : "invalid";
 }
+
+const TEXT_FIELDS = ["kind", "reason", "mode", "title", "hypothesis", "control", "treatment", "page", "guardrail", "reasoning", "confidence", "confidenceReason", "risks", "question"] as const;
+
+function asText(value: unknown): unknown {
+  if (value == null || typeof value === "string") return value;
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (typeof item === "string" ? item : item && typeof item === "object" ? Object.values(item).filter((part) => typeof part === "string").join(": ") : String(item)))
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .join("; ");
+  }
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return value;
+}
+
+/** Models sometimes return a list or a number where Kismet expects a sentence; turn those fields into text. */
+export function normalizeDesignAnswer<T extends object>(answer: T): T {
+  if (!answer || typeof answer !== "object") return answer;
+  const record = answer as Record<string, unknown>;
+  const next: Record<string, unknown> = { ...record };
+  for (const key of TEXT_FIELDS) if (key in record) next[key] = asText(record[key]);
+  if (Array.isArray(record.evidence)) {
+    next.evidence = record.evidence.map((item) => (item && typeof item === "object"
+      ? { ...item, source: asText((item as Record<string, unknown>).source), quote: asText((item as Record<string, unknown>).quote) }
+      : item));
+  }
+  return next as T;
+}
