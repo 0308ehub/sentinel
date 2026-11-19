@@ -1,30 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
+import {
+  experimentQueryKeys,
+  useExperimentChanges,
+  useExperimentSnapshot,
+  useExperimentSummary,
+  type ExperimentChanges as Changes,
+  type ExperimentSnapshot as SnapshotResponse,
+} from "@/components/autopilot/experiment-queries";
 import type { ChangeSummary } from "@/lib/autopilot/change-summary";
 import { addedTextFromPatch, normalizePreviewCondition, textDifference } from "@/lib/autopilot/preview-diff";
 import type { Experiment } from "@/lib/autopilot/types";
-
-type ChangeFile = { patch?: string };
-
-type Changes = {
-  source: "none" | "draft" | "branch" | "pull";
-  previewUrl?: string | null;
-  siteUrl?: string | null;
-  ownRepo?: boolean;
-  files?: ChangeFile[];
-  pull?: { state: "open" | "closed" | "merged"; files?: ChangeFile[] };
-};
-
-type SummaryResponse = { summary?: ChangeSummary; pending?: boolean; siteUrl?: string | null; error?: string };
-type SnapshotResponse = {
-  status: "none" | "rendering" | "ready" | "failed";
-  scenario?: string | null;
-  error?: string | null;
-  controlHtml?: string | null;
-  treatmentHtml?: string | null;
-};
 
 function previewHref(origin: string, page: string, flag: string, arm: "control" | "treatment", embed: boolean) {
   const url = new URL(page || "/", `${origin}/`);
@@ -34,39 +23,22 @@ function previewHref(origin: string, page: string, flag: string, arm: "control" 
 }
 
 export function WhatChanges({ experiment }: { experiment: Experiment }) {
-  const [summary, setSummary] = useState<SummaryResponse | null>(null);
-  const [changes, setChanges] = useState<Changes | null>(null);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    const controller = new AbortController();
-    Promise.all([
-      fetch(`/api/autopilot/experiments/${experiment.id}/summary`, { cache: "no-store", signal: controller.signal }),
-      fetch(`/api/autopilot/experiments/${experiment.id}/changes`, { cache: "no-store", signal: controller.signal }),
-    ]).then(async ([summaryResponse, changesResponse]) => {
-      const summaryBody = (await summaryResponse.json().catch(() => ({}))) as SummaryResponse;
-      const changesBody = (await changesResponse.json().catch(() => ({}))) as Changes & { error?: string };
-      if (!summaryResponse.ok) throw new Error(summaryBody.error || "Could not load the change summary.");
-      if (!changesResponse.ok) throw new Error(changesBody.error || "Could not load the preview.");
-      setSummary(summaryBody);
-      setChanges(changesBody);
-    }).catch((reason: unknown) => {
-      if (reason instanceof DOMException && reason.name === "AbortError") return;
-      setError(reason instanceof Error ? reason.message : "Could not load what changes.");
-    });
-    return () => controller.abort();
-    // Reload when the change itself moves on: a branch is pushed, a PR opens, or the draft is replaced.
-  }, [experiment.id, experiment.branch, experiment.prNumber, experiment.draftPath, experiment.version]);
+  const summaryQuery = useExperimentSummary(experiment);
+  const changesQuery = useExperimentChanges(experiment);
+  const summary = summaryQuery.data;
+  const changes = changesQuery.data;
+  const reason = summaryQuery.error ?? changesQuery.error;
+  const error = reason instanceof Error ? reason.message || (changesQuery.error ? "Could not load the preview." : "Could not load the change summary.") : reason ? "Could not load what changes." : "";
 
   return (
     <section className="border-b border-[#e6e8ec] px-4 py-4 text-[#374151]">
       <h2 className="text-sm font-medium text-[#111827]">What changes</h2>
       {error ? <p className="mt-3 text-sm text-[#b42318]">{error}</p> : !summary || !changes ? (
-        <p className="mt-3 text-sm text-[#6b7280]">Loading what changes…</p>
+        <LoadingBlock className="mt-3 min-h-40" label="Loading what changes…" />
       ) : summary.pending || !summary.summary ? (
         <p className="mt-3 text-sm text-[#6b7280]">The change is still being built.</p>
       ) : (
-        <SummaryContent experiment={experiment} summary={summary.summary} changes={changes} siteUrl={summary.siteUrl ?? changes.siteUrl ?? null} />
+        <div className="animate-in fade-in duration-150"><SummaryContent experiment={experiment} summary={summary.summary} changes={changes} siteUrl={summary.siteUrl ?? changes.siteUrl ?? null} /></div>
       )}
     </section>
   );
@@ -113,8 +85,14 @@ function VisualPreview({ experiment, changes, siteUrl, when, addedText }: {
   when: string;
   addedText: string[];
 }) {
-  const [snapshot, setSnapshot] = useState<SnapshotResponse | null>(null);
+  const queryClient = useQueryClient();
+  const snapshotQuery = useExperimentSnapshot(experiment);
+  const snapshot = snapshotQuery.data ?? null;
+  const refetchSnapshot = snapshotQuery.refetch;
   const [snapshotMessage, setSnapshotMessage] = useState("");
+  const snapshotLoadMessage = snapshotQuery.error instanceof Error
+    ? snapshotQuery.error.message || "Could not load the sample preview."
+    : snapshotQuery.error ? "Could not load the sample preview." : "";
   const startAttempted = useRef(false);
   const ownOrigin = changes.ownRepo && typeof window !== "undefined" ? window.location.origin : null;
   const liveOrigin = ownOrigin ?? siteUrl;
@@ -130,43 +108,34 @@ function VisualPreview({ experiment, changes, siteUrl, when, addedText }: {
       setSnapshotMessage((await started.text()) || "Could not start the sample preview.");
       return;
     }
-    setSnapshot((await started.json()) as SnapshotResponse);
+    queryClient.setQueryData(experimentQueryKeys.snapshot(experiment), (await started.json()) as SnapshotResponse);
   };
 
   useEffect(() => {
-    let active = true;
+    if (!snapshot) return;
     let timer: number | undefined;
-    const load = async () => {
-      const response = await fetch(`/api/autopilot/experiments/${experiment.id}/snapshot`, { cache: "no-store" });
-      const body = (await response.json().catch(() => ({}))) as SnapshotResponse & { error?: string };
-      if (!active) return;
-      if (!response.ok) {
-        setSnapshotMessage(body.error || "Could not load the sample preview.");
-        return;
-      }
-      setSnapshot(body);
-      if (body.status === "none" && hasSource && shouldAutoRender && !startAttempted.current) {
+    const advance = async () => {
+      if (snapshot.status === "none" && hasSource && shouldAutoRender && !startAttempted.current) {
         startAttempted.current = true;
         const started = await fetch(`/api/autopilot/experiments/${experiment.id}/snapshot`, { method: "POST" });
-        if (!active) return;
         if (!started.ok) {
           setSnapshotMessage((await started.text()) || "Could not start the sample preview.");
           return;
         }
-        setSnapshot((await started.json()) as SnapshotResponse);
-        timer = window.setTimeout(load, 10_000);
-      } else if (body.status === "rendering") {
-        timer = window.setTimeout(load, 10_000);
+        queryClient.setQueryData(experimentQueryKeys.snapshot(experiment), (await started.json()) as SnapshotResponse);
+      } else if (snapshot.status === "rendering") {
+        timer = window.setTimeout(() => { void refetchSnapshot(); }, 10_000);
       }
     };
-    load().catch((reason: unknown) => {
-      if (active) setSnapshotMessage(reason instanceof Error ? reason.message : "Could not load the sample preview.");
+    advance().catch((reason: unknown) => {
+      setSnapshotMessage(reason instanceof Error ? reason.message : "Could not load the sample preview.");
     });
     return () => {
-      active = false;
       if (timer) window.clearTimeout(timer);
     };
-  }, [experiment.id, hasSource, shouldAutoRender]);
+  }, [experiment, hasSource, queryClient, refetchSnapshot, shouldAutoRender, snapshot]);
+
+  if (snapshotQuery.isPending) return <LoadingBlock className="mt-4 min-h-72" label="Loading sample preview…" />;
 
   return (
     <div className="mt-4">
@@ -197,8 +166,8 @@ function VisualPreview({ experiment, changes, siteUrl, when, addedText }: {
       {snapshot?.status === "rendering" && (
         <p className="mt-2 text-xs text-[#6b7280]">Rendering both versions with sample data… (usually a few minutes)</p>
       )}
-      {(snapshot?.status === "failed" || snapshotMessage) && (
-        <p className="mt-2 text-xs text-[#6b7280]">{snapshotMessage || snapshot?.error || "The sample preview could not be rendered."}</p>
+      {(snapshot?.status === "failed" || snapshotMessage || snapshotLoadMessage) && (
+        <p className="mt-2 text-xs text-[#6b7280]">{snapshotMessage || snapshotLoadMessage || snapshot?.error || "The sample preview could not be rendered."}</p>
       )}
     </div>
   );
@@ -214,11 +183,8 @@ function SnapshotChoice({ experiment, changes, liveOrigin, isLive, when, addedTe
   snapshot: SnapshotResponse | null;
 }) {
   const ready = snapshot?.status === "ready" && Boolean(snapshot.controlHtml && snapshot.treatmentHtml);
-  const [shownAs, setShownAs] = useState<"sample" | "account">("account");
+  const [shownAs, setShownAs] = useState<"sample" | "account">(() => ready && (Boolean(when.trim()) || !isLive) ? "sample" : "account");
   const chosen = useRef(false);
-  useEffect(() => {
-    if (!chosen.current && ready && (Boolean(when.trim()) || !isLive)) setShownAs("sample");
-  }, [ready, when, isLive]);
   const live = (
     <PreviewBody experiment={experiment} changes={changes} liveOrigin={liveOrigin} isLive={isLive} when={when} addedText={addedText} />
   );
@@ -260,6 +226,17 @@ function SnapshotChoice({ experiment, changes, liveOrigin, isLive, when, addedTe
           {!isLive && <div className="mt-3">{live}</div>}
         </>
       ) : live}
+    </div>
+  );
+}
+
+function LoadingBlock({ className, label }: { className: string; label: string }) {
+  return (
+    <div className={`${className} animate-pulse rounded-md border border-[#e6e8ec] bg-[#f8f9fa] p-3`} role="status">
+      <span className="sr-only">{label}</span>
+      <div className="h-3 w-2/3 rounded bg-[#e6e8ec]" />
+      <div className="mt-3 h-3 w-1/2 rounded bg-[#eceef1]" />
+      <div className="mt-6 h-24 rounded bg-[#eceef1]" />
     </div>
   );
 }

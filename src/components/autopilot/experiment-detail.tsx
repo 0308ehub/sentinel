@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { ExternalLink, Loader2 } from "lucide-react";
 import { BuildLive } from "@/components/autopilot/build-live";
 import { CodeChange } from "@/components/autopilot/code-change";
 import { WhatChanges } from "@/components/autopilot/what-changes";
+import { useVisitorSeries } from "@/components/autopilot/experiment-queries";
 import { BuilderMenu, useAccountBuilder } from "@/components/autopilot/builder-menu";
 import { RolloutScheduleDialog } from "@/components/autopilot/rollout-schedule";
 import { Button } from "@/components/ui/button";
@@ -790,7 +791,7 @@ function ResultsCanvas({
           <p className="mt-2 text-xs text-[#6b7280]">{Math.round(readout.syntheticShare * 100)}% of this traffic is synthetic.</p>
         )}
       </div>
-      {showChart && experiment && <VisitorChart experimentId={experiment.id} startedAt={experiment.startedAt} names={names} />}
+      {showChart && experiment && <VisitorChart experiment={experiment} names={names} />}
     </div>
   );
 }
@@ -853,28 +854,15 @@ function IntervalMark({ lift, low, high }: { lift: number; low: number; high: nu
 }
 
 function VisitorChart({
-  experimentId,
-  startedAt,
+  experiment,
   names,
 }: {
-  experimentId: string;
-  startedAt: string | null;
+  experiment: Experiment;
   names: { control: string; treatment: string };
 }) {
-  const [points, setPoints] = useState<DailyVisitors[] | null>(null);
   const [open, setOpen] = useState(true);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    fetch(`/api/autopilot/experiments/${experimentId}`, { cache: "no-store", signal: controller.signal })
-      .then(async (res) => (await res.json().catch(() => ({}))) as { series?: DailyVisitors[] })
-      .then((body) => setPoints(fillDays(startedAt, body.series ?? [])))
-      .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === "AbortError") return;
-        setPoints(fillDays(startedAt, []));
-      });
-    return () => controller.abort();
-  }, [experimentId, startedAt]);
+  const series = useVisitorSeries(experiment);
+  const points = series.isPending ? null : fillDays(experiment.startedAt, series.data ?? []);
 
   return (
     <section className="border-t border-[#e6e8ec] px-4 py-3">
@@ -893,9 +881,12 @@ function VisitorChart({
             </span>
           </div>
           {points == null ? (
-            <p className="py-8 text-sm text-[#6b7280]">Loading visitors…</p>
+            <div className="min-h-64 animate-pulse rounded-md bg-[#f8f9fa] p-4" role="status">
+              <span className="sr-only">Loading visitors…</span>
+              <div className="h-full min-h-56 rounded border border-[#e6e8ec] bg-[#eceef1]" />
+            </div>
           ) : (
-            <VisitorLines points={points} />
+            <div className="animate-in fade-in duration-150"><VisitorLines points={points} /></div>
           )}
         </>
       )}

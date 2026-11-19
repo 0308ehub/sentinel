@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
+import { useExperimentChanges } from "@/components/autopilot/experiment-queries";
 import { parsePatch } from "@/lib/autopilot/diff";
 import type { Experiment } from "@/lib/autopilot/types";
 
@@ -42,34 +43,28 @@ export function CodeChange({ experiment }: { experiment: Experiment }) {
           <SwitchButton active={cleanup} onClick={() => setCleanup(true)}>Cleanup change</SwitchButton>
         </div>
       )}
-      <ChangeLoader key={cleanup ? "cleanup" : "experiment"} experimentId={experiment.id} cleanup={cleanup} />
+      <ChangeLoader key={cleanup ? "cleanup" : "experiment"} experiment={experiment} cleanup={cleanup} />
     </div>
   );
 }
 
-function ChangeLoader({ experimentId, cleanup }: { experimentId: string; cleanup: boolean }) {
-  const [changes, setChanges] = useState<Changes | null>(null);
-  const [error, setError] = useState("");
-  useEffect(() => {
-    const controller = new AbortController();
-    fetch(`/api/autopilot/experiments/${experimentId}/changes${cleanup ? "?cleanup=1" : ""}`, {
-      cache: "no-store",
-      signal: controller.signal,
-    })
-      .then(async (response) => {
-        const body = (await response.json().catch(() => ({}))) as Changes & { error?: string };
-        if (!response.ok) throw new Error(body.error || "Could not load the code change.");
-        setChanges(body);
-      })
-      .catch((reason: unknown) => {
-        if (reason instanceof DOMException && reason.name === "AbortError") return;
-        setError(reason instanceof Error ? reason.message : "Could not load the code change.");
-      });
-    return () => controller.abort();
-  }, [cleanup, experimentId]);
+function ChangeLoader({ experiment, cleanup }: { experiment: Experiment; cleanup: boolean }) {
+  const query = useExperimentChanges(experiment, { cleanup });
+  const error = query.error instanceof Error ? query.error.message || "Could not load the code change." : query.error ? "Could not load the code change." : "";
   if (error) return <p className="text-sm text-[#b42318]">{error}</p>;
-  if (!changes) return <p className="text-sm text-[#6b7280]">Loading code change…</p>;
-  return <ChangeContent changes={changes} />;
+  if (!query.data) return <CodeChangeSkeleton />;
+  return <div className="animate-in fade-in duration-150"><ChangeContent changes={query.data as Changes} /></div>;
+}
+
+function CodeChangeSkeleton() {
+  return (
+    <div className="min-h-52 animate-pulse rounded-md border border-[#e6e8ec] bg-[#f8f9fa] p-3" role="status">
+      <span className="sr-only">Loading code change…</span>
+      <div className="h-3 w-1/2 rounded bg-[#e2e5e9]" />
+      <div className="mt-5 h-9 rounded bg-[#e8eaed]" />
+      <div className="mt-3 h-24 rounded bg-[#eceef1]" />
+    </div>
+  );
 }
 
 function SwitchButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {

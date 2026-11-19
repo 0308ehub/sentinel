@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Clock, ListFilter, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Plus, Trash2 } from "lucide-react";
 import {
   DropdownMenu,
@@ -11,6 +12,7 @@ import {
 import { workSession, type WorkBucket, type WorkSession, type WorkTone } from "@/lib/autopilot/work-sessions";
 import type { Experiment } from "@/lib/autopilot/types";
 import { cn } from "@/lib/utils";
+import { prefetchExperiment } from "@/components/autopilot/experiment-queries";
 
 type SessionFilter = "active" | "review" | "working" | "running" | "ended";
 
@@ -72,6 +74,7 @@ export function ExperimentSessions({
   onStop: (experiment: Experiment) => void;
   onRun: () => void;
 }) {
+  const queryClient = useQueryClient();
   const [filter, setFilter] = useState<SessionFilter>("active");
   const rows = useMemo(() => {
     return experiments
@@ -82,6 +85,20 @@ export function ExperimentSessions({
 
   const collapsed = useSyncExternalStore(subscribeCollapsed, readCollapsed, () => false);
   const needsReview = rows.filter(({ session }) => session.bucket === "review" || session.bucket === "ready").length;
+
+  useEffect(() => {
+    const warm = () => { rows.slice(0, 3).forEach(({ experiment }) => { void prefetchExperiment(queryClient, experiment); }); };
+    const idleWindow = window as Window & {
+      requestIdleCallback?: (callback: () => void) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+    if (idleWindow.requestIdleCallback) {
+      const idle = idleWindow.requestIdleCallback(warm);
+      return () => idleWindow.cancelIdleCallback?.(idle);
+    }
+    const timer = window.setTimeout(warm, 0);
+    return () => window.clearTimeout(timer);
+  }, [queryClient, rows]);
 
   if (collapsed) {
     return (
@@ -156,6 +173,7 @@ export function ExperimentSessions({
                 <SessionRow
                   session={session}
                   selected={session.id === selectedId}
+                  onPrefetch={() => { void prefetchExperiment(queryClient, experiment); }}
                   onOpen={() => onOpen(session.id)}
                   onStop={() => {
                     if (window.confirm(`Stop “${experiment.title}” and remove the unmerged change?`)) onStop(experiment);
@@ -182,15 +200,19 @@ function SessionRow({
   session,
   selected,
   onOpen,
+  onPrefetch,
   onStop,
 }: {
   session: WorkSession;
   selected: boolean;
   onOpen: () => void;
+  onPrefetch: () => void;
   onStop: () => void;
 }) {
   return (
     <div
+      onPointerEnter={onPrefetch}
+      onFocus={onPrefetch}
       className={cn(
         "group flex items-start gap-2.5 rounded-md px-2 py-1.5",
         selected ? "bg-[#f2f2f4]" : "hover:bg-[#f7f7f8]",

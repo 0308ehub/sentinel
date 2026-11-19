@@ -28,6 +28,7 @@ const GROUPS = [
     label: "Organization",
     items: [
       { label: "General", href: "/settings", icon: Building2, exact: true },
+      { label: "Connected apps", href: "/settings/connectors", icon: Plug },
       { label: "Plan & billing", href: "/settings/billing", icon: CreditCard },
       { label: "Projects", href: "/settings/projects", icon: FolderKanban },
       { label: "Members", href: "/settings/members", icon: Users },
@@ -37,7 +38,6 @@ const GROUPS = [
       { label: "Privacy", href: "/settings/privacy", icon: ShieldAlert },
       { label: "Data retention", href: "/settings/retention", icon: Clock },
       { label: "Navigation", href: "/settings/navigation", icon: PanelLeft },
-      { label: "Connected apps", href: "/settings/connectors", icon: Plug },
       { label: "AI", href: "/settings/models", icon: Waypoints },
     ],
   },
