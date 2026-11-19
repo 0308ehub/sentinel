@@ -271,6 +271,13 @@ function PreviewBody({ experiment, changes, liveOrigin, isLive, when, addedText 
       <Link href="/experiments/install" className="text-brand hover:underline">Add your site&apos;s URL on the install page</Link> to see both versions here.
     </p>
   );
+  // `page` falls back to an area name like "Experiments" when Kismet could not name a route; loading
+  // that as a URL only shows the site's 404 page.
+  if (!experiment.page?.trim().startsWith("/")) return (
+    <p className="rounded border border-[#e1e4e8] bg-[#f8f9fa] p-3 text-sm text-[#6b7280]">
+      Kismet doesn&apos;t know which page this changes, so there&apos;s no live preview. See the code change below.
+    </p>
+  );
   const control = previewHref(liveOrigin, experiment.page, experiment.flag, "control", isLive);
   const treatmentOrigin = isLive ? liveOrigin : changes.previewUrl;
   const treatment = treatmentOrigin ? previewHref(treatmentOrigin, experiment.page, experiment.flag, "treatment", isLive) : null;
