@@ -4,6 +4,9 @@ import { followAgentBuilds } from "@/lib/autopilot/agent-build";
 import { followDispatchBuilds } from "@/lib/autopilot/dispatch-build";
 import { withAutopilotUser } from "@/lib/autopilot/scope";
 import { listExperiments, withTickLock } from "@/lib/autopilot/store";
+import { lastRunAt } from "@/lib/autopilot/store";
+import { sourceLabel } from "@/lib/autopilot/source";
+import { postAccountAlert } from "@/lib/autopilot/notify";
 import { listConnectionUsers } from "@/lib/connections/store";
 
 function bearerMatches(header: string | null, secret: string): boolean {
@@ -33,6 +36,17 @@ export async function GET(request: Request) {
   });
   let checked = 0;
   for (const userId of [...new Set(users)]) {
+    await withAutopilotUser(userId, async () => {
+      try {
+        if (!(await sourceLabel())) return;
+        const last = await lastRunAt();
+        if (last && Date.now() - Date.parse(last) <= 150 * 60_000) return;
+        const when = last ? new Date(last).toISOString() : "never";
+        await postAccountAlert(`tick_missing:${last ? new Date(last).toISOString() : "null"}`, `Kismet hasn't run since ${when} UTC. The hourly job may be down.`);
+      } catch (error) {
+        console.error("[autopilot] could not check missed runs", error);
+      }
+    });
     // Check without the lock first, so an idle account never holds it and blocks the hourly run.
     const didCheck = await withAutopilotUser(userId, async () => {
       if (!(await hasActiveBuild())) return false;

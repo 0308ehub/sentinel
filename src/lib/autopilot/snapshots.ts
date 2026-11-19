@@ -5,7 +5,7 @@ import { db, newId } from "@/lib/autopilot/db";
 import { chosenAutopilotRepo } from "@/lib/autopilot/repo";
 import { sanitizeSnapshotHtml } from "@/lib/autopilot/snapshot-html";
 import { autopilotUser } from "@/lib/autopilot/scope";
-import { recordAgentSession } from "@/lib/autopilot/spend";
+import { agentBudgetLeft, recordAgentSession } from "@/lib/autopilot/spend";
 import type { Experiment } from "@/lib/autopilot/types";
 import { client, managedSessionView } from "@/lib/coder/sessions";
 import { githubTokenFor } from "@/lib/github/app";
@@ -122,12 +122,16 @@ Check that treatment.html visibly contains the change and control.html does not.
 ${previous}`;
 }
 
-export async function startSnapshot(experiment: Experiment, summary: ChangeSummary): Promise<SnapshotRow> {
+export async function startSnapshot(experiment: Experiment, summary: ChangeSummary): Promise<SnapshotRow | null> {
   const agentId = process.env.KISMET_RENDER_AGENT_ID?.trim() || process.env.KISMET_CODER_AGENT_ID?.trim();
   if (!process.env.ANTHROPIC_API_KEY?.trim() || !agentId || !process.env.KISMET_CODER_ENVIRONMENT_ID?.trim()) {
     throw new SnapshotError("Kismet's rendering agent is not configured.");
   }
   if (summary.kind !== "ui") throw new SnapshotError("Only visual changes can be rendered.");
+  if (await agentBudgetLeft() <= 0) {
+    console.info("[autopilot] skipped sample preview: account daily spending limit reached");
+    return null;
+  }
   const source = await snapshotSource(experiment);
   if (!source) throw new SnapshotError("This change does not have code to render yet.");
   const existing = await snapshotFor(experiment.id, source.sha);

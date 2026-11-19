@@ -6,7 +6,7 @@ import { withAutopilotUser } from "@/lib/autopilot/scope";
 import { currentUserId } from "@/lib/connections/current";
 import { isLocalSource, sourceLabel } from "@/lib/autopilot/source";
 import { buildNext, followPulls } from "@/lib/autopilot/build";
-import { followAgentBuilds } from "@/lib/autopilot/agent-build";
+import { agentBuildAvailable, followAgentBuilds } from "@/lib/autopilot/agent-build";
 import { followSnapshots } from "@/lib/autopilot/snapshots";
 import { followDispatchBuilds } from "@/lib/autopilot/dispatch-build";
 import { buildCleanup, followCleanups } from "@/lib/autopilot/cleanup";
@@ -25,6 +25,7 @@ import {
   claimLegacyRows,
   evidenceCounts,
   lastRunAt,
+  latestErrorMessage,
   listActivity,
   listExperiments,
   listLearnings,
@@ -34,6 +35,7 @@ import {
   log,
   addEvidence,
   retireStaleSignals,
+  recentTickActivity,
   withTickLock,
 } from "@/lib/autopilot/store";
 import { syntheticEnabled, syntheticEvidence } from "@/lib/autopilot/synthetic";
@@ -41,8 +43,11 @@ import type { AutopilotState } from "@/lib/autopilot/types";
 import { buildThemes } from "@/lib/autopilot/themes";
 import { triageSignals } from "@/lib/autopilot/triage";
 import { verifyFixes } from "@/lib/autopilot/verify-fixes";
-import { notifySlack } from "@/lib/autopilot/notify";
+import { notifySlack, postAccountAlert } from "@/lib/autopilot/notify";
 import { refreshAgentSpend } from "@/lib/autopilot/spend";
+import { alertDue, failureStreak } from "@/lib/autopilot/notify-core";
+import { siteUrl } from "@/lib/site";
+import { getConnection } from "@/lib/connections/store";
 
 export interface TickResult {
   ran: boolean;
@@ -123,6 +128,16 @@ async function runScopedTick(): Promise<TickResult> {
     await step("spend", result, refreshAgentSpend);
 
     await log("tick", result.errors.length ? `Ran with ${result.errors.length} error(s).` : "Ran.");
+    try {
+      const ticks = await recentTickActivity(10);
+      const due = alertDue(ticks.map((tick) => ({ message: tick.message, at: tick.at })));
+      if (due) {
+        const latest = (await latestErrorMessage())?.slice(0, 200) || "Unknown error";
+        await postAccountAlert(due.key, `Kismet's last 3 runs had errors. Latest: ${latest}. ${siteUrl().replace(/\/$/, "")}/experiments`);
+      }
+    } catch (error) {
+      console.error("[autopilot] could not send failing-run alert", error);
+    }
     return result;
   });
   return outcome ?? { ran: false, steps: ["Another run is already in progress."], errors: [] };
@@ -150,6 +165,8 @@ export async function autopilotState(): Promise<AutopilotState> {
     goals: [],
     activity: [],
     lastRunAt: null,
+    health: { failingRuns: 0, latestError: null, lastRunAt: null },
+    setup: { slack: false, repo: false, agent: false, firstRun: false },
     synthetic: syntheticEnabled(),
     dryRun: autopilotDryRun() || isLocalSource(),
     repo: null,
@@ -176,7 +193,7 @@ export async function autopilotState(): Promise<AutopilotState> {
           await log("error", `dispatch-build failed: ${message}`).catch(() => {});
         });
       }
-      const [signals, experiments, learnings, goals, ratings, activity, last, counts, repo, sampleEvidence] = await Promise.all([
+      const [signals, experiments, learnings, goals, ratings, activity, last, counts, repo, sampleEvidence, ticks, latestError, slack, agent] = await Promise.all([
         listSignals(),
         listExperiments(),
         listLearnings(),
@@ -187,6 +204,10 @@ export async function autopilotState(): Promise<AutopilotState> {
         evidenceCounts(7),
         sourceLabel(),
         sampleEvidenceCount(),
+        recentTickActivity(10),
+        latestErrorMessage(),
+        getConnection(userId, "slack").then((connection) => Boolean(connection)).catch(() => false),
+        agentBuildAvailable().catch(() => false),
       ]);
       return {
         ...empty,
@@ -200,6 +221,8 @@ export async function autopilotState(): Promise<AutopilotState> {
         goals,
         activity,
         lastRunAt: last,
+        health: { failingRuns: failureStreak(ticks.map((tick) => tick.message)), latestError, lastRunAt: last },
+        setup: { slack, repo: Boolean(repo), agent, firstRun: Boolean(last) },
         summary: {
           evidenceThisWeek: counts.total,
           realThisWeek: counts.real,

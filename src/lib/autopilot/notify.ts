@@ -60,7 +60,7 @@ function readableSlackError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
 }
 
-async function claim(eventKey: string): Promise<boolean> {
+export async function claim(eventKey: string): Promise<boolean> {
   const sql = await db();
   const rows = await sql`
     insert into kismet.autopilot_notifications (user_id, event_key)
@@ -70,9 +70,21 @@ async function claim(eventKey: string): Promise<boolean> {
   return rows.length > 0;
 }
 
-async function release(eventKey: string): Promise<void> {
+export async function release(eventKey: string): Promise<void> {
   const sql = await db();
   await sql`delete from kismet.autopilot_notifications where user_id = ${autopilotUser()} and event_key = ${eventKey}`;
+}
+
+export async function postAccountAlert(eventKey: string, text: string): Promise<boolean> {
+  const prefs = await getNotifyPrefs();
+  if (!prefs.enabled || !prefs.channelId || !(await claim(eventKey))) return false;
+  try {
+    await postSlackMessage(prefs.channelId, text);
+    return true;
+  } catch (error) {
+    await release(eventKey);
+    throw readableSlackError(error);
+  }
 }
 
 async function finish(eventKey: string, slackTs: string): Promise<void> {

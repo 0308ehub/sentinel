@@ -232,6 +232,8 @@ export interface AutopilotState {
   goals: Goal[];
   activity: Activity[];
   lastRunAt: string | null;
+  health: { failingRuns: number; latestError: string | null; lastRunAt: string | null };
+  setup: { slack: boolean; repo: boolean; agent: boolean; firstRun: boolean };
   synthetic: boolean;
   dryRun: boolean;
   /** Where this account's changes go; null until the account chooses a repository. */

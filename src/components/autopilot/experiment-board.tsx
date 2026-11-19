@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Check, ChevronDown, Loader2, MoreHorizontal, Play } from "lucide-react";
+import { Check, ChevronDown, Circle, Loader2, MoreHorizontal, Play } from "lucide-react";
 import { BuilderMenu, useAccountBuilder } from "@/components/autopilot/builder-menu";
 import { ExperimentDetail } from "@/components/autopilot/experiment-detail";
 import { ExperimentSessions } from "@/components/autopilot/experiment-sessions";
@@ -20,6 +20,7 @@ import type { Builder } from "@/lib/autopilot/builders";
 import type { RolloutPhase } from "@/lib/autopilot/rollout-plan";
 import { useVariant } from "@/lib/autopilot/variant";
 import { formatRelativeTime } from "@/lib/utils";
+import { setupSteps } from "@/lib/autopilot/setup-core";
 import type { AutopilotState, Experiment, Goal, Learning, Signal, SuggestionRating } from "@/lib/autopilot/types";
 
 const ENDED = new Set<Experiment["status"]>(["rolled_out", "stopped", "rejected", "failed"]);
@@ -80,7 +81,11 @@ export function ExperimentBoard({
   const [goalName, setGoalName] = useState("");
   const [goalKind, setGoalKind] = useState<"click" | "visit" | "event">("click");
   const [goalValue, setGoalValue] = useState("");
+  const [renderedAt] = useState(() => Date.now());
   const variant = useVariant("ap-add-first-experiment-guidance-to-the-exp-v1");
+  const setup = setupSteps(state.setup);
+  const setupComplete = setup.every((step) => step.done);
+  const missedRun = state.health.lastRunAt != null && renderedAt - Date.parse(state.health.lastRunAt) > 150 * 60_000;
 
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get("experiment");
@@ -248,6 +253,29 @@ export function ExperimentBoard({
             </Button>
           </div>
         </div>
+        {state.health.failingRuns >= 3 ? (
+          <p className="mt-3 text-xs text-amber-700">Kismet&apos;s last {state.health.failingRuns} runs had errors: {state.health.latestError ?? "Unknown error"}</p>
+        ) : missedRun ? (
+          <p className="mt-3 text-xs text-amber-700">Kismet hasn&apos;t run since <RelativeTime date={state.health.lastRunAt!} />.</p>
+        ) : null}
+        {!setupComplete && (
+          <div className="mt-3 max-w-2xl rounded-md border border-[#e6e8ec] bg-white p-3">
+            <p className="text-sm font-medium text-[#111827]">Finish setting up Kismet</p>
+            <ul className="mt-2 grid gap-2 text-xs text-[#6b7280] sm:grid-cols-2">
+              {setup.map((step) => (
+                <li key={step.key} className="flex items-start gap-2">
+                  {step.done ? <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-green-600" /> : <Circle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#b4bac2]" />}
+                  <span>
+                    {step.key === "slack" && <><a href="/settings/connectors" className="font-medium text-[#374151] hover:underline">Connect Slack</a></>}
+                    {step.key === "repo" && <><a href="/settings/connectors" className="font-medium text-[#374151] hover:underline">Choose the repository Kismet ships to</a></>}
+                    {step.key === "agent" && <><span className="font-medium text-[#374151]">Coding agent ready</span>{!step.done && <span> — Kismet will write changes once the GitHub app can push to your repo</span>}</>}
+                    {step.key === "firstRun" && <><span className="font-medium text-[#374151]">First run finished</span>{!step.done && <button type="button" onClick={onRun} disabled={running} className="ml-2 text-brand hover:underline disabled:opacity-50">Run now</button>}</>}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         <div className="mt-4 flex gap-6 border-b border-[#e6e8ec] text-sm">
           <button type="button" onClick={() => setTab("overview")} className={tab === "overview" ? "border-b-2 border-brand pb-2 font-medium text-brand" : "pb-2 text-[#6b7280]"}>Overview</button>
           <button type="button" onClick={() => setTab("learnings")} className={tab === "learnings" ? "border-b-2 border-brand pb-2 font-medium text-brand" : "pb-2 text-[#6b7280]"}>Learnings</button>

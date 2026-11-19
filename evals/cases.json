@@ -1,0 +1,86 @@
+[
+  {
+    "id": "triage-ui-bug-two-reporters",
+    "stage": "triage",
+    "input": { "signals": [{ "id": "sig-ui-bug", "title": "Save button does nothing", "problem": "People cannot save connector settings.", "evidence": [{ "title": "Save does nothing after I edit the token" }, { "title": "Clicked Save three times and settings reverted" }] }] },
+    "expect": { "kinds": { "sig-ui-bug": "bug" } }
+  },
+  {
+    "id": "triage-feature-request",
+    "stage": "triage",
+    "input": { "signals": [{ "id": "sig-feature", "title": "Add CSV export", "problem": "Customers want to download experiment results as CSV.", "evidence": [{ "title": "Could I export this table to CSV?" }] }] },
+    "expect": { "kinds": { "sig-feature": "idea" } }
+  },
+  {
+    "id": "triage-copy-label",
+    "stage": "triage",
+    "input": { "signals": [{ "id": "sig-copy", "title": "Connector label is unclear", "problem": "The Notion connector action is labeled Create instead of Connect.", "evidence": [{ "title": "The Create label should say Connect" }] }] },
+    "expect": { "kinds": { "sig-copy": "idea" } }
+  },
+  {
+    "id": "triage-duplicate-bug-reports",
+    "stage": "triage",
+    "input": { "signals": [{ "id": "sig-dup-a", "title": "Dashboard crashes opening results", "problem": "Opening experiment results shows an error.", "evidence": [{ "title": "Results page crashes" }] }, { "id": "sig-dup-b", "title": "Error when viewing experiment results", "problem": "The results view fails to load.", "evidence": [{ "title": "Same crash when I open results" }] }] },
+    "expect": { "kinds": { "sig-dup-a": "bug", "sig-dup-b": "bug" } }
+  },
+  {
+    "id": "design-ui-bug-two-reporters",
+    "stage": "design",
+    "input": { "parts": { "product": "Kismet is a Next.js web app for product managers.", "goals": "- Complete connector setup: click Save (42.0%, 320 visitors/week)", "trackedEvents": "None. Do not use an event metric.", "problem": "Save button does nothing: People cannot save connector settings. (area: /settings/connectors/notion)", "themes": "2 people mentioned this 2 times (new)", "evidence": ["- [slack] Save does nothing after I edit the token", "- [ticket] Clicked Save three times — settings reverted"], "learnings": "No relevant learnings yet.", "earlierAttempts": "No earlier attempts.", "preferences": "No suggestion preferences yet." } },
+    "expect": { "kind": "fix" }
+  },
+  {
+    "id": "design-feature-request",
+    "stage": "design",
+    "input": { "parts": { "product": "Kismet is a Next.js web app for product managers.", "goals": "- Share experiment results: visit /experiments (18.0%, 500 visitors/week)", "trackedEvents": "- result_shared: 90 visitors in 14 days", "problem": "Add CSV export: Customers want to download experiment results as CSV. (area: /experiments)", "themes": "3 people mentioned this 4 times (growing)", "evidence": ["- [slack] Could I export this table to CSV?", "- [interview] We paste results into a spreadsheet every week"], "learnings": "No relevant learnings yet.", "earlierAttempts": "No earlier attempts.", "preferences": "No suggestion preferences yet." } },
+    "expect": { "kind": "experiment" }
+  },
+  {
+    "id": "design-praise",
+    "stage": "design",
+    "input": { "parts": { "product": "Kismet is a Next.js web app for product managers.", "goals": "No goals yet.", "trackedEvents": "None. Do not use an event metric.", "problem": "Dashboard feedback: A customer commented on the dashboard. (area: /experiments)", "themes": "1 person mentioned this 1 time (new)", "evidence": ["- [slack] Love the new dashboard!"], "learnings": "No relevant learnings yet.", "earlierAttempts": "No earlier attempts.", "preferences": "No suggestion preferences yet." } },
+    "expect": { "kind": "none" }
+  },
+  {
+    "id": "design-test-do-not-change",
+    "stage": "design",
+    "input": { "parts": { "product": "Kismet is a Next.js web app for product managers.", "goals": "No goals yet.", "trackedEvents": "None. Do not use an event metric.", "problem": "Test message: Internal test of feedback ingestion. (area: /experiments)", "themes": "No qualitative theme for this problem.", "evidence": ["- [slack] test, please don't change anything"], "learnings": "No relevant learnings yet.", "earlierAttempts": "No earlier attempts.", "preferences": "No suggestion preferences yet." } },
+    "expect": { "kind": "none" }
+  },
+  {
+    "id": "design-question-notion",
+    "stage": "design",
+    "input": { "parts": { "product": "Kismet has /settings/connectors/notion for connecting Notion.", "goals": "No goals yet.", "trackedEvents": "None. Do not use an event metric.", "problem": "Notion question: A person asked for setup help. (area: /settings/connectors/notion)", "themes": "1 person mentioned this 1 time (new)", "evidence": ["- [slack] How do I connect Notion?"], "learnings": "No relevant learnings yet.", "earlierAttempts": "No earlier attempts.", "preferences": "No suggestion preferences yet." } },
+    "expect": { "kind": "none" }
+  },
+  {
+    "id": "design-vague-complaint",
+    "stage": "design",
+    "input": { "parts": { "product": "Kismet is a Next.js web app for product managers.", "goals": "No goals yet.", "trackedEvents": "None. Do not use an event metric.", "problem": "General dissatisfaction: Feedback was negative but gave no details. (area: /experiments)", "themes": "1 person mentioned this 1 time (new)", "evidence": ["- [slack] This isn't great."], "learnings": "No relevant learnings yet.", "earlierAttempts": "No earlier attempts.", "preferences": "No suggestion preferences yet." } },
+    "expect": { "kind": "none" }
+  },
+  {
+    "id": "design-already-satisfied",
+    "stage": "design",
+    "input": { "parts": { "product": "Kismet's experiment results page already has a Download CSV action.", "goals": "No goals yet.", "trackedEvents": "None. Do not use an event metric.", "problem": "CSV export request: A person wants to export results. (area: /experiments)", "themes": "1 person mentioned this 1 time (new)", "evidence": ["- [ticket] Please add a way to download results as CSV"], "learnings": "No relevant learnings yet.", "earlierAttempts": "No earlier attempts.", "preferences": "No suggestion preferences yet." } },
+    "expect": { "kind": "none" }
+  },
+  {
+    "id": "design-copy-label-fix",
+    "stage": "design",
+    "input": { "parts": { "product": "Kismet has a Notion connector with a button currently labeled Create.", "goals": "No goals yet.", "trackedEvents": "None. Do not use an event metric.", "problem": "Connector label typo: The action says Create but should say Connect. (area: /settings/connectors/notion)", "themes": "2 people mentioned this 2 times (steady)", "evidence": ["- [ticket] The Notion button says Create; it should say Connect", "- [slack] Create is the wrong label here"], "learnings": "No relevant learnings yet.", "earlierAttempts": "No earlier attempts.", "preferences": "No suggestion preferences yet." } },
+    "expect": { "kind": "fix" }
+  },
+  {
+    "id": "design-pricing-conversion",
+    "stage": "design",
+    "input": { "parts": { "product": "Kismet's /pricing page has plan cards and a Start trial button.", "goals": "- Start trial: click Start trial (6.0%, 1400 visitors/week)", "trackedEvents": "- trial_started: 84 visitors in 14 days", "problem": "Clarify annual savings: Showing annual savings may increase trial starts. (area: /pricing)", "themes": "4 people mentioned price comparisons 5 times (growing)", "evidence": ["- [interview] I couldn't tell what I save annually", "- [slack] An annual savings callout would help us decide"], "learnings": "No relevant learnings yet.", "earlierAttempts": "No earlier attempts.", "preferences": "No suggestion preferences yet." } },
+    "expect": { "kind": "experiment" }
+  },
+  {
+    "id": "design-angry-non-actionable",
+    "stage": "design",
+    "input": { "parts": { "product": "Kismet is a Next.js web app for product managers.", "goals": "No goals yet.", "trackedEvents": "None. Do not use an event metric.", "problem": "Angry feedback: A person expressed frustration without describing a behavior. (area: /experiments)", "themes": "1 person mentioned this 1 time (new)", "evidence": ["- [slack] This product is terrible and I'm furious."], "learnings": "No relevant learnings yet.", "earlierAttempts": "No earlier attempts.", "preferences": "No suggestion preferences yet." } },
+    "expect": { "kind": "none" }
+  }
+]

@@ -11,6 +11,7 @@ import type { Builder } from "@/lib/autopilot/builders";
 import type { Experiment, Signal } from "@/lib/autopilot/types";
 import { buildThemes } from "@/lib/autopilot/themes";
 import { formatPreferences } from "@/lib/autopilot/preferences";
+import { classifyDesignAnswer, designSystemPrompt, designUserMessage, fixSystemPrompt } from "@/lib/autopilot/design-prompt-core";
 
 /** After this many attempts on one problem, Autopilot stops and leaves it to a person. */
 export const MAX_VERSIONS = 3;
@@ -90,15 +91,7 @@ interface ChangeAnswer extends DesignAnswer {
 async function designFix(candidate: Signal, experiments: Experiment[], buildWith?: Builder | null): Promise<string> {
   const previous = experiments.filter((experiment) => experiment.signalId === candidate.id);
   const version = previous.length + 1;
-  const system = [
-    "Decide first whether this reported bug actually calls for a product change.",
-    'If it is a test message, asks not to change anything, is praise or a question, describes already-working behavior, or has no concrete problem in the evidence, return only {"kind":"none","reason":"<one sentence>"}. This is a normal first-class outcome, not a last resort.',
-    "Otherwise explain what is most likely broken given the evidence, the fix, and what could go wrong.",
-    "Do not propose experiments, flags, variants, or A/B tests.",
-    "Return JSON: {title,hypothesis,control,treatment,page,reasoning,evidence:[{source,quote}],confidence,confidenceReason,risks}.",
-    "title is a short description without a Fix prefix. hypothesis says what is broken. treatment is the intended fix in one or two sentences.",
-    "confidence must be high or medium. Cite 2–6 complaints when available.",
-  ].join(" ");
+  const system = fixSystemPrompt();
   const user = JSON.stringify({
     problem: { title: candidate.title, description: candidate.problem, area: candidate.area },
     complaints: candidate.evidence.slice(0, 15).map((item) => ({ source: item.source, author: item.author, title: item.title, body: item.body })),
@@ -184,52 +177,28 @@ async function designCandidate(
   const themeText = theme
     ? `${theme.people} people mentioned this ${theme.mentions} times (${theme.trend})${theme.quotes.length ? `\n${theme.quotes.map((quote) => `- “${quote.text}” — ${quote.source}${quote.author ? ` · ${quote.author}` : ""}`).join("\n")}` : ""}`
     : "No qualitative theme for this problem.";
-  const system = [
-      "You are an autonomous product manager. Design one small UI change to one existing React component that addresses the problem.",
-      'First decide whether the problem calls for any product change. If it is a test message, asks not to change anything, is praise or a question, describes already-working behavior, or has no concrete problem in the evidence, return only {"kind":"none","reason":"<one sentence>"}. This is a normal first-class outcome, not a last resort.',
-      "Set kind to \"fix\" when the change is a small, obvious correction that should ship to everyone: a color, label, spacing, or similar tweak people have already asked for, where splitting traffic would not teach anything.",
-      "Set kind to \"experiment\" when the outcome is uncertain. An experiment is safe to show to half of visitors and is measured.",
-      "Set mode to \"stochastic\" when the change is a prompt, model, ranking, or generated text that can differ on each request. Otherwise \"deterministic\".",
-      "A stochastic test still needs one metric both versions can produce. Do not score a single sample of the model's words.",
-      "Those rules are for experiments. A fix does not split traffic and may omit the metric.",
-      "For an experiment, pick the metric as the outcome the user is trying to reach, which must be possible in BOTH versions,",
-      "never the new element itself (clicks on a button only the new version has would rig the test).",
-      "Use one of:",
-      '{"kind":"click","text":"<visible label of the button or link that completes the task in both versions, e.g. the submit button of a dialog>"}',
-      'or {"kind":"visit","path":"/some/path"} (visitor reaches that page in either version)',
-      'or {"kind":"event","name":"<a name listed under TRACKED EVENTS>"} (a business outcome the site reports with kismet.track, such as a purchase or sign-up).',
-      "When a TRACKED EVENT is the real outcome the change is meant to move, prefer it over a click or a visit.",
-      "page is the route the change appears on, like /features or /settings/connectors.",
-      "Optionally choose a guardrail outcome that must not get worse, using the same metric format; omit guardrailMetric if none fits.",
-      "Otherwise return JSON: {kind, mode, title, hypothesis, control,treatment, metric, page, guardrail, guardrailMetric}. kind is \"experiment\" or \"fix\". mode is \"deterministic\" or \"stochastic\".",
-      "For a fix, metric may be omitted. Keep each field to one or two sentences.",
-      "If earlier attempts failed or were rejected, try a meaningfully different idea.",
-      "Build on LEARNINGS: repeat what won in new places, do not retry ideas that lost, were flat, or that a person rejected, unless you change them meaningfully and say how.",
-      "Prefer one of the GOALS as the metric when the change can plausibly move it; otherwise use the closest outcome both versions share.",
-    ].join(" ");
-  const user = [
-      `PRODUCT\n${await productContext()}`,
-      `GOALS\n${goalsText}`,
-      `TRACKED EVENTS\n${trackedText}`,
-      `PROBLEM\n${candidate.title}: ${candidate.problem} (area: ${candidate.area || "unknown"})`,
-      `THEMES\n${themeText}`,
-      `EVIDENCE (${candidate.evidence.length})`,
-      ...candidate.evidence.slice(0, 15).map((e) => `- [${e.source}] ${e.title}${e.body && e.source !== "slack" ? ` — ${e.body}` : ""}`),
-      `LEARNINGS\n${usefulLearnings.length ? usefulLearnings.map((learning) => `- ${learning.outcome}: ${learning.title} — ${learning.learning}`).join("\n") : "No relevant learnings yet."}`,
-      `EARLIER ATTEMPTS\n${attemptsSummary(previous)}${earlierLearnings.length ? `\nLearnings from this signal:\n${earlierLearnings.map((learning) => `- ${learning.outcome}: ${learning.learning}`).join("\n")}` : ""}`,
-      `PREFERENCES\n${formatPreferences(ratings)}`,
-    ].join("\n");
+  const system = designSystemPrompt();
+  const user = designUserMessage({
+    product: await productContext(), goals: goalsText, trackedEvents: trackedText,
+    problem: `${candidate.title}: ${candidate.problem} (area: ${candidate.area || "unknown"})`,
+    themes: themeText,
+    evidence: candidate.evidence.map((e) => `- [${e.source}] ${e.title}${e.body && e.source !== "slack" ? ` — ${e.body}` : ""}`),
+    learnings: usefulLearnings.length ? usefulLearnings.map((learning) => `- ${learning.outcome}: ${learning.title} — ${learning.learning}`).join("\n") : "No relevant learnings yet.",
+    earlierAttempts: `${attemptsSummary(previous)}${earlierLearnings.length ? `\nLearnings from this signal:\n${earlierLearnings.map((learning) => `- ${learning.outcome}: ${learning.learning}`).join("\n")}` : ""}`,
+    preferences: formatPreferences(ratings),
+  });
   async function request(message: string): Promise<
     | { answer: DesignAnswer; kind: "none"; reason: string }
     | { answer: DesignAnswer; spec: NonNullable<ReturnType<typeof parseMetricSpec>>; estimate: ResultEstimate; kind: "experiment" | "fix"; mode: "deterministic" | "stochastic" }
   > {
     const text = await askForJson(system, message, false, undefined, "experiment");
     const answer = readJson<DesignAnswer>(text);
-    if (answer.kind === "none") {
+    const classification = classifyDesignAnswer(answer);
+    if (classification === "none") {
       if (!answer.reason?.trim()) throw new Error("The no-change design was missing a reason.");
       return { answer, kind: "none", reason: answer.reason.trim() };
     }
-    const kind = answer.kind === "fix" ? "fix" : "experiment";
+    const kind = classification === "fix" ? "fix" : "experiment";
     const mode = kind === "experiment" && answer.mode === "stochastic" ? "stochastic" : "deterministic";
     const page = answer.page?.trim().startsWith("/") ? answer.page.trim() : "/";
     const spec = parseMetricSpec(answer.metric) ?? (kind === "fix" ? { kind: "visit" as const, path: page } : null);

@@ -5,7 +5,8 @@ import { SERVER_SDK_FILE } from "@/lib/sdk/kismet-server";
 import { cancelOutsideBuild } from "@/lib/autopilot/dispatch";
 import { autopilotDryRun, autopilotRepo, defaultAutopilotRepo } from "@/lib/autopilot/repo";
 import { autopilotUser } from "@/lib/autopilot/scope";
-import { recordAgentSession } from "@/lib/autopilot/spend";
+import { accountDailyLimitCents, formatDollars } from "@/lib/autopilot/spend-core";
+import { agentBudgetLeft, recordAgentSession } from "@/lib/autopilot/spend";
 import { listExperiments, listSignals, log, setSignalStatus, snoozeSignal, updateExperiment } from "@/lib/autopilot/store";
 import { isLocalSource } from "@/lib/autopilot/source";
 import { startSnapshot } from "@/lib/autopilot/snapshots";
@@ -32,6 +33,14 @@ export async function startAgentBuild(experiment: Experiment, signal: Signal | u
     item.id !== experiment.id && item.status === "building" && (item.coderSessionId || item.buildRef),
   );
   if (active) return null;
+  if (await agentBudgetLeft() <= 0) {
+    const note = `Paused: this account reached its daily spending limit (${formatDollars(accountDailyLimitCents())}). Kismet continues tomorrow.`;
+    if (experiment.note !== note) {
+      await updateExperiment(experiment.id, { note });
+      await log("build", note, experiment.id);
+    }
+    return null;
+  }
   const repo = await autopilotRepo();
   const token = await githubToken(repo);
   if (!token) return null;

@@ -66,6 +66,13 @@ export async function startCoderSession(userId: string, text: string): Promise<C
   const repo = await withAutopilotUser(userId, chosenAutopilotRepo);
   const githubToken = await githubTokenFor(userId, repo ?? undefined);
   if (!githubToken || !repo) throw new CoderError(CONNECT_MESSAGE, 409);
+  const { AgentBudgetError, assertAgentBudget } = await import("@/lib/autopilot/spend");
+  try {
+    await assertAgentBudget(userId);
+  } catch (error) {
+    if (error instanceof AgentBudgetError) throw new CoderError("This account reached its daily spending limit. It resets tomorrow.", 429);
+    throw error;
+  }
   const sql = await db();
   const count = await sql<{ count: number }[]>`
     select count(*)::int as count from kismet.coder_sessions

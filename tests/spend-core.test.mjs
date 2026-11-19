@@ -1,6 +1,21 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { activityLabel, activitySummary, formatDollars, stackWidths, utcDays } from "../src/lib/autopilot/spend-core.ts";
+import { accountDailyLimitCents, activityLabel, activitySummary, combineTodaySpend, formatDollars, stackWidths, utcDays } from "../src/lib/autopilot/spend-core.ts";
+
+test("reads the account daily limit with a $25 default", () => {
+  assert.equal(accountDailyLimitCents(undefined), 2500);
+  assert.equal(accountDailyLimitCents(""), 2500);
+  assert.equal(accountDailyLimitCents("1200"), 1200);
+  assert.equal(accountDailyLimitCents("bad"), 2500);
+});
+
+test("combines model and agent spend with a floor for unsettled sessions", () => {
+  assert.equal(combineTodaySpend(75, [
+    { cents: 40, settled: false },
+    { cents: 180, settled: false },
+    { cents: 20, settled: true },
+  ]), 375);
+});
 
 test("formats cents as dollars", () => {
   assert.equal(formatDollars(0), "$0.00");

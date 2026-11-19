@@ -2,7 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/autopilot/db";
 import { autopilotUser } from "@/lib/autopilot/scope";
-import { activityLabel, spendTotal, utcDays, type ActivityCount, type SpendAmounts } from "@/lib/autopilot/spend-core";
+import { accountDailyLimitCents, activityLabel, combineTodaySpend, spendTotal, utcDays, type ActivityCount, type SpendAmounts } from "@/lib/autopilot/spend-core";
 import { client } from "@/lib/coder/sessions";
 
 export type AgentSpendKind = "build" | "render" | "chat";
@@ -22,9 +22,40 @@ export interface RecentAgentSpend {
 }
 
 export interface SpendOverview {
+  today: { cents: number; limitCents: number; paused: boolean };
   days: SpendDay[];
   totals: { last7Days: SpendAmounts & { totalCents: number }; thisMonth: SpendAmounts & { totalCents: number } };
   recent: RecentAgentSpend[];
+}
+
+export class AgentBudgetError extends Error {}
+
+export async function todaySpendCents(userId: string): Promise<number> {
+  const sql = await db();
+  const day = new Date().toISOString().slice(0, 10);
+  const [modelRows, agentRows] = await Promise.all([
+    sql<{ cents: number }[]>`
+      select coalesce(cents, 0)::int as cents from kismet.ai_spend
+      where subject = ${`user:${userId}`} and bucket = ${`day:${day}`} limit 1
+    `,
+    sql<{ cents: number; settled: boolean }[]>`
+      select cents::int, settled from kismet.agent_spend
+      where user_id = ${userId}
+        and created_at >= ${day}::date at time zone 'UTC'
+        and created_at < (${day}::date + 1) at time zone 'UTC'
+    `,
+  ]);
+  return combineTodaySpend(Number(modelRows[0]?.cents ?? 0), agentRows.map((row) => ({
+    cents: Number(row.cents), settled: Boolean(row.settled),
+  })));
+}
+
+export async function agentBudgetLeft(userId = autopilotUser()): Promise<number> {
+  return Math.max(0, accountDailyLimitCents() - await todaySpendCents(userId));
+}
+
+export async function assertAgentBudget(userId = autopilotUser()): Promise<void> {
+  if (await agentBudgetLeft(userId) <= 0) throw new AgentBudgetError("This account reached its daily spending limit. It resets tomorrow.");
 }
 
 export async function recordAgentSession(input: {
@@ -84,7 +115,7 @@ export async function spendOverview(days = 30): Promise<SpendOverview> {
   const dayKeys = utcDays(days);
   const firstDay = dayKeys[0] ?? new Date().toISOString().slice(0, 10);
   const subject = `user:${userId}`;
-  const [agentRows, modelRows, activityRows, recent] = await Promise.all([
+  const [agentRows, modelRows, activityRows, recent, todayCents] = await Promise.all([
     sql<AgentDayRow[]>`
       select to_char(created_at at time zone 'UTC', 'YYYY-MM-DD') as day, kind,
         coalesce(sum(cents), 0)::int as cents, count(*)::int as sessions
@@ -109,6 +140,7 @@ export async function spendOverview(days = 30): Promise<SpendOverview> {
       from kismet.agent_spend where user_id = ${userId}
       order by created_at desc limit 20
     `,
+    todaySpendCents(userId),
   ]);
 
   const byDay = new Map<string, SpendDay>();
@@ -145,6 +177,7 @@ export async function spendOverview(days = 30): Promise<SpendOverview> {
   };
 
   return {
+    today: { cents: todayCents, limitCents: accountDailyLimitCents(), paused: todayCents >= accountDailyLimitCents() },
     days: dayKeys.map((day) => getDay(day)),
     totals: { last7Days: totalFor(last7Start), thisMonth: totalFor(monthStart) },
     recent: recent.map((row) => ({

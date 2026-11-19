@@ -3,6 +3,24 @@ import type { Evidence } from "./types.ts";
 
 export const DIGEST_UTC_HOUR = 16;
 
+export interface TickMessage { message: string; at: string }
+
+export function failureStreak(recentTickMessages: string[]): number {
+  let count = 0;
+  for (const message of recentTickMessages) {
+    if (!message.startsWith("Ran with")) break;
+    count += 1;
+  }
+  return count;
+}
+
+export function alertDue(recentTicks: TickMessage[]): { key: string; streak: number } | null {
+  const streak = failureStreak(recentTicks.map((tick) => tick.message));
+  if (streak < 3) return null;
+  const first = recentTicks[streak - 1];
+  return first ? { key: `tick_failing:${first.at}`, streak } : null;
+}
+
 export interface ReporterThread { channelId: string; threadTs: string }
 
 /** Picks up to five distinct Slack threads from a signal's evidence. */

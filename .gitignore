@@ -53,3 +53,4 @@ next-env.d.ts
 
 # local inbox when Postgres is not configured
 /data/
+evals/last-run.json

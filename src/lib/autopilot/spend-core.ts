@@ -13,6 +13,25 @@ export interface ActivityCount {
   count: number;
 }
 
+export interface AgentSpendEntry {
+  cents: number;
+  settled: boolean;
+}
+
+export function accountDailyLimitCents(value = process.env.KISMET_ACCOUNT_DAILY_CENTS): number {
+  if (value == null || value.trim() === "") return 2500;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : 2500;
+}
+
+/** Combines today's model ledger with agent sessions, reserving a small floor for open sessions. */
+export function combineTodaySpend(modelCents: number, sessions: AgentSpendEntry[]): number {
+  return Math.max(0, Math.floor(modelCents)) + sessions.reduce((total, session) => {
+    const recorded = Math.max(0, Math.floor(session.cents));
+    return total + (session.settled ? recorded : Math.max(recorded, 100));
+  }, 0);
+}
+
 const ACTIVITY_LABELS: Record<string, [string, string]> = {
   triage: ["problem triaged", "problems triaged"],
   design: ["experiment designed", "experiments designed"],

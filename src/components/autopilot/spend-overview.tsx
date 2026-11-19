@@ -12,6 +12,7 @@ interface SpendDay extends SpendAmounts {
 interface Totals extends SpendAmounts { totalCents: number }
 
 interface Overview {
+  today: { cents: number; limitCents: number; paused: boolean };
   days: SpendDay[];
   totals: { last7Days: Totals; thisMonth: Totals };
   recent: { title: string; kind: "build" | "render" | "chat"; cents: number; experimentId: string | null; createdAt: string }[];
@@ -41,13 +42,14 @@ export function SpendOverview() {
   const hasSpend = data.days.some((day) => spendTotal(day) > 0);
   const hasActivity = data.days.some((day) => activitySummary(day.activity).length > 0);
   if (!hasSpend && !hasActivity && data.recent.length === 0) {
-    return <p className="py-8 text-sm text-[#6b7280]">Kismet has not recorded any costs or activity yet.</p>;
+    return <div className="space-y-6 py-2"><TodayMeter today={data.today} /><p className="py-6 text-sm text-[#6b7280]">Kismet has not recorded any costs or activity yet.</p></div>;
   }
   const max = Math.max(1, ...data.days.map(spendTotal));
   const activityDays = [...data.days].reverse().filter((day) => activitySummary(day.activity).length > 0);
 
   return (
     <div className="space-y-8 py-2 text-sm text-[#374151]">
+      <TodayMeter today={data.today} />
       <div className="grid gap-3 sm:grid-cols-2">
         <TotalCard title="Last 7 days" total={data.totals.last7Days} />
         <TotalCard title="This month" total={data.totals.thisMonth} />
@@ -104,6 +106,18 @@ export function SpendOverview() {
       </section>
     </div>
   );
+}
+
+function TodayMeter({ today }: { today: Overview["today"] }) {
+  return <div>
+    <div className="flex items-center justify-between text-xs">
+      <span className="font-medium text-[#374151]">Today {formatDollars(today.cents)} of {formatDollars(today.limitCents)}</span>
+      {today.paused && <span className="font-medium text-orange-600">Paused until tomorrow</span>}
+    </div>
+    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[#eef0f3]">
+      <div className="h-full rounded-full bg-orange-500" style={{ width: `${Math.min(100, today.limitCents ? (today.cents / today.limitCents) * 100 : 100)}%` }} />
+    </div>
+  </div>;
 }
 
 function TotalCard({ title, total }: { title: string; total: Totals }) {

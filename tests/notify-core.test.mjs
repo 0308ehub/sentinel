@@ -1,7 +1,21 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildDigest, deriveEvents, digestDue, reporterReplyKey, reporterReplyText, reporterThreads } from "../src/lib/autopilot/notify-core.ts";
+import { alertDue, buildDigest, deriveEvents, digestDue, failureStreak, reporterReplyKey, reporterReplyText, reporterThreads } from "../src/lib/autopilot/notify-core.ts";
+
+test("counts only the newest consecutive failing ticks", () => {
+  assert.equal(failureStreak(["Ran with 2 error(s).", "Ran with 1 error(s).", "Ran.", "Ran with 4 error(s)."]), 2);
+});
+
+test("alerts at three failures with a stable key for the streak", () => {
+  const ticks = [
+    { message: "Ran with 1 error(s).", at: "2026-11-19T03:00:00.000Z" },
+    { message: "Ran with 2 error(s).", at: "2026-11-19T02:00:00.000Z" },
+    { message: "Ran with 1 error(s).", at: "2026-11-19T01:00:00.000Z" },
+  ];
+  assert.deepEqual(alertDue(ticks), { key: "tick_failing:2026-11-19T01:00:00.000Z", streak: 3 });
+  assert.equal(alertDue(ticks.slice(0, 2)), null);
+});
 
 function experiment(overrides = {}) {
   return {

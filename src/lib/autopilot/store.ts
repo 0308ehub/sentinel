@@ -599,6 +599,24 @@ export async function lastRunAt(): Promise<string | null> {
   return isoOrNull(rows[0]?.at);
 }
 
+export async function recentTickActivity(limit = 10): Promise<Activity[]> {
+  const sql = await db();
+  const rows = await sql`
+    select * from kismet.activity where user_id = ${scopeUser()} and kind = 'tick'
+    order by id desc limit ${limit}
+  `;
+  return rows.map((row) => ({ id: Number(row.id), at: iso(row.at), kind: "tick", message: String(row.message), ref: null }));
+}
+
+export async function latestErrorMessage(): Promise<string | null> {
+  const sql = await db();
+  const rows = await sql`
+    select message from kismet.activity where user_id = ${scopeUser()} and kind = 'error'
+    order by id desc limit 1
+  `;
+  return rows[0] ? String(rows[0].message) : null;
+}
+
 export async function evidenceCounts(sinceDays: number): Promise<{ total: number; real: number }> {
   const sql = await db();
   const rows = await sql`
