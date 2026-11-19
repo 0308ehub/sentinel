@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { armFor, type Arm, type FlagState } from "@/lib/autopilot/assign";
+import { armFor, EVENT_NAME, type Arm, type FlagState } from "@/lib/autopilot/assign";
 import { hasPreviewOverrides, previewOverridesForPage, type PreviewOverrides } from "@/lib/autopilot/preview";
 import { ExperimentContext } from "@/lib/autopilot/variant";
 
@@ -12,7 +12,7 @@ const FLUSH_MS = 4000;
 const PREVIEW_KEY = "kismet-preview";
 
 interface TrackedEvent {
-  name: "view" | "click";
+  name: "view" | "click" | "track";
   page: string;
   element: string;
   arms: Record<string, Arm>;
@@ -139,7 +139,24 @@ export function ExperimentProvider({ children }: { children: React.ReactNode }) 
     };
   }, [previewReady, previewing, visitor]);
 
-  const value = useMemo(() => ({ visitor, arms }), [visitor, arms]);
+  const pendingTracks = useRef<{ name: string; page: string }[]>([]);
+  const canRecord = Boolean(visitor) && flagsReady && previewReady && !previewing;
+  useEffect(() => {
+    if (!canRecord) return;
+    for (const item of pendingTracks.current.splice(0)) {
+      queue.current.push({ name: "track", page: item.page, element: item.name, arms: armsRef.current });
+    }
+  }, [canRecord]);
+
+  const track = useCallback((name: string) => {
+    if (!EVENT_NAME.test(name) || previewing) return;
+    const page = window.location.pathname;
+    // Before the flags arrive the event would not carry its experiments, so it waits.
+    if (canRecord) queue.current.push({ name: "track", page, element: name, arms: armsRef.current });
+    else if (pendingTracks.current.length < 50) pendingTracks.current.push({ name, page });
+  }, [canRecord, previewing]);
+
+  const value = useMemo(() => ({ visitor, arms, track }), [visitor, arms, track]);
   const previewArm = Object.values(overrides)[0];
   return (
     <ExperimentContext.Provider value={value}>

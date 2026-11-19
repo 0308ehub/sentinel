@@ -1,11 +1,21 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { ChevronDown, Loader2, Play } from "lucide-react";
+import { Check, ChevronDown, Loader2, MoreHorizontal, Play } from "lucide-react";
+import { BuilderMenu, useAccountBuilder } from "@/components/autopilot/builder-menu";
 import { ExperimentDetail } from "@/components/autopilot/experiment-detail";
+import { ExperimentSessions } from "@/components/autopilot/experiment-sessions";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { RelativeTime } from "@/components/shared/relative-time";
+import { describeMetric } from "@/lib/autopilot/assign";
+import type { Builder } from "@/lib/autopilot/builders";
 import type { RolloutPhase } from "@/lib/autopilot/rollout-plan";
 import { useVariant } from "@/lib/autopilot/variant";
 import { formatRelativeTime } from "@/lib/utils";
@@ -48,12 +58,12 @@ export function ExperimentBoard({
   message: string | null;
   onRun: () => void;
   onRemoveSample: () => void;
-  onTest: (signal: Signal) => void;
+  onTest: (signal: Signal, builder: Builder) => void;
   onDismiss: (signal: Signal) => void;
   onAct: (experiment: Experiment, action: "approve" | "reject" | "cancel" | "rollout" | "stop" | "approve-cleanup" | "dismiss-cleanup") => void;
   onRated: () => void;
   onSchedule: (experiment: Experiment, phases: RolloutPhase[]) => Promise<void>;
-  onCreate: (input: { title: string; change: string; page: string }) => Promise<void>;
+  onCreate: (input: { title: string; change: string; page: string; builder: Builder }) => Promise<void>;
 }) {
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<"overview" | "learnings" | "themes" | "activity">("overview");
@@ -67,7 +77,7 @@ export function ExperimentBoard({
   const goals = editedGoals ?? state.goals;
   const [editingGoals, setEditingGoals] = useState(false);
   const [goalName, setGoalName] = useState("");
-  const [goalKind, setGoalKind] = useState<"click" | "visit">("click");
+  const [goalKind, setGoalKind] = useState<"click" | "visit" | "event">("click");
   const [goalValue, setGoalValue] = useState("");
   const variant = useVariant("ap-add-first-experiment-guidance-to-the-exp-v1");
 
@@ -87,7 +97,11 @@ export function ExperimentBoard({
   );
 
   async function addGoal() {
-    const metric = goalKind === "click" ? { kind: "click", text: goalValue } : { kind: "visit", path: goalValue };
+    const metric = goalKind === "click"
+      ? { kind: "click", text: goalValue }
+      : goalKind === "event"
+        ? { kind: "event", name: goalValue.trim() }
+        : { kind: "visit", path: goalValue };
     const response = await fetch("/api/autopilot/goals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: goalName, metric }) });
     if (!response.ok) return;
     const latest = await fetch("/api/autopilot/goals", { cache: "no-store" }).then((r) => r.json()) as { goals: Goal[] };
@@ -150,34 +164,44 @@ export function ExperimentBoard({
         ? state.signals.find((signal) => signal.id === openExperiment.signalId) ?? null
         : null;
 
-  if (selection && (openExperiment || (selection.kind === "signal" && openSignal))) {
-    const suggested = selection.kind === "signal" || (openExperiment != null && SUGGESTED_STATUS.has(openExperiment.status));
-    return (
-      <ExperimentDetail
-        experiment={openExperiment}
-        signal={openSignal}
-        learning={openExperiment ? state.learnings.find((learning) => learning.experimentId === openExperiment.id) ?? null : null}
-        suggested={suggested}
-        lastFailed={openExperiment ? null : lastFailedAttempt(state.experiments, openSignal?.id ?? null)}
-        busy={busy}
-        onBack={() => setSelected(null)}
-        onApprove={() => openExperiment && onAct(openExperiment, "approve")}
-        onReject={() => openExperiment && onAct(openExperiment, "reject")}
-        onCancel={() => openExperiment && onAct(openExperiment, "cancel")}
-        onRollout={() => openExperiment && onAct(openExperiment, "rollout")}
-        onSchedule={(phases) => openExperiment ? onSchedule(openExperiment, phases) : Promise.resolve()}
-        onStop={() => openExperiment && onAct(openExperiment, "stop")}
-        onApproveCleanup={() => openExperiment && onAct(openExperiment, "approve-cleanup")}
-        onDismissCleanup={() => openExperiment && onAct(openExperiment, "dismiss-cleanup")}
-        onStart={() => openSignal && onTest(openSignal)}
-        onDismissSignal={() => openSignal && onDismiss(openSignal)}
-        rating={ratingForSelection(state.ratings, selection)}
-        onRated={onRated}
-      />
-    );
-  }
+  const open = selection && (openExperiment || (selection.kind === "signal" && openSignal));
+  const suggested = selection?.kind === "signal" || (openExperiment != null && SUGGESTED_STATUS.has(openExperiment.status));
 
   return (
+    <div className="flex h-full min-h-0 bg-white">
+      <ExperimentSessions
+        experiments={state.experiments}
+        selectedId={selection?.kind === "experiment" ? selection.id : null}
+        running={running}
+        onOpen={(id) => setSelected({ kind: "experiment", id })}
+        onCreate={() => setCreating(true)}
+        onStop={(experiment) => onAct(experiment, "cancel")}
+        onRun={onRun}
+      />
+      <div className="min-w-0 flex-1 overflow-hidden">
+        {open ? (
+          <ExperimentDetail
+            experiment={openExperiment}
+            signal={openSignal}
+            learning={openExperiment ? state.learnings.find((learning) => learning.experimentId === openExperiment.id) ?? null : null}
+            suggested={suggested}
+            lastFailed={openExperiment ? null : lastFailedAttempt(state.experiments, openSignal?.id ?? null)}
+            busy={busy}
+            onBack={() => setSelected(null)}
+            onApprove={() => openExperiment && onAct(openExperiment, "approve")}
+            onReject={() => openExperiment && onAct(openExperiment, "reject")}
+            onCancel={() => openExperiment && onAct(openExperiment, "cancel")}
+            onRollout={() => openExperiment && onAct(openExperiment, "rollout")}
+            onSchedule={(phases) => openExperiment ? onSchedule(openExperiment, phases) : Promise.resolve()}
+            onStop={() => openExperiment && onAct(openExperiment, "stop")}
+            onApproveCleanup={() => openExperiment && onAct(openExperiment, "approve-cleanup")}
+            onDismissCleanup={() => openExperiment && onAct(openExperiment, "dismiss-cleanup")}
+            onStart={(builder) => openSignal && onTest(openSignal, builder)}
+            onDismissSignal={() => openSignal && onDismiss(openSignal)}
+            rating={selection ? ratingForSelection(state.ratings, selection) : null}
+            onRated={onRated}
+          />
+        ) : (
     <div className="flex h-full flex-col overflow-auto bg-white [scrollbar-gutter:stable]">
       <div className="px-6 pt-5">
         <div className="flex items-start justify-between gap-4">
@@ -194,7 +218,7 @@ export function ExperimentBoard({
               )}
             </p>
             <div className="mt-2 text-xs text-[#6b7280]">
-              {goals.length ? <>Goals: {goals.map((goal, index) => <span key={goal.id} title={goal.spec.kind === "click" ? `Visitors who click ${goal.spec.text}` : `Visitors who reach ${goal.spec.path}`}>{index > 0 && " · "}{goal.name} ({(goal.baselineRate * 100).toFixed(1)}%)</span>)}</> : <>Kismet will propose goals once it has seen enough visitors. </>}
+              {goals.length ? <>Goals: {goals.map((goal, index) => <span key={goal.id} title={describeMetric(goal.spec)}>{index > 0 && " · "}{goal.name} ({(goal.baselineRate * 100).toFixed(1)}%)</span>)}</> : <>Kismet will propose goals once it has seen enough visitors. </>}
               <button type="button" className="ml-1 text-brand hover:underline" onClick={() => setEditingGoals((value) => !value)}>{goals.length ? "Edit" : "Add one"}</button>
             </div>
             {editingGoals && (
@@ -202,8 +226,8 @@ export function ExperimentBoard({
                 {goals.map((goal) => <div key={goal.id} className="flex items-center justify-between py-1"><span>{goal.name}</span><button type="button" aria-label={`Remove ${goal.name}`} className="text-[#6b7280] hover:text-red-600" onClick={() => void removeGoal(goal.id)}>Remove</button></div>)}
                 <div className="mt-2 flex flex-wrap gap-2">
                   <input aria-label="Goal name" value={goalName} onChange={(e) => setGoalName(e.target.value)} maxLength={60} placeholder="Goal name" className="h-8 rounded border px-2" />
-                  <select aria-label="Goal metric kind" value={goalKind} onChange={(e) => setGoalKind(e.target.value as "click" | "visit")} className="h-8 rounded border px-2"><option value="click">Click</option><option value="visit">Visit</option></select>
-                  <input aria-label={goalKind === "click" ? "Click label" : "Visit path"} value={goalValue} onChange={(e) => setGoalValue(e.target.value)} placeholder={goalKind === "click" ? "Button label" : "/path"} className="h-8 rounded border px-2" />
+                  <select aria-label="Goal metric kind" value={goalKind} onChange={(e) => setGoalKind(e.target.value as "click" | "visit" | "event")} className="h-8 rounded border px-2"><option value="click">Click</option><option value="visit">Visit</option><option value="event">Event</option></select>
+                  <input aria-label={goalKind === "click" ? "Click label" : goalKind === "event" ? "Event name" : "Visit path"} value={goalValue} onChange={(e) => setGoalValue(e.target.value)} placeholder={goalKind === "click" ? "Button label" : goalKind === "event" ? "purchase" : "/path"} className="h-8 rounded border px-2" />
                   <button type="button" disabled={!goalName.trim() || !goalValue.trim() || goals.length >= 5} className="h-8 rounded border px-3 disabled:opacity-50" onClick={() => void addGoal()}>Add</button>
                 </div>
               </div>
@@ -291,15 +315,18 @@ export function ExperimentBoard({
               <th className="px-3 py-2 font-medium">Type</th>
               <th className="px-3 py-2 font-medium">Feature</th>
               <th className="px-3 py-2 font-medium">Environments</th>
-              <th className="px-3 py-2 font-medium">Modified</th>
+              <th className="px-3 py-2 font-medium">
+                <span className="inline-flex items-center gap-1">Modified <ChevronDown className="h-3 w-3" /></span>
+              </th>
               <th className="px-3 py-2 font-medium">Created</th>
-              <th className="px-3 py-2 text-right font-medium">Results</th>
+              <th className="px-3 py-2 font-medium">Results</th>
+              <th className="w-10 px-3 py-2"><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-3 py-8 text-sm text-[#6b7280]">
+                <td colSpan={8} className="px-3 py-8 text-sm text-[#6b7280]">
                   {state.experiments.length === 0 && suggestions.length === 0
                     ? "Kismet will suggest experiments here after it reads your evidence."
                     : "No experiments match this filter."}
@@ -308,39 +335,37 @@ export function ExperimentBoard({
             ) : (
               rows.map((row) => {
                 const id = row.kind === "experiment" ? row.experiment.id : row.signal.id;
+                const feature = featureNotation(row.feature);
+                const open = () => setSelected(row.kind === "experiment" ? { kind: "experiment", id } : { kind: "signal", id });
+                const places = environmentsFor(row);
                 return (
                   <tr
                     key={`${row.kind}-${id}`}
-                    className="cursor-pointer border-b border-[#eef0f3] text-[#374151] hover:bg-[#f8fafc] [&>td]:px-3"
-                    onClick={() => setSelected(row.kind === "experiment" ? { kind: "experiment", id } : { kind: "signal", id })}
+                    className="cursor-pointer border-b border-[#eef0f3] text-sm text-[#374151] hover:bg-[#f8fafc] [&>td]:px-3"
+                    onClick={open}
                   >
-                    <td className="py-3">
-                      <div className="flex items-center gap-2">
-                        <span className={row.suggested ? "font-medium text-[#111827]" : "font-medium text-brand"}>{row.name}</span>
-                        {row.suggested && (
-                          <span className="rounded border border-[#c7d7fe] bg-[#eef4ff] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-brand">
-                            Suggested
-                          </span>
-                        )}
-                        {row.kind === "signal" && row.signal.snoozedUntil && <span className="text-xs text-[#9aa0a8]">Waiting for more traffic</span>}
-                      </div>
-                      <div className="text-xs text-[#9aa0a8]">{row.key}</div>
+                    <td className="py-3.5">
+                      <div className="font-medium text-brand">{row.name}</div>
+                      <div className="mt-0.5 text-xs text-[#8b919a]">{row.key}</div>
+                      {row.kind === "signal" && row.signal.snoozedUntil && <div className="mt-0.5 text-xs text-[#9aa0a8]">Waiting for more traffic</div>}
                     </td>
-                    <td className="whitespace-nowrap">{row.kind === "experiment" ? row.experiment.kind === "fix" ? "Fix" : row.experiment.kind === "change" ? "Change" : "A/B Test" : row.signal.kind === "bug" ? "Fix" : "A/B Test"}</td>
-                    <td>{row.feature}</td>
+                    <td className="whitespace-nowrap">{typeLabel(row)}</td>
                     <td>
-                      <Env live={row.live} muted={row.suggested} />
+                      <div>{feature.name}</div>
+                      {feature.key && <div className="mt-0.5 text-xs text-[#8b919a]">{feature.key}</div>}
+                    </td>
+                    <td>
+                      <Environments other={places.other} production={places.production} />
                     </td>
                     <td className="whitespace-nowrap">{formatDay(row.modified)}</td>
                     <td className="whitespace-nowrap">{formatDay(row.created)}</td>
-                    <td className="text-right">
-                      <span
-                        className={`inline-flex items-center rounded border px-2 py-1 text-xs ${
-                          row.suggested ? "border-[#d5d8de] text-[#374151]" : "border-brand text-brand"
-                        }`}
-                      >
-                        {row.suggested ? "Review" : "Results"}
+                    <td>
+                      <span className={`inline-flex h-7 items-center rounded border px-2.5 text-xs ${hasResults(row) ? "border-brand text-brand" : "border-[#d5d8de] text-[#9aa0a8]"}`}>
+                        Results
                       </span>
+                    </td>
+                    <td className="text-right" onClick={(event) => event.stopPropagation()}>
+                      <RowMenu name={row.name} onOpen={open} onStop={row.kind === "experiment" && places.production && row.experiment.status !== "rolled_out" ? () => onAct(row.experiment, "stop") : null} />
                     </td>
                   </tr>
                 );
@@ -348,6 +373,9 @@ export function ExperimentBoard({
             )}
           </tbody>
         </table>
+        )}
+      </div>
+    </div>
         )}
       </div>
       <CreateExperimentDialog open={creating} busy={busy === "create"} onOpenChange={setCreating} onCreate={onCreate} />
@@ -364,21 +392,25 @@ function CreateExperimentDialog({
   open: boolean;
   busy: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreate: (input: { title: string; change: string; page: string }) => Promise<void>;
+  onCreate: (input: { title: string; change: string; page: string; builder: Builder }) => Promise<void>;
 }) {
+  const accountBuilder = useAccountBuilder();
   const [title, setTitle] = useState("");
   const [change, setChange] = useState("");
   const [page, setPage] = useState("");
+  const [picked, setPicked] = useState<Builder | null>(null);
   const [error, setError] = useState("");
+  const builder = picked ?? accountBuilder;
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setError("");
     try {
-      await onCreate({ title: title.trim(), change: change.trim(), page: page.trim() });
+      await onCreate({ title: title.trim(), change: change.trim(), page: page.trim(), builder });
       setTitle("");
       setChange("");
       setPage("");
+      setPicked(null);
       onOpenChange(false);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not create the experiment.");
@@ -401,6 +433,7 @@ function CreateExperimentDialog({
               <span className="text-[#374151]">What should change</span>
               <textarea value={change} onChange={(event) => setChange(event.target.value)} required rows={4} placeholder="Showing items you may like on the homepage banner will increase purchases" className="mt-1 w-full resize-none rounded-md border border-[#e1e4e8] px-3 py-2 text-sm outline-none focus:border-[#111]" />
             </label>
+            <BuilderMenu value={builder} onChange={setPicked} />
             <label className="block text-sm">
               <span className="text-[#6b7280]">Page, if you know it</span>
               <input value={page} onChange={(event) => setPage(event.target.value)} placeholder="/home" className="mt-1 h-9 w-full rounded-md border border-[#e1e4e8] px-3 text-sm outline-none focus:border-[#111]" />
@@ -540,18 +573,66 @@ function LearningBadge({ outcome }: { outcome: Learning["outcome"] }) {
   return <span className={`inline-flex rounded border px-2 py-0.5 text-xs font-medium ${styles}`}>{outcome[0].toUpperCase() + outcome.slice(1)}</span>;
 }
 
-function Env({ live, muted }: { live: boolean; muted: boolean }) {
+function typeLabel(row: { kind: "experiment"; experiment: Experiment } | { kind: "signal"; signal: Signal }): string {
+  if (row.kind === "signal") return row.signal.kind === "bug" ? "Feature Test" : "A/B Test";
+  return row.experiment.kind === "test" ? "A/B Test" : "Feature Test";
+}
+
+function featureNotation(value: string): { name: string; key: string | null } {
+  const raw = value.trim();
+  if (!raw || raw === "None") return { name: "None", key: null };
+  const key = raw.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40);
+  const name = raw.startsWith("/")
+    ? raw.split("/").filter(Boolean).map((part) => part.replace(/[-_]/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase())).join(" / ") || "Home"
+    : raw;
+  return { name, key: key || null };
+}
+
+function environmentsFor(row: { kind: "experiment"; experiment: Experiment; live: boolean } | { kind: "signal"; live: boolean }): { other: boolean; production: boolean } {
+  if (row.kind === "signal") return { other: false, production: false };
+  const status = row.experiment.status;
+  const production = row.live || status === "rolled_out";
+  const other = status === "building" || status === "awaiting_approval" || (Boolean(row.experiment.draftPath || row.experiment.prUrl) && !production);
+  return { other, production };
+}
+
+function hasResults(row: { kind: "experiment"; experiment: Experiment } | { kind: "signal" }): boolean {
+  if (row.kind === "signal") return false;
+  const status = row.experiment.status;
+  return Boolean(row.experiment.readout || row.experiment.directional) || status === "running" || status === "awaiting_rollout" || status === "rolling_out" || status === "rolled_out" || status === "stopped";
+}
+
+function Environments({ other, production }: { other: boolean; production: boolean }) {
   return (
-    <div className="space-y-1 whitespace-nowrap text-xs">
-      <div className="flex items-center gap-1.5">
-        <span className={`h-2 w-2 rounded-full ${live && !muted ? "bg-[#1f9d55]" : "bg-[#c5c9d0]"}`} />
-        Production
-      </div>
-      <div className="flex items-center gap-1.5 text-[#9aa0a8]">
-        <span className="h-2 w-2 rounded-full bg-[#d5d8de]" />
-        Other environments
-      </div>
+    <div className="space-y-1 whitespace-nowrap text-xs text-[#374151]">
+      <div className="flex items-center gap-1.5"><EnvMark on={other} />Other Environments (1)</div>
+      <div className="flex items-center gap-1.5"><EnvMark on={production} />Production</div>
     </div>
+  );
+}
+
+function EnvMark({ on }: { on: boolean }) {
+  if (!on) return <span className="h-3.5 w-3.5 shrink-0 rounded-full bg-[#d9dce1]" aria-hidden />;
+  return (
+    <span className="grid h-3.5 w-3.5 shrink-0 place-items-center rounded-full bg-[#1f9d55] text-white" aria-hidden>
+      <Check className="h-2.5 w-2.5" strokeWidth={3} />
+    </span>
+  );
+}
+
+function RowMenu({ name, onOpen, onStop }: { name: string; onOpen: () => void; onStop: (() => void) | null }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button type="button" aria-label={`Actions for ${name}`} className="rounded p-1 text-[#9aa0a8] hover:bg-[#eef0f3] hover:text-[#374151]">
+          <MoreHorizontal className="h-4 w-4" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={onOpen}>Open</DropdownMenuItem>
+        {onStop && <DropdownMenuItem onClick={onStop}>Stop</DropdownMenuItem>}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

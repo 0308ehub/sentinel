@@ -3,7 +3,7 @@ import "server-only";
 import { db, newId } from "@/lib/autopilot/db";
 import { autopilotUser } from "@/lib/autopilot/scope";
 import { parseMetricSpec, type Arm, type FlagState, type MetricSpec } from "@/lib/autopilot/assign";
-import { isOutsideBuilder, type OutsideBuilder } from "@/lib/autopilot/builders";
+import { chosenBuilder, isOutsideBuilder, type Builder, type OutsideBuilder } from "@/lib/autopilot/builders";
 import { ANALYTICS_FRESH_DAYS, ELEMENT_GONE_DAYS, otherFreshDays } from "@/lib/autopilot/freshness";
 import type { ResultEstimate } from "@/lib/autopilot/power";
 import type { ChangeSummary } from "@/lib/autopilot/change-summary";
@@ -111,6 +111,7 @@ function toExperiment(row: Row): Experiment {
     draftPath: (row.draft_path as string | null) ?? null,
     coderSessionId: (row.coder_session_id as string | null) ?? null,
     agentFailed: Boolean(row.agent_failed),
+    buildWith: chosenBuilder(row.build_with),
     builder: isOutsideBuilder(row.builder) ? row.builder : null,
     buildRef: (row.build_ref as string | null) ?? null,
     buildUrl: (row.build_url as string | null) ?? null,
@@ -472,17 +473,18 @@ export async function createExperiment(input: {
   kind?: Experiment["kind"];
   mode?: "deterministic" | "stochastic";
   rationale?: Experiment["rationale"];
+  buildWith?: Builder | null;
 }): Promise<string> {
   const sql = await db();
   const id = newId("exp");
   await sql`
     insert into kismet.experiments
-      (id, user_id, signal_id, version, kind, title, hypothesis, metric, metric_spec, guardrail_spec, page, guardrail, control, treatment, flag, estimate, rationale, mode, status)
+      (id, user_id, signal_id, version, kind, title, hypothesis, metric, metric_spec, guardrail_spec, page, guardrail, control, treatment, flag, estimate, rationale, mode, build_with, status)
     values
       (${id}, ${scopeUser()}, ${input.signalId}, ${input.version}, ${input.kind ?? "test"}, ${input.title.slice(0, 200)}, ${input.hypothesis.slice(0, 1000)},
        ${input.metric.slice(0, 120)}, ${input.metricSpec ? sql.json(input.metricSpec) : null}, ${input.guardrailSpec ? sql.json(input.guardrailSpec) : null}, ${input.page.slice(0, 200)}, ${input.guardrail.slice(0, 300)}, ${input.control.slice(0, 500)},
        ${input.treatment.slice(0, 500)}, ${input.flag}, ${input.estimate ? sql.json(input.estimate as never) : null}, ${input.rationale ? sql.json(input.rationale as never) : null},
-       ${input.mode === "stochastic" ? "stochastic" : "deterministic"}, 'building')
+       ${input.mode === "stochastic" ? "stochastic" : "deterministic"}, ${input.buildWith ?? null}, 'building')
   `;
   return id;
 }
@@ -662,9 +664,27 @@ export async function setFlag(
   `;
 }
 
+type Db = Awaited<ReturnType<typeof db>>;
+
+/**
+ * The events that count as a conversion for a metric. Columns are unqualified so the condition fits
+ * any query that reads a single events table.
+ */
+function converts(sql: Db, spec: MetricSpec) {
+  if (spec.kind === "click") return sql`name = 'click' and element ilike ${"%" + spec.text + "%"}`;
+  if (spec.kind === "visit") return sql`name = 'view' and page like ${spec.path.replace(/[%_]/g, "") + "%"}`;
+  return sql`name = 'track' and element = ${spec.name}`;
+}
+
+/**
+ * view and click come from the browser. track is an event the site reports itself (kismet.track).
+ * exposure marks that the server SDK put a visitor in an experiment; element holds the flag.
+ */
+export type EventName = "view" | "click" | "track" | "exposure";
+
 export interface NewEvent {
   visitor: string;
-  name: "view" | "click";
+  name: EventName;
   page: string;
   element: string;
   arms: Record<string, Arm>;
@@ -710,10 +730,6 @@ export interface ArmCount {
 /** Visitors and converted visitors per arm since the experiment started, counted from tracked events. */
 export async function countArms(flag: string, since: string, spec: MetricSpec): Promise<ArmCount[]> {
   const sql = await db();
-  const converts =
-    spec.kind === "click"
-      ? sql`e.name = 'click' and e.element ilike ${"%" + spec.text + "%"}`
-      : sql`e.name = 'view' and e.page like ${spec.path.replace(/[%_]/g, "") + "%"}`;
   const rows = await sql`
     with exposed as (
       select visitor, min(arms ->> ${flag}) as arm, bool_or(synthetic) as synthetic
@@ -723,7 +739,7 @@ export async function countArms(flag: string, since: string, spec: MetricSpec): 
     ),
     converted as (
       select distinct e.visitor from kismet.events e
-      where e.user_id = ${scopeUser()} and e.at >= ${since} and e.arms ? ${flag} and ${converts}
+      where e.user_id = ${scopeUser()} and e.at >= ${since} and e.arms ? ${flag} and ${converts(sql, spec)}
     )
     select x.arm,
            count(*)::int as visitors,
@@ -753,9 +769,6 @@ export interface MetricBaseline {
 export async function metricWindow(spec: MetricSpec, from: string, to: string): Promise<MetricBaseline> {
   const sql = await db();
   const userId = scopeUser();
-  const converts = spec.kind === "click"
-    ? sql`e.name = 'click' and e.element ilike ${"%" + spec.text + "%"}`
-    : sql`e.name = 'view' and e.page like ${spec.path.replace(/[%_]/g, "") + "%"}`;
   const [row] = await sql`
     with mode as (
       select not exists (
@@ -767,7 +780,7 @@ export async function metricWindow(spec: MetricSpec, from: string, to: string): 
     ), converted as (
       select distinct e.visitor from kismet.events e, mode
       where e.user_id = ${userId} and e.at >= ${from} and e.at < ${to}
-        and (not e.synthetic or mode.include_synthetic) and ${converts}
+        and (not e.synthetic or mode.include_synthetic) and ${converts(sql, spec)}
     )
     select count(*)::int as visitors, count(c.visitor)::int as conversions
     from active a left join converted c on c.visitor = a.visitor
@@ -782,9 +795,6 @@ export async function metricBaseline(spec: MetricSpec, days = 14): Promise<Metri
   const sql = await db();
   const userId = scopeUser();
   const safeDays = Math.max(1, Math.min(90, Math.floor(days)));
-  const converts = spec.kind === "click"
-    ? sql`e.name = 'click' and e.element ilike ${"%" + spec.text + "%"}`
-    : sql`e.name = 'view' and e.page like ${spec.path.replace(/[%_]/g, "") + "%"}`;
   const [row] = await sql`
     with mode as (
       select not exists (
@@ -798,7 +808,7 @@ export async function metricBaseline(spec: MetricSpec, days = 14): Promise<Metri
     ), converted as (
       select distinct e.visitor from kismet.events e, mode
       where e.user_id = ${userId} and e.at >= now() - make_interval(days => ${safeDays}::int)
-        and (not e.synthetic or mode.include_synthetic) and ${converts}
+        and (not e.synthetic or mode.include_synthetic) and ${converts(sql, spec)}
     )
     select count(*)::int as visitors, count(c.visitor)::int as conversions
     from active a left join converted c on c.visitor = a.visitor
@@ -822,7 +832,7 @@ export async function recentJourneys(days = 14, limit = 12): Promise<string[]> {
     ), eligible as (
       select e.* from kismet.events e, mode where e.user_id = ${userId}
         and e.at >= now() - make_interval(days => ${safeDays}::int)
-        and (not e.synthetic or mode.include_synthetic)
+        and (not e.synthetic or mode.include_synthetic) and e.name <> 'exposure'
     ), chosen as (
       select visitor, max(at) as latest, count(distinct at::date)::int as visits
       from eligible group by visitor order by latest desc limit ${safeLimit}::int
@@ -888,33 +898,32 @@ export async function interviewContext(): Promise<Evidence[]> {
 }
 
 export interface PopularEvent { label: string; visitors: number }
-export async function popularUsage(): Promise<{ visitors: number; pages: PopularEvent[]; clicks: PopularEvent[] }> {
+export async function popularUsage(): Promise<{ visitors: number; pages: PopularEvent[]; clicks: PopularEvent[]; events: PopularEvent[] }> {
   const sql = await db();
   const userId = scopeUser();
-  const [total, pages, clicks] = await Promise.all([
+  const [total, pages, clicks, events] = await Promise.all([
     sql`select count(distinct visitor)::int as visitors from kismet.events where user_id = ${userId} and at >= now() - interval '14 days'`,
     sql`select page as label, count(distinct visitor)::int as visitors from kismet.events where user_id = ${userId}
       and at >= now() - interval '14 days' and name = 'view' group by page order by visitors desc limit 30`,
     sql`select element as label, count(distinct visitor)::int as visitors from kismet.events where user_id = ${userId}
       and at >= now() - interval '14 days' and name = 'click' and element <> '' group by element order by visitors desc limit 40`,
+    sql`select element as label, count(distinct visitor)::int as visitors from kismet.events where user_id = ${userId}
+      and at >= now() - interval '14 days' and name = 'track' group by element order by visitors desc limit 30`,
   ]);
-  return { visitors: Number(total[0]?.visitors ?? 0), pages: pages.map((r) => ({ label: String(r.label), visitors: Number(r.visitors) })),
-    clicks: clicks.map((r) => ({ label: String(r.label), visitors: Number(r.visitors) })) };
+  const popular = (rows: typeof pages) => rows.map((r) => ({ label: String(r.label), visitors: Number(r.visitors) }));
+  return { visitors: Number(total[0]?.visitors ?? 0), pages: popular(pages), clicks: popular(clicks), events: popular(events) };
 }
 
 export interface GoalVisitorRow { visitor: string; firstAt: string; pages: string[]; converted: boolean }
 export async function goalVisitorRows(spec: MetricSpec): Promise<GoalVisitorRow[]> {
   const sql = await db();
   const userId = scopeUser();
-  const converts = spec.kind === "click"
-    ? sql`r.name = 'click' and r.element ilike ${"%" + spec.text + "%"}`
-    : sql`r.name = 'view' and r.page like ${spec.path.replace(/[%_]/g, "") + "%"}`;
   const rows = await sql`
     with mode as (select not exists (select 1 from kismet.events where user_id = ${userId} and at >= now() - interval '14 days' and synthetic = false) as all_synthetic),
     firsts as (select visitor, min(at) as first_at from kismet.events where user_id = ${userId} group by visitor),
     recent as (select e.* from kismet.events e, mode where e.user_id = ${userId} and e.at >= now() - interval '14 days' and (not e.synthetic or mode.all_synthetic))
     select r.visitor, f.first_at, array_agg(distinct r.page) filter (where r.name = 'view') as pages,
-      bool_or(${converts}) as converted
+      bool_or(${converts(sql, spec)}) as converted
     from recent r join firsts f on f.visitor = r.visitor group by r.visitor, f.first_at
   `;
   return rows.map((r) => ({ visitor: String(r.visitor), firstAt: iso(r.first_at), pages: (r.pages as string[] | null) ?? [], converted: Boolean(r.converted) }));
@@ -974,10 +983,6 @@ export interface CrossCount {
 /** One experiment's visitors and conversions, split by which version of another experiment they saw. */
 export async function countArmsAcross(flag: string, other: string, since: string, spec: MetricSpec): Promise<CrossCount[]> {
   const sql = await db();
-  const converts =
-    spec.kind === "click"
-      ? sql`e.name = 'click' and e.element ilike ${"%" + spec.text + "%"}`
-      : sql`e.name = 'view' and e.page like ${spec.path.replace(/[%_]/g, "") + "%"}`;
   const rows = await sql`
     with exposed as (
       select visitor, min(arms ->> ${flag}) as arm, min(arms ->> ${other}) as other_arm
@@ -987,7 +992,7 @@ export async function countArmsAcross(flag: string, other: string, since: string
     ),
     converted as (
       select distinct e.visitor from kismet.events e
-      where e.user_id = ${scopeUser()} and e.at >= ${since} and e.arms ? ${flag} and ${converts}
+      where e.user_id = ${scopeUser()} and e.at >= ${since} and e.arms ? ${flag} and ${converts(sql, spec)}
     )
     select x.arm, x.other_arm, count(*)::int as visitors, count(c.visitor)::int as conversions
     from exposed x left join converted c on c.visitor = x.visitor

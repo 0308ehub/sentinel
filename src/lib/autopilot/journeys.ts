@@ -1,6 +1,6 @@
 export interface JourneyEvent {
   visitor: string;
-  name: "view" | "click";
+  name: "view" | "click" | "track";
   page: string;
   element: string;
   at: string;
@@ -22,7 +22,11 @@ export function formatJourneys(events: JourneyEvent[], maxSteps = 25): string[] 
     const first = rows[0];
     const isNew = Date.parse(first.firstAt) >= Date.parse(first.windowStart);
     const steps = rows.slice(0, maxSteps).map((event) =>
-      event.name === "click" ? `clicked "${event.element || "unknown"}"` : event.page || "/",
+      event.name === "click"
+        ? `clicked "${event.element || "unknown"}"`
+        : event.name === "track"
+          ? `reported "${event.element}"`
+          : event.page || "/",
     );
     return `visitor ${index + 1} (${isNew ? "new" : "returning"}, ${first.visits} ${first.visits === 1 ? "visit" : "visits"}): ${steps.join(" → ")}`;
   });

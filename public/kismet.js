@@ -110,7 +110,13 @@
   var api = {
     visitor: visitor,
     ready: ready,
-    variant: function (flag) { return preview[flag] || arms[flag] || "control"; }
+    variant: function (flag) { return preview[flag] || arms[flag] || "control"; },
+    // Waits for the flags so the event carries the experiments this visitor is in.
+    track: function (name) {
+      if (typeof name !== "string" || !/^[A-Za-z0-9_.:-]{1,80}$/.test(name)) return;
+      var page = window.location.pathname;
+      ready.then(function () { record("track", page, name); });
+    }
   };
   window.kismet = api;
 

@@ -1,5 +1,5 @@
 import type { MetricSpec } from "@/lib/autopilot/assign";
-import type { OutsideBuilder } from "@/lib/autopilot/builders";
+import type { Builder, OutsideBuilder } from "@/lib/autopilot/builders";
 import type { ResultEstimate } from "@/lib/autopilot/power";
 import type { ChangeSummary } from "@/lib/autopilot/change-summary";
 import type { Theme } from "@/lib/autopilot/themes";
@@ -162,6 +162,8 @@ export interface Experiment {
   draftPath: string | null;
   coderSessionId: string | null;
   agentFailed: boolean;
+  /** Who should write this change. Null means the account's default agent. */
+  buildWith: Builder | null;
   /** Set when the account's own coding agent writes the change: which one, its run, and where to watch it. */
   builder: OutsideBuilder | null;
   buildRef: string | null;

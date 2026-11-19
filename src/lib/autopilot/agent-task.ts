@@ -1,3 +1,6 @@
+import type { MetricSpec } from "./assign.ts";
+import { SERVER_SDK_FILE, SERVER_SDK_SOURCE, SERVER_SDK_TYPES, SERVER_SDK_TYPES_FILE } from "../sdk/kismet-server.ts";
+
 interface TaskExperiment {
   flag: string;
   title: string;
@@ -9,6 +12,7 @@ interface TaskExperiment {
   guardrail: string;
   kind?: "experiment" | "test" | "change" | "fix";
   mode?: "deterministic" | "stochastic";
+  metricSpec?: MetricSpec | null;
 }
 
 interface TaskSignal {
@@ -89,6 +93,40 @@ export function codeRules(flag: string, external: boolean): string {
   ].join(" ");
 }
 
+/** How the experiment is measured when the metric is an event the site reports itself. */
+export function trackRules(spec: MetricSpec | null | undefined, external: boolean): string {
+  if (spec?.kind !== "event") return "";
+  const call = external
+    ? `window.kismet?.track("${spec.name}") in browser code, or await kismet.track("${spec.name}", visitor.id) with the server SDK in server code`
+    : `const track = useTrack() from "@/lib/autopilot/variant" and track("${spec.name}") in a client component`;
+  return [
+    `MEASUREMENT: this experiment is measured by the event "${spec.name}".`,
+    `Find the code where that outcome actually happens (the success path, after it is confirmed). If it does not already report "${spec.name}", add ${call}.`,
+    "The call must run in BOTH control and treatment, exactly once per outcome, so the versions are compared fairly. Never put it inside the new element only.",
+  ].join(" ");
+}
+
+/** For a change that runs on the server, where window.kismet does not exist. */
+export function serverRules(flag: string): string {
+  return [
+    "SERVER CODE: if this change runs on the server (a route handler, server action, server component, API, or a prompt or model call), do not use window.kismet there.",
+    `Instead add the Kismet server SDK: create ${SERVER_SDK_FILE} and ${SERVER_SDK_TYPES_FILE} in the project's lib or utils folder with exactly the contents under SERVER SDK below, unchanged.`,
+    `Then: import { kismet } from "<relative path>/kismet-server.mjs"; const visitor = kismet.visitorFrom(<the request's Cookie header>); const variant = await kismet.variant("${flag}", visitor.id);`,
+    'Use the new version only when variant === "treatment". When visitor.setCookie is not null, add it to the response as a Set-Cookie header.',
+    "In a serverless function, await kismet.flush() before the response is returned.",
+    "The SDK reads the site key from the KISMET_SITE_KEY environment variable. Do not hardcode it. Say in your final response that KISMET_SITE_KEY must be set.",
+  ].join(" ");
+}
+
+function serverSdkFiles(): string {
+  return `SERVER SDK\n--- ${SERVER_SDK_FILE} ---\n${SERVER_SDK_SOURCE}\n--- ${SERVER_SDK_TYPES_FILE} ---\n${SERVER_SDK_TYPES}`;
+}
+
+/** The text the experiment gate starts with. The server form adds the visitor after the flag. */
+export function experimentGate(flag: string, external: boolean): string {
+  return external ? `kismet.variant("${flag}"` : `useVariant("${flag}")`;
+}
+
 export function gateInPatch(files: readonly { patch?: string }[], gate: string): boolean {
   return files.some((file) => file.patch?.includes(gate));
 }
@@ -131,17 +169,20 @@ export function experimentTask(
     !fix && experiment.mode === "stochastic"
       ? "This change can come out differently on each request. Do not cache one sample of the text. Keep the same inputs and let it run again for each visitor. The flag splits visitors, not one response."
       : "",
-    fix ? `Add data-kismet-fix="${experiment.flag}" on the changed element.` : `Add data-track="${experiment.flag}" to the new element.`,
+    fix ? "" : trackRules(experiment.metricSpec, external),
+    !fix && external ? serverRules(experiment.flag) : "",
+    fix ? `Add data-kismet-fix="${experiment.flag}" on the changed element.` : `If the change adds a visible element, add data-track="${experiment.flag}" to it.`,
     checkout
       ? "Run the project's checks if they finish in a few minutes."
       : "Run the project's checks if they finish in a few minutes. Commit and push the change.",
     checkout
       ? "Do not open a pull request and do not merge anything. Kismet checks the change and opens the pull request."
       : `End your final response with exactly: BRANCH: ${branch}`,
+    !fix && external ? serverSdkFiles() : "",
   ].filter(Boolean).join("\n\n");
 }
 
-export function pullBody(experiment: TaskExperiment, signal: TaskSignal | undefined, summary: string): string {
+export function pullBody(experiment: TaskExperiment, signal: TaskSignal | undefined, summary: string, serverSdk = false): string {
   const evidence = signal?.evidence ?? [];
   const synthetic = evidence.filter((item) => item.synthetic).length;
   const fix = experiment.kind === "fix";
@@ -162,6 +203,9 @@ export function pullBody(experiment: TaskExperiment, signal: TaskSignal | undefi
     fix
       ? "This is a quick fix. Approving it ships the change to everyone. There is no A/B split."
       : `The change is dark until Kismet starts the experiment (flag \`${experiment.flag}\`, 50/50 split).`,
+    serverSdk
+      ? `This change adds the Kismet server SDK (\`${SERVER_SDK_FILE}\`). Set \`KISMET_SITE_KEY\` in the server environment to the \`data-site\` value of your Kismet script tag before merging, or every visitor gets the current version.`
+      : "",
     "Approve it from the Dashboard, or merge this PR — merging is the approval.",
     "",
     "_Opened by Kismet._",

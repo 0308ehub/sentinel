@@ -5,8 +5,10 @@ import { ExternalLink, Loader2 } from "lucide-react";
 import { BuildLive } from "@/components/autopilot/build-live";
 import { CodeChange } from "@/components/autopilot/code-change";
 import { WhatChanges } from "@/components/autopilot/what-changes";
+import { BuilderMenu, useAccountBuilder } from "@/components/autopilot/builder-menu";
 import { RolloutScheduleDialog } from "@/components/autopilot/rollout-schedule";
 import { Button } from "@/components/ui/button";
+import { BUILDER_NAME, type Builder } from "@/lib/autopilot/builders";
 import { canLaunch, launchChecks } from "@/lib/autopilot/launch";
 import type { RolloutPhase } from "@/lib/autopilot/rollout-plan";
 import { maxExperimentDays } from "@/lib/autopilot/thresholds";
@@ -87,7 +89,7 @@ export function ExperimentDetail({
   onStop: () => void;
   onApproveCleanup: () => void;
   onDismissCleanup: () => void;
-  onStart: () => void;
+  onStart: (builder: Builder) => void;
   onDismissSignal: () => void;
   rating: SuggestionRating | null;
   onRated: () => void;
@@ -120,6 +122,10 @@ export function ExperimentDetail({
     : [];
   const readyToLaunch = canLaunch(checks);
   const [scheduling, setScheduling] = useState(false);
+  const accountBuilder = useAccountBuilder();
+  const [pickedWriter, setPickedWriter] = useState<Builder | null>(null);
+  const writer = pickedWriter ?? accountBuilder;
+  const writtenBy = experiment?.builder ?? experiment?.buildWith ?? null;
   const decisions = (
     <Decisions
       experiment={experiment}
@@ -134,7 +140,7 @@ export function ExperimentDetail({
       onStop={onStop}
       onApproveCleanup={onApproveCleanup}
       onDismissCleanup={onDismissCleanup}
-      onStart={onStart}
+      onStart={() => onStart(writer)}
       onDismissSignal={onDismissSignal}
       rating={rating}
       onRated={onRated}
@@ -173,8 +179,10 @@ export function ExperimentDetail({
             </p>
           )}
         </div>
+        {!experiment && signal && <BuilderMenu value={writer} onChange={setPickedWriter} />}
         <dl className="space-y-3 text-xs">
           <Fact label="Last publish" value={formatDay(experiment?.startedAt ?? experiment?.createdAt ?? signal?.updatedAt ?? null)} />
+          {writtenBy && <Fact label="Written by" value={BUILDER_NAME[writtenBy]} />}
           {experiment?.status === "awaiting_approval" && experiment.kind !== "fix" && (
             <div className="space-y-1.5">
               <p className="font-medium text-[#111827]">Before this can launch</p>

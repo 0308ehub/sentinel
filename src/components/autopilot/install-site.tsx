@@ -129,6 +129,35 @@ export function InstallSite() {
               ? `${details.eventsLast24h} ${details.eventsLast24h === 1 ? "event has" : "events have"} arrived in the last 24 hours.`
               : "No events have arrived in the last 24 hours."}
           </p>
+          <div className="space-y-2 border-t border-border pt-4">
+            <h2 className="text-sm font-medium">Report business events</h2>
+            <p className="text-xs text-muted-foreground">
+              The script records page views and clicks by itself. Report outcomes it can&apos;t see, like a purchase or a sign-up,
+              where they happen. Kismet can then use them as goals.
+            </p>
+            <pre className="overflow-x-auto rounded-md border border-border bg-muted/50 p-3 text-xs">
+              <code>{`window.kismet?.track("purchase");`}</code>
+            </pre>
+          </div>
+          <div className="space-y-2 border-t border-border pt-4">
+            <h2 className="text-sm font-medium">Server SDK</h2>
+            <p className="text-xs text-muted-foreground">
+              For experiments in server code, like an API, pricing, or an AI prompt. It puts each visitor in the same version as
+              the script does. Add{" "}
+              <a className="text-brand hover:underline" href="/sdk/kismet-server.mjs" target="_blank" rel="noreferrer">kismet-server.mjs</a>{" "}
+              and{" "}
+              <a className="text-brand hover:underline" href="/sdk/kismet-server.d.mts" target="_blank" rel="noreferrer">kismet-server.d.mts</a>{" "}
+              to your project and set <code>KISMET_SITE_KEY={details.key}</code> on the server.
+            </p>
+            <pre className="overflow-x-auto rounded-md border border-border bg-muted/50 p-3 text-xs">
+              <code>{`import { kismet } from "./kismet-server.mjs";
+
+const visitor = kismet.visitorFrom(request.headers.get("cookie"));
+const variant = await kismet.variant("my-flag", visitor.id);
+await kismet.track("purchase", visitor.id);
+await kismet.flush(); // before a serverless function returns`}</code>
+            </pre>
+          </div>
           <div className="flex items-center justify-between gap-4 border-t border-border pt-4">
             <p className="text-xs text-muted-foreground">Rotate the key if it has been exposed.</p>
             <Button size="sm" variant="outline" disabled={rotating} onClick={() => void rotate()}>

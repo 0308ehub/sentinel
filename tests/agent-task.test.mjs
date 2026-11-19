@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { experimentTask, gateInPatch } from "../src/lib/autopilot/agent-task.ts";
+import { experimentGate, experimentTask, gateInPatch } from "../src/lib/autopilot/agent-task.ts";
 
 const experiment = {
   flag: "checkout-copy", title: "Clearer checkout", hypothesis: "More people finish", page: "/checkout",
@@ -32,6 +32,32 @@ test("quick fix task ships the change without an experiment gate", () => {
   assert.match(task, /quick fix/);
   assert.match(task, /data-kismet-fix="checkout-copy"/);
   assert.doesNotMatch(task, /useVariant\("checkout-copy"\)/);
+});
+
+test("an event metric tells the agent to track it in both versions", () => {
+  const spec = { kind: "event", name: "purchase" };
+  const external = experimentTask({ ...experiment, metricSpec: spec }, signal, true);
+  assert.match(external, /window\.kismet\?\.track\("purchase"\)/);
+  assert.match(external, /BOTH control and treatment/);
+  const internal = experimentTask({ ...experiment, metricSpec: spec }, signal, false);
+  assert.match(internal, /useTrack\(\)/);
+  assert.doesNotMatch(experimentTask(experiment, signal, true), /MEASUREMENT/);
+});
+
+test("external experiments carry the server SDK; internal ones and fixes do not", () => {
+  const external = experimentTask(experiment, signal, true);
+  assert.match(external, /SERVER SDK/);
+  assert.match(external, /export function createKismet/);
+  assert.match(external, /kismet\.variant\("checkout-copy", visitor\.id\)/);
+  assert.doesNotMatch(experimentTask(experiment, signal, false), /SERVER SDK/);
+  assert.doesNotMatch(experimentTask({ ...experiment, kind: "fix" }, signal, true), /SERVER SDK/);
+});
+
+test("the external gate accepts the browser and the server form", () => {
+  const gate = experimentGate("checkout-copy", true);
+  assert.equal(gateInPatch([{ patch: '+ setVariant(kismet.variant("checkout-copy"));' }], gate), true);
+  assert.equal(gateInPatch([{ patch: '+ const variant = await kismet.variant("checkout-copy", visitor.id);' }], gate), true);
+  assert.equal(gateInPatch([{ patch: '+ kismet.variant("checkout-copy-v2")' }], gate), false);
 });
 
 test("gateInPatch checks only supplied patches", () => {

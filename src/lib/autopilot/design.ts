@@ -3,9 +3,10 @@ import "server-only";
 import { askForJson, readJson } from "@/lib/ai/respond";
 import { describeMetric, parseMetricSpec } from "@/lib/autopilot/assign";
 import { relevantLearnings } from "@/lib/autopilot/learning-core";
-import { createExperiment, interviewContext, listExperiments, listGoals, listLearnings, listRatings, listSignals, log, metricBaseline, recentJourneys, setSignalStatus, snoozeSignal } from "@/lib/autopilot/store";
+import { createExperiment, interviewContext, listExperiments, listGoals, listLearnings, listRatings, listSignals, log, metricBaseline, popularUsage, recentJourneys, setSignalStatus, snoozeSignal } from "@/lib/autopilot/store";
 import { daysToResult, type ResultEstimate } from "@/lib/autopilot/power";
 import { maxExperimentDays, relativeMde } from "@/lib/autopilot/thresholds";
+import type { Builder } from "@/lib/autopilot/builders";
 import type { Experiment, Signal } from "@/lib/autopilot/types";
 import { buildThemes } from "@/lib/autopilot/themes";
 import { formatPreferences } from "@/lib/autopilot/preferences";
@@ -22,8 +23,8 @@ async function productContext(): Promise<string> {
       "Kismet is a Next.js web app for product managers.",
       "Pages: /experiments (dashboard inbox), /timeline (experiment timeline), /graph, /design, /ai (chat), /analytics,",
       "/integrations, /settings, /settings/connectors/*.",
-      "The live home is /experiments, titled Dashboard. It is an inbox of suggestions, each labeled Experiment or Quick fix.",
-      "Check for suggestions runs Kismet's loop. Create experiment opens a short form and starts one experiment from what the person wrote. Suggested rows stay grey until a person approves them.",
+      "The live home is /experiments, titled Dashboard. A Sessions list on the left shows each experiment being written: Working while the agent is coding, PR is ready once a pull request exists, and Review PR when it is your turn to approve. The inbox table lists each experiment by name and key, type (A/B Test or Feature Test), feature name and key, and whether it is on in Other Environments or Production.",
+      "Check for suggestions runs Kismet's loop. Create experiment opens a short form and starts one experiment from what the person wrote. Results stays grey until the experiment is running.",
       "Opening a running experiment shows variations, conversions per visitor, improvement, a confidence interval, and visitors over time.",
       "Design a change to controls that are on the page today, or add one new control. Do not make a missing button more prominent.",
       "Creating a feature happens through the command palette item Propose feature…, whose submit button is Propose & open workspace.",
@@ -63,7 +64,7 @@ interface ChangeAnswer extends DesignAnswer {
   question?: string;
 }
 
-async function designFix(candidate: Signal, experiments: Experiment[]): Promise<string> {
+async function designFix(candidate: Signal, experiments: Experiment[], buildWith?: Builder | null): Promise<string> {
   const previous = experiments.filter((experiment) => experiment.signalId === candidate.id);
   const version = previous.length + 1;
   const system = [
@@ -95,8 +96,9 @@ async function designFix(candidate: Signal, experiments: Experiment[]): Promise<
     guardrail: "",
     control: answer.control?.trim() || candidate.problem,
     treatment: answer.treatment.trim(),
-    flag: `fix-${slug(shortTitle)}-v${version}`,
+      flag: `fix-${slug(shortTitle)}-v${version}`,
     estimate: null,
+    buildWith,
     rationale: {
       reasoning: answer.reasoning.trim(),
       evidence: cited.map((item) => ({ source: item.source!.trim(), quote: item.quote!.trim() })),
@@ -131,8 +133,9 @@ async function designCandidate(
   experiments: Experiment[],
   personApproved = false,
   preferKind?: "experiment" | "fix",
+  buildWith?: Builder | null,
 ): Promise<string | null> {
-  if (candidate.kind === "bug" && preferKind !== "experiment") return designFix(candidate, experiments);
+  if (candidate.kind === "bug" && preferKind !== "experiment") return designFix(candidate, experiments, buildWith);
   const previous = experiments.filter((e) => e.signalId === candidate.id).sort((a, b) => a.version - b.version);
   if (previous.length >= MAX_VERSIONS) {
     await setSignalStatus(candidate.id, "dismissed");
@@ -140,7 +143,10 @@ async function designCandidate(
     return null;
   }
 
-  const [goals, allLearnings, ratings] = await Promise.all([listGoals(), listLearnings(200), listRatings()]);
+  const [goals, allLearnings, ratings, usage] = await Promise.all([listGoals(), listLearnings(200), listRatings(), popularUsage()]);
+  const trackedText = usage.events.length
+    ? usage.events.map((event) => `- ${event.label}: ${event.visitors} visitors in 14 days`).join("\n")
+    : "None. Do not use an event metric.";
   const candidatePage = previous.findLast((experiment) => experiment.page)?.page ?? candidate.area;
   const usefulLearnings = relevantLearnings(allLearnings, { page: candidatePage, area: candidate.area });
   const earlierLearnings = allLearnings.filter((learning) => learning.signalId === candidate.id);
@@ -160,7 +166,9 @@ async function designCandidate(
       "never the new element itself (clicks on a button only the new version has would rig the test).",
       "Use one of:",
       '{"kind":"click","text":"<visible label of the button or link that completes the task in both versions, e.g. the submit button of a dialog>"}',
-      'or {"kind":"visit","path":"/some/path"} (visitor reaches that page in either version).',
+      'or {"kind":"visit","path":"/some/path"} (visitor reaches that page in either version)',
+      'or {"kind":"event","name":"<a name listed under TRACKED EVENTS>"} (a business outcome the site reports with kismet.track, such as a purchase or sign-up).',
+      "When a TRACKED EVENT is the real outcome the change is meant to move, prefer it over a click or a visit.",
       "page is the route the change appears on, like /features or /settings/connectors.",
       "Optionally choose a guardrail outcome that must not get worse, using the same metric format; omit guardrailMetric if none fits.",
       "Return JSON: {kind, mode, title, hypothesis, control, treatment, metric, page, guardrail, guardrailMetric}. kind is \"experiment\" or \"fix\". mode is \"deterministic\" or \"stochastic\".",
@@ -172,6 +180,7 @@ async function designCandidate(
   const user = [
       `PRODUCT\n${await productContext()}`,
       `GOALS\n${goalsText}`,
+      `TRACKED EVENTS\n${trackedText}`,
       `PROBLEM\n${candidate.title}: ${candidate.problem} (area: ${candidate.area || "unknown"})`,
       `THEMES\n${themeText}`,
       `EVIDENCE (${candidate.evidence.length})`,
@@ -218,7 +227,8 @@ async function designCandidate(
       "Say what could go wrong. Optionally draft one short question to ask users that would most reduce the uncertainty.",
       "metric is the outcome to check before and after the change (prefer one of the GOALS). It must be exactly one of:",
       '{"kind":"click","text":"<visible label of a button or link that exists before and after the change>"}',
-      'or {"kind":"visit","path":"/some/path"}. page is the route the change appears on, like /settings/connectors.',
+      'or {"kind":"visit","path":"/some/path"}',
+      'or {"kind":"event","name":"<a name listed under TRACKED EVENTS>"}. page is the route the change appears on, like /settings/connectors.',
       'Return JSON: {title, hypothesis, control, treatment, metric, page, guardrail, reasoning, evidence:[{source, quote}], confidence, confidenceReason, risks, question}.',
     ].join(" ");
     const changeText = await askForJson(changeSystem, `${user}\n\nJOURNEYS\n${journeys.length ? journeys.join("\n") : "No recent journeys."}`, false, undefined, "experiment");
@@ -243,6 +253,7 @@ async function designCandidate(
       page: change.page?.trim().startsWith("/") ? change.page.trim() : candidate.area,
       guardrail: change.guardrail ?? "", control: change.control ?? "", treatment: change.treatment,
       flag: `ap-${slug(change.title)}-v${version}`, estimate: { baselineRate, weeklyVisitors: baseline.weeklyVisitors, relativeMde: relative, ...result, at: new Date().toISOString() },
+      buildWith,
       rationale: {
         reasoning: change.reasoning?.trim() ?? "", evidence: cited.map((item) => ({ source: item.source!.trim(), quote: item.quote!.trim() })),
         confidence: change.confidence, confidenceReason: change.confidenceReason?.trim() ?? "", risks: change.risks?.trim() ?? "",
@@ -272,6 +283,7 @@ async function designCandidate(
     estimate,
     kind: kind === "fix" ? "fix" : "test",
     mode,
+    buildWith,
   });
   await setSignalStatus(candidate.id, "experimenting");
   const designed = kind === "fix"
@@ -298,7 +310,7 @@ export async function designNext(): Promise<string | null> {
 }
 
 /** Starts a test for one problem the person chose, including one that is still short of the evidence bar. */
-export async function designSignal(signalId: string, preferKind?: "experiment" | "fix"): Promise<string> {
+export async function designSignal(signalId: string, preferKind?: "experiment" | "fix", buildWith?: Builder | null): Promise<string> {
   const [signals, experiments] = await Promise.all([listSignals(), listExperiments()]);
   const candidate = signals.find((s) => s.id === signalId);
   if (!candidate || candidate.status === "dismissed" || candidate.status === "stale") throw new Error("That problem is not available.");
@@ -308,7 +320,7 @@ export async function designSignal(signalId: string, preferKind?: "experiment" |
   if (experiments.some((e) => e.signalId === candidate.id && ACTIVE.has(e.status))) {
     throw new Error("Kismet is already testing this problem.");
   }
-  const message = await designCandidate(candidate, experiments, true, preferKind);
+  const message = await designCandidate(candidate, experiments, true, preferKind, buildWith);
   if (!message) throw new Error(`“${candidate.title}” needs a person after ${MAX_VERSIONS} attempts.`);
   return message;
 }

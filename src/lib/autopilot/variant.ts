@@ -6,9 +6,15 @@ import type { Arm } from "@/lib/autopilot/assign";
 export interface ExperimentContextValue {
   visitor: string;
   arms: Record<string, Arm>;
+  track: (name: string) => void;
 }
 
-export const ExperimentContext = createContext<ExperimentContextValue>({ visitor: "", arms: {} });
+export const ExperimentContext = createContext<ExperimentContextValue>({ visitor: "", arms: {}, track: () => {} });
+
+/** Reports a business event, such as a purchase or a sign-up, that an experiment can be measured by. */
+export function useTrack(): (name: string) => void {
+  return useContext(ExperimentContext).track;
+}
 
 /**
  * Which version of an Autopilot experiment this visitor sees. Experiment code shipped by Autopilot

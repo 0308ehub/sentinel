@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { ExperimentBoard } from "@/components/autopilot/experiment-board";
+import type { Builder } from "@/lib/autopilot/builders";
 import type { AutopilotState, Experiment, Signal } from "@/lib/autopilot/types";
 
 export function AutopilotView() {
@@ -63,7 +64,7 @@ export function AutopilotView() {
     }
   }
 
-  async function createExperiment(input: { title: string; change: string; page: string }) {
+  async function createExperiment(input: { title: string; change: string; page: string; builder: Builder }) {
     setBusy("create");
     setMessage("Writing the experiment. This usually takes under a minute.");
     try {
@@ -81,9 +82,9 @@ export function AutopilotView() {
     }
   }
 
-  async function testSignal(signal: Signal) {
+  async function testSignal(signal: Signal, builder: Builder) {
     if (state?.experiments.some((experiment) => experiment.status === "building")) {
-      setMessage("Kismet is already writing a change. It is listed in the table.");
+      setMessage("Kismet is already writing a change. It is listed in Sessions.");
       return;
     }
     setBusy(signal.id);
@@ -92,7 +93,7 @@ export function AutopilotView() {
       const res = await fetch(`/api/autopilot/signals/${signal.id}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "test" }),
+        body: JSON.stringify({ action: "test", builder }),
       });
       const body = (await res.json()) as { message?: string; error?: string };
       setMessage(body.message ?? body.error ?? "The test did not start.");
@@ -177,7 +178,7 @@ export function AutopilotView() {
       message={message}
       onRun={() => void runNow()}
       onRemoveSample={() => void removeSample()}
-      onTest={(signal) => void testSignal(signal)}
+      onTest={(signal, builder) => void testSignal(signal, builder)}
       onDismiss={(signal) => void dismissSignal(signal)}
       onAct={(experiment, action) => void act(experiment, action)}
       onRated={() => void load()}

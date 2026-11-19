@@ -13,6 +13,11 @@ export function parseBuilder(value: unknown): Builder {
   return BUILDERS.find((builder) => builder === value) ?? "kismet";
 }
 
+/** A choice saved on one experiment. Missing means the account's default agent. */
+export function chosenBuilder(value: unknown): Builder | null {
+  return BUILDERS.find((builder) => builder === value) ?? null;
+}
+
 export function isOutsideBuilder(value: unknown): value is OutsideBuilder {
   return value === "cursor" || value === "claude-code";
 }

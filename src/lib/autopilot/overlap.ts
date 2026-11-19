@@ -1,6 +1,6 @@
 import "server-only";
 
-import { LAYER_SLOTS, type MetricSpec } from "@/lib/autopilot/assign";
+import { LAYER_SLOTS, sameMetricSpec, type MetricSpec } from "@/lib/autopilot/assign";
 import { countArmsAcross, listExperiments, listFlags, type CrossCount } from "@/lib/autopilot/store";
 import type { Experiment } from "@/lib/autopilot/types";
 
@@ -44,8 +44,7 @@ function samePage(a: string, b: string): boolean {
 }
 
 function sameMetric(a: MetricSpec | null, b: MetricSpec | null): boolean {
-  if (!a || !b || a.kind !== b.kind) return false;
-  return a.kind === "click" ? a.text.toLowerCase() === (b as typeof a).text.toLowerCase() : a.path === (b as typeof a).path;
+  return sameMetricSpec(a, b);
 }
 
 export function conflicts(a: Experiment, b: Experiment): boolean {

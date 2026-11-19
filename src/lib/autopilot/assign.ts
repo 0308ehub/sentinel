@@ -15,8 +15,14 @@ export interface FlagState {
 
 export const LAYER_SLOTS = 100;
 
-/** How a metric is counted. Both forms exist in control and treatment, so the arms are comparable. */
-export type MetricSpec = { kind: "click"; text: string } | { kind: "visit"; path: string };
+/**
+ * How a metric is counted. All forms exist in control and treatment, so the arms are comparable.
+ * An event is one the site reports itself with kismet.track, such as a purchase or a sign-up.
+ */
+export type MetricSpec = { kind: "click"; text: string } | { kind: "visit"; path: string } | { kind: "event"; name: string };
+
+/** Names accepted by kismet.track, in the browser script and the server SDK. */
+export const EVENT_NAME = /^[A-Za-z0-9_.:-]{1,80}$/;
 
 // FNV-1a: stable, fast, and identical on server and client.
 function hash(input: string): number {
@@ -52,9 +58,21 @@ export function parseMetricSpec(value: unknown): MetricSpec | null {
   if (spec.kind === "visit" && typeof spec.path === "string" && spec.path.startsWith("/")) {
     return { kind: "visit", path: spec.path.trim().slice(0, 200) };
   }
+  if (spec.kind === "event" && typeof spec.name === "string" && EVENT_NAME.test(spec.name.trim())) {
+    return { kind: "event", name: spec.name.trim() };
+  }
   return null;
 }
 
 export function describeMetric(spec: MetricSpec): string {
-  return spec.kind === "click" ? `visitors who click “${spec.text}”` : `visitors who reach ${spec.path}`;
+  if (spec.kind === "click") return `visitors who click “${spec.text}”`;
+  if (spec.kind === "visit") return `visitors who reach ${spec.path}`;
+  return `visitors who report “${spec.name}”`;
+}
+
+export function sameMetricSpec(a: MetricSpec | null, b: MetricSpec | null): boolean {
+  if (!a || !b || a.kind !== b.kind) return false;
+  if (a.kind === "click" && b.kind === "click") return a.text.toLowerCase() === b.text.toLowerCase();
+  if (a.kind === "visit" && b.kind === "visit") return a.path === b.path;
+  return a.kind === "event" && b.kind === "event" && a.name === b.name;
 }

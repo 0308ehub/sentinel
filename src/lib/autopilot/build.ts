@@ -111,14 +111,14 @@ export async function buildNext(): Promise<string | null> {
     await setSignalStatus(experiment.signalId, "open");
     return `Stopped “${experiment.title}”. The coding agent did not ship a change.`;
   }
+  // A choice on this experiment wins. Otherwise the account's default agent writes it.
+  const builder = experiment.buildWith ?? (await accountBuilder());
+  if (builder !== "kismet" && !autopilotDryRun() && !isLocalSource()) return startDispatchBuild(experiment, signal, builder);
   if (experiment.kind === "fix") {
     if (await agentBuildAvailable()) return startAgentBuild(experiment, signal);
     await updateExperiment(experiment.id, { note: "A coding agent is required to build this fix." });
     return null;
   }
-  // The account's own agent (Cursor or Claude Code) pushes to GitHub, so a dry run keeps to the paths below.
-  const builder = await accountBuilder();
-  if (builder !== "kismet" && !autopilotDryRun() && !isLocalSource()) return startDispatchBuild(experiment, signal, builder);
   if (await agentBuildAvailable()) return startAgentBuild(experiment, signal);
 
   try {

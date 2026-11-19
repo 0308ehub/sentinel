@@ -14,8 +14,9 @@ export async function inferGoals(): Promise<string | null> {
   const context = await interviewContext();
   const product = process.env.AUTOPILOT_PRODUCT_CONTEXT?.trim() || "A web product using Kismet to improve its customer experience.";
   const text = await askForJson(
-    "Propose 1–3 measurable product goals: outcomes that mean this product delivered value. Prefer reaching a core page or clicking a completion control such as Connect, Save, or Create. Return JSON {goals:[{name,metric}]}; metric must be {kind:'click',text} or {kind:'visit',path}.",
+    "Propose 1–3 measurable product goals: outcomes that mean this product delivered value. Prefer a tracked business event such as a purchase or sign-up when one is listed, then reaching a core page or clicking a completion control such as Connect, Save, or Create. Return JSON {goals:[{name,metric}]}; metric must be {kind:'event',name} with a name from TRACKED EVENTS, {kind:'click',text}, or {kind:'visit',path}.",
     [`PRODUCT\n${product}`, `SETUP CONTEXT\n${context.map((e) => `${e.title}: ${e.body}`).join("\n") || "None"}`,
+      `TRACKED EVENTS\n${usage.events.map((p) => `${p.label}: ${p.visitors}`).join("\n") || "None"}`,
       `TOP PAGES\n${usage.pages.map((p) => `${p.label}: ${p.visitors}`).join("\n")}`,
       `TOP CLICKS\n${usage.clicks.map((p) => `${p.label}: ${p.visitors}`).join("\n")}`].join("\n\n"),
     false, undefined, "experiment"

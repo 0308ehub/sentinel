@@ -1,6 +1,7 @@
 import "server-only";
 
-import { experimentBranch, experimentTask, fixPullBody, fixTask, gateInPatch, pullBody } from "@/lib/autopilot/agent-task";
+import { experimentBranch, experimentGate, experimentTask, fixPullBody, fixTask, gateInPatch, pullBody } from "@/lib/autopilot/agent-task";
+import { SERVER_SDK_FILE } from "@/lib/sdk/kismet-server";
 import { cancelOutsideBuild } from "@/lib/autopilot/dispatch";
 import { autopilotDryRun, autopilotRepo, defaultAutopilotRepo } from "@/lib/autopilot/repo";
 import { autopilotUser } from "@/lib/autopilot/scope";
@@ -77,7 +78,7 @@ export async function finishBuild(
   const files = await compareFiles(repo, base, branch);
   const external = repo !== defaultAutopilotRepo();
   const fix = experiment.kind === "fix";
-  const gate = external ? `kismet.variant("${experiment.flag}")` : `useVariant("${experiment.flag}")`;
+  const gate = experimentGate(experiment.flag, external);
   if (!fix && !gateInPatch(files, gate)) return failBuild(experiment, "the coding agent did not add the experiment gate");
   const changed = fix ? files.find((file) => file.patch) : files.find((file) => file.patch?.includes(gate));
   if (!changed) return failBuild(experiment, fix ? "the coding agent did not change any files" : "the gated file could not be found");
@@ -89,7 +90,9 @@ export async function finishBuild(
   // gets its pull request, just without the stored copies.
   const pull = await createPullFromBranch(
     repo, branch, base, experiment.kind === "fix" ? experiment.title : `Experiment: ${experiment.title}`,
-    experiment.kind === "fix" ? fixPullBody(experiment, signal, agentReport) : pullBody(experiment, signal, experiment.treatment),
+    experiment.kind === "fix"
+      ? fixPullBody(experiment, signal, agentReport)
+      : pullBody(experiment, signal, experiment.treatment, files.some((file) => file.filename.endsWith(SERVER_SDK_FILE))),
   );
   await updateExperiment(experiment.id, {
     status: "awaiting_approval", prUrl: pull.url, prNumber: pull.number, branch,

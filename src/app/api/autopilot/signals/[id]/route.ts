@@ -1,4 +1,5 @@
 import { buildNext } from "@/lib/autopilot/build";
+import { chosenBuilder } from "@/lib/autopilot/builders";
 import { designSignal } from "@/lib/autopilot/design";
 import { withAutopilotUser } from "@/lib/autopilot/scope";
 import { setSignalStatus } from "@/lib/autopilot/store";
@@ -12,11 +13,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const userId = await currentUserId();
   if (!userId) return Response.json({ error: "Sign in required." }, { status: 401 });
   const { id } = await params;
-  const body = (await request.json().catch(() => ({}))) as { action?: string };
+  const body = (await request.json().catch(() => ({}))) as { action?: string; builder?: unknown };
   if (body.action === "test") {
     try {
       const message = await withAutopilotUser(userId, async () => {
-        const designed = await designSignal(id);
+        const designed = await designSignal(id, undefined, chosenBuilder(body.builder));
         const built = await buildNext();
         return [designed, built].filter(Boolean).join(" ");
       });

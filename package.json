@@ -14,7 +14,8 @@
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
     "test": "node --experimental-strip-types --no-warnings --test tests/*.test.mjs",
-    "smoke": "node scripts/smoke.mjs"
+    "smoke": "node scripts/smoke.mjs",
+    "sdk:build": "node --experimental-strip-types --no-warnings scripts/build-sdk.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

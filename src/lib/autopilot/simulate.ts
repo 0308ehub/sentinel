@@ -70,7 +70,9 @@ export async function simulateTraffic(): Promise<string | null> {
         events.push(
           spec.kind === "click"
             ? { visitor, name: "click", page, element: spec.text, arms, synthetic: true }
-            : { visitor, name: "view", page: spec.path, element: "", arms, synthetic: true }
+            : spec.kind === "event"
+              ? { visitor, name: "track", page, element: spec.name, arms, synthetic: true }
+              : { visitor, name: "view", page: spec.path, element: "", arms, synthetic: true }
         );
       }
     }

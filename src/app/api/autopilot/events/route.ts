@@ -2,11 +2,13 @@ import { autopilotConfigured } from "@/lib/autopilot/db";
 import { siteAutopilotUser, withAutopilotUser } from "@/lib/autopilot/scope";
 import { userForSiteKey } from "@/lib/autopilot/sites";
 import { addEvents, type NewEvent } from "@/lib/autopilot/store";
-import type { Arm } from "@/lib/autopilot/assign";
+import { EVENT_NAME, type Arm } from "@/lib/autopilot/assign";
 
 export const dynamic = "force-dynamic";
 
 const MAX_EVENTS = 50;
+const VISITOR = /^[A-Za-z0-9-]{8,64}$/;
+const FLAG = /^[a-z0-9-]{1,80}$/;
 const WINDOW_MS = 60_000;
 const MAX_POSTS = 30;
 const MAX_KEY_POSTS = 120;
@@ -54,7 +56,7 @@ function cleanArms(value: unknown): Record<string, Arm> {
   const arms: Record<string, Arm> = {};
   if (!value || typeof value !== "object") return arms;
   for (const [key, arm] of Object.entries(value as Record<string, unknown>).slice(0, 20)) {
-    if (/^[a-z0-9-]{1,80}$/.test(key) && (arm === "control" || arm === "treatment")) arms[key] = arm;
+    if (FLAG.test(key) && (arm === "control" || arm === "treatment")) arms[key] = arm;
   }
   return arms;
 }
@@ -75,17 +77,23 @@ export async function POST(request: Request) {
   }
   if (!userId) return new Response(null, { status: 204, headers });
   const visitor = typeof body?.visitor === "string" ? body.visitor : "";
-  if (!/^[A-Za-z0-9-]{8,64}$/.test(visitor) || !Array.isArray(body?.events)) {
+  if (!VISITOR.test(visitor) || !Array.isArray(body?.events)) {
     return Response.json({ error: "bad_request" }, { status: 400, headers });
   }
   const events: NewEvent[] = [];
   for (const raw of body.events.slice(0, MAX_EVENTS) as Record<string, unknown>[]) {
-    if (raw?.name !== "view" && raw?.name !== "click") continue;
+    const name = raw?.name;
+    if (name !== "view" && name !== "click" && name !== "track" && name !== "exposure") continue;
+    const element = typeof raw.element === "string" ? raw.element.slice(0, 80) : "";
+    if (name === "track" && !EVENT_NAME.test(element)) continue;
+    if (name === "exposure" && !FLAG.test(element)) continue;
+    // A server batches events from many visitors into one request.
+    const own = typeof raw.visitor === "string" && VISITOR.test(raw.visitor) ? raw.visitor : visitor;
     events.push({
-      visitor,
-      name: raw.name,
+      visitor: own,
+      name,
       page: typeof raw.page === "string" ? raw.page.slice(0, 200) : "",
-      element: typeof raw.element === "string" ? raw.element.slice(0, 80) : "",
+      element,
       arms: cleanArms(raw.arms),
       synthetic: false,
     });

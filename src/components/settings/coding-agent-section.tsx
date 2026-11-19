@@ -107,7 +107,7 @@ export function CodingAgentSection({ repo }: { repo: string }) {
       <div>
         <h2 className="text-sm font-medium">Who writes the code</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          Kismet designs each experiment and opens its pull request. Choose the coding agent that writes the change.
+          Kismet designs each experiment and opens its pull request. This is the default agent. You can pick a different one for a single experiment when you create it.
         </p>
       </div>
       <div className="divide-y divide-border rounded-xl border border-border">
