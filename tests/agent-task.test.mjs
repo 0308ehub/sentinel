@@ -41,6 +41,17 @@ test("agent tasks forbid marker-only branches and define the no-change response"
   }
 });
 
+test("person notes appear in both agent tasks only when set", () => {
+  const withNotes = { ...experiment, adjustments: "Use the existing Button and keep the copy shorter." };
+  for (const task of [experimentTask(withNotes, signal, false), fixTask({ ...withNotes, kind: "fix" }, signal)]) {
+    assert.match(task, /NOTES FROM THE PERSON \(follow these\)/);
+    assert.match(task, /Use the existing Button and keep the copy shorter\./);
+  }
+  for (const task of [experimentTask(experiment, signal, false), fixTask({ ...experiment, kind: "fix" }, signal)]) {
+    assert.doesNotMatch(task, /NOTES FROM THE PERSON/);
+  }
+});
+
 test("an event metric tells the agent to track it in both versions", () => {
   const spec = { kind: "event", name: "purchase" };
   const external = experimentTask({ ...experiment, metricSpec: spec }, signal, true);

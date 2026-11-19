@@ -104,6 +104,7 @@ function toExperiment(row: Row): Experiment {
     prUrl: (row.pr_url as string | null) ?? null,
     prNumber: row.pr_number == null ? null : Number(row.pr_number),
     note: (row.note as string | null) ?? null,
+    adjustments: (row.adjustments as string | null) ?? null,
     readout: (row.readout as Readout | null) ?? null,
     rationale: (row.rationale as Experiment["rationale"]) ?? null,
     directional: (row.directional as Experiment["directional"]) ?? null,
@@ -201,6 +202,14 @@ export async function setSignalStatus(id: string, status: SignalStatus): Promise
   await sql`update kismet.signals set status = ${status}, updated_at = now() where user_id = ${scopeUser()} and id = ${id}`;
 }
 
+export async function setSignalAdjustments(id: string, adjustments: string | null): Promise<void> {
+  const sql = await db();
+  await sql`
+    update kismet.signals set adjustments = ${adjustments}, updated_at = now()
+    where user_id = ${scopeUser()} and id = ${id}
+  `;
+}
+
 export async function setSignalTriage(id: string, kind: "bug" | "idea", reason: string): Promise<void> {
   const sql = await db();
   await sql`
@@ -259,6 +268,7 @@ export async function listSignals(): Promise<Signal[]> {
           minSources: READY_MIN_SOURCES,
         }),
         snoozedUntil: isoOrNull(row.active_snoozed_until),
+        adjustments: (row.adjustments as string | null) ?? null,
       };
     })
     .sort((a, b) => b.evidence.length - a.evidence.length);
@@ -478,17 +488,18 @@ export async function createExperiment(input: {
   mode?: "deterministic" | "stochastic";
   rationale?: Experiment["rationale"];
   buildWith?: Builder | null;
+  adjustments?: string | null;
 }): Promise<string> {
   const sql = await db();
   const id = newId("exp");
   await sql`
     insert into kismet.experiments
-      (id, user_id, signal_id, version, kind, title, hypothesis, metric, metric_spec, guardrail_spec, page, guardrail, control, treatment, flag, estimate, rationale, mode, build_with, status)
+      (id, user_id, signal_id, version, kind, title, hypothesis, metric, metric_spec, guardrail_spec, page, guardrail, control, treatment, flag, estimate, rationale, mode, build_with, adjustments, status)
     values
       (${id}, ${scopeUser()}, ${input.signalId}, ${input.version}, ${input.kind ?? "test"}, ${input.title.slice(0, 200)}, ${input.hypothesis.slice(0, 1000)},
        ${input.metric.slice(0, 120)}, ${input.metricSpec ? sql.json(input.metricSpec) : null}, ${input.guardrailSpec ? sql.json(input.guardrailSpec) : null}, ${input.page.slice(0, 200)}, ${input.guardrail.slice(0, 300)}, ${input.control.slice(0, 500)},
        ${input.treatment.slice(0, 500)}, ${input.flag}, ${input.estimate ? sql.json(input.estimate as never) : null}, ${input.rationale ? sql.json(input.rationale as never) : null},
-       ${input.mode === "stochastic" ? "stochastic" : "deterministic"}, ${input.buildWith ?? null}, 'building')
+       ${input.mode === "stochastic" ? "stochastic" : "deterministic"}, ${input.buildWith ?? null}, ${input.adjustments ?? null}, 'building')
   `;
   return id;
 }
@@ -502,6 +513,7 @@ export async function updateExperiment(
     prNumber: number | null;
     branch: string | null;
     note: string | null;
+    adjustments: string | null;
     readout: Readout | null;
     directional: Experiment["directional"];
     draftPath: string | null;
@@ -538,6 +550,7 @@ export async function updateExperiment(
   if (patch.prNumber !== undefined) columns.pr_number = patch.prNumber;
   if (patch.branch !== undefined) columns.branch = patch.branch;
   if (patch.note !== undefined) columns.note = patch.note;
+  if (patch.adjustments !== undefined) columns.adjustments = patch.adjustments;
   if (patch.readout !== undefined) columns.readout = patch.readout === null ? null : sql.json(patch.readout as never);
   if (patch.directional !== undefined) columns.directional = patch.directional === null ? null : sql.json(patch.directional as never);
   if (patch.draftPath !== undefined) columns.draft_path = patch.draftPath;

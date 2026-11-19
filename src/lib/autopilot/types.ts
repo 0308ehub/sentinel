@@ -38,6 +38,7 @@ export interface Signal {
   sources: EvidenceSource[];
   ready: boolean;
   snoozedUntil: string | null;
+  adjustments: string | null;
 }
 
 export interface Goal {
@@ -154,6 +155,7 @@ export interface Experiment {
   prUrl: string | null;
   prNumber: number | null;
   note: string | null;
+  adjustments: string | null;
   readout: Readout | null;
   rationale: ChangeRationale | null;
   directional: DirectionalResult | null;

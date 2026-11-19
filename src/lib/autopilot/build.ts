@@ -73,6 +73,7 @@ async function writeChange(
       `CONTROL: ${experiment.control}`,
       `TREATMENT: ${experiment.treatment}`,
       `METRIC: ${experiment.metric}`,
+      ...(experiment.adjustments?.trim() ? [`NOTES FROM THE PERSON (follow these)\n${experiment.adjustments.trim()}`] : []),
       "",
       ...files.map((f) => `FILE ${f.path}${editable.includes(f) ? " (EDITABLE)" : " (reference only)"}\n${f.content}`),
     ].join("\n"),

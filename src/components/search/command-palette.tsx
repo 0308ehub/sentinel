@@ -30,7 +30,7 @@ const NAV_ITEMS = [
   { label: "Dashboard", href: "/experiments", icon: LayoutDashboard },
   { label: "Timeline", href: "/timeline", icon: Clock },
   { label: "Graph", href: "/graph", icon: GitBranch },
-  { label: "Design", href: "/design", icon: Frame },
+  { label: "Design canvas", href: "/design", icon: Frame },
   { label: "Analytics", href: "/analytics", icon: BarChart3 },
   { label: "Connections", href: "/settings/connectors", icon: Boxes },
   { label: "Kismet home", href: "/", icon: Home },

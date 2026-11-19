@@ -73,6 +73,7 @@ async function createNoChangeExperiment(candidate: Signal, previous: Experiment[
     treatment: "",
     flag: `no-change-${slug(candidate.title)}-v${version}`,
     buildWith,
+    adjustments: candidate.adjustments,
   });
   const experiment = await getExperiment(id);
   if (!experiment) throw new Error("The no-change record could not be loaded.");
@@ -121,6 +122,7 @@ async function designFix(candidate: Signal, experiments: Experiment[], buildWith
       flag: `fix-${slug(shortTitle)}-v${version}`,
     estimate: null,
     buildWith,
+    adjustments: candidate.adjustments,
     rationale: {
       reasoning: answer.reasoning.trim(),
       evidence: cited.map((item) => ({ source: item.source!.trim(), quote: item.quote!.trim() })),
@@ -262,6 +264,7 @@ async function designCandidate(
       guardrail: change.guardrail ?? "", control: change.control ?? "", treatment: change.treatment,
       flag: `ap-${slug(change.title)}-v${version}`, estimate: { baselineRate, weeklyVisitors: baseline.weeklyVisitors, relativeMde: relative, ...result, at: new Date().toISOString() },
       buildWith,
+      adjustments: candidate.adjustments,
       rationale: {
         reasoning: change.reasoning?.trim() ?? "", evidence: cited.map((item) => ({ source: item.source!.trim(), quote: item.quote!.trim() })),
         confidence: change.confidence, confidenceReason: change.confidenceReason?.trim() ?? "", risks: change.risks?.trim() ?? "",
@@ -292,6 +295,7 @@ async function designCandidate(
     kind: kind === "fix" ? "fix" : "test",
     mode,
     buildWith,
+    adjustments: candidate.adjustments,
   });
   await setSignalStatus(candidate.id, "experimenting");
   const designed = kind === "fix"

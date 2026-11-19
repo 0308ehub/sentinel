@@ -6,7 +6,6 @@ import { useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
-  Frame,
   Clock,
   GitBranch,
   BarChart3,
@@ -48,7 +47,6 @@ const PRIMARY: NavItem[] = [
   { id: "experiments", label: "Dashboard", href: "/experiments", icon: LayoutDashboard },
   { id: "timeline", label: "Timeline", href: "/timeline", icon: Clock },
   { id: "graph", label: "Graph", href: "/graph", icon: GitBranch },
-  { id: "design", label: "Design", href: "/design", icon: Frame },
   { id: "analytics", label: "Analytics", href: "/analytics", icon: BarChart3 },
 ];
 

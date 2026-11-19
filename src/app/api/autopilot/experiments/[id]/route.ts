@@ -3,7 +3,7 @@ import { approveCleanup, dismissCleanup } from "@/lib/autopilot/cleanup";
 import { approve, reject, rollout, scheduleRollout, stop } from "@/lib/autopilot/lifecycle";
 import type { RolloutPhase } from "@/lib/autopilot/rollout-plan";
 import { withAutopilotUser } from "@/lib/autopilot/scope";
-import { getExperiment, visitorSeries } from "@/lib/autopilot/store";
+import { getExperiment, updateExperiment, visitorSeries } from "@/lib/autopilot/store";
 import { currentUserId } from "@/lib/connections/current";
 import { GitHubApiError } from "@/lib/github/client";
 
@@ -21,6 +21,25 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     if (!experiment) return Response.json({ error: "Experiment not found." }, { status: 404 });
     const series = experiment.startedAt ? await visitorSeries(experiment.flag, experiment.startedAt) : [];
     return Response.json({ series });
+  });
+}
+
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const userId = await currentUserId();
+  if (!userId) return Response.json({ error: "Sign in required." }, { status: 401 });
+  const { id } = await params;
+  const body = (await request.json().catch(() => ({}))) as { adjustments?: unknown };
+  if (typeof body.adjustments !== "string") return Response.json({ error: "Notes must be text." }, { status: 400 });
+  const requestedAdjustments = body.adjustments;
+  return withAutopilotUser(userId, async () => {
+    const experiment = await getExperiment(id);
+    if (!experiment) return Response.json({ error: "Experiment not found." }, { status: 404 });
+    if (experiment.buildStartedAt || experiment.coderSessionId || experiment.buildRef || experiment.draftPath || experiment.status !== "building") {
+      return Response.json({ error: "Notes cannot be changed after building starts." }, { status: 409 });
+    }
+    const adjustments = requestedAdjustments.trim().slice(0, 2000) || null;
+    await updateExperiment(id, { adjustments });
+    return Response.json({ adjustments });
   });
 }
 

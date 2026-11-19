@@ -130,6 +130,18 @@ export function AutopilotView() {
     }
   }
 
+  async function saveAdjustments(target: Signal | Experiment, adjustments: string) {
+    const kind = "version" in target ? "experiments" : "signals";
+    const response = await fetch(`/api/autopilot/${kind}/${target.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ adjustments }),
+    });
+    const body = (await response.json()) as { error?: string };
+    if (!response.ok) throw new Error(body.error || "Could not save your notes.");
+    await load();
+  }
+
   async function scheduleRollout(experiment: Experiment, phases: { at: string; pass: number }[]) {
     setBusy(experiment.id + "schedule");
     setMessage(null);
@@ -190,6 +202,7 @@ export function AutopilotView() {
       onRated={() => void load()}
       onSchedule={scheduleRollout}
       onCreate={createExperiment}
+      onSaveAdjustments={saveAdjustments}
     />
   );
 }

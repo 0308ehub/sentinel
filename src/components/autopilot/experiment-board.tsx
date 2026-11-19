@@ -53,6 +53,7 @@ export function ExperimentBoard({
   onRated,
   onSchedule,
   onCreate,
+  onSaveAdjustments,
 }: {
   state: AutopilotState;
   running: boolean;
@@ -66,6 +67,7 @@ export function ExperimentBoard({
   onRated: () => void;
   onSchedule: (experiment: Experiment, phases: RolloutPhase[]) => Promise<void>;
   onCreate: (input: { title: string; change: string; page: string; builder: Builder }) => Promise<void>;
+  onSaveAdjustments: (target: Signal | Experiment, adjustments: string) => Promise<void>;
 }) {
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<"overview" | "learnings" | "themes" | "activity" | "spend">("overview");
@@ -209,6 +211,7 @@ export function ExperimentBoard({
             onDismissSignal={() => openSignal && onDismiss(openSignal)}
             rating={selection ? ratingForSelection(state.ratings, selection) : null}
             onRated={onRated}
+            onSaveAdjustments={(adjustments) => onSaveAdjustments(openExperiment ?? openSignal!, adjustments)}
           />
         ) : (
     <div className="flex h-full flex-col overflow-auto bg-white [scrollbar-gutter:stable]">

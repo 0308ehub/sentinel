@@ -142,6 +142,9 @@ alter table kismet.signals add column if not exists kind text;
 alter table kismet.signals add column if not exists kind_reason text;
 alter table kismet.experiments add column if not exists verified_at timestamptz;
 alter table kismet.experiments add column if not exists verdict text;
+alter table kismet.experiments add column if not exists adjustments text;
+-- A suggestion can collect notes before its experiment row exists. They are copied on design.
+alter table kismet.signals add column if not exists adjustments text;
 
 create table if not exists kismet.autopilot_learnings (
   id text primary key,

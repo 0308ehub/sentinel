@@ -74,6 +74,7 @@ export function ExperimentDetail({
   onDismissSignal,
   rating,
   onRated,
+  onSaveAdjustments,
 }: {
   experiment: Experiment | null;
   signal: Signal | null;
@@ -95,6 +96,7 @@ export function ExperimentDetail({
   onDismissSignal: () => void;
   rating: SuggestionRating | null;
   onRated: () => void;
+  onSaveAdjustments: (adjustments: string) => Promise<void>;
 }) {
   const title = experiment?.title ?? signal?.title ?? "Experiment";
   const readout = experiment?.readout ?? null;
@@ -235,6 +237,9 @@ export function ExperimentDetail({
           )}
         </dl>
         <Autonomous experiment={experiment} signal={signal} learning={learning} suggested={suggested} lastFailed={lastFailed} />
+        {(suggested || experiment?.adjustments) && (
+          <AdjustmentNotes experiment={experiment} signal={signal} onSave={onSaveAdjustments} />
+        )}
         {singleColumn && experiment && <FixFollowUp experiment={experiment} signal={signal} className="border-t border-[#e6e8ec] pt-3" />}
         </div>
       </aside>
@@ -280,6 +285,59 @@ export function ExperimentDetail({
           onSave={onSchedule}
         />
       )}
+    </div>
+  );
+}
+
+function AdjustmentNotes({
+  experiment,
+  signal,
+  onSave,
+}: {
+  experiment: Experiment | null;
+  signal: Signal | null;
+  onSave: (adjustments: string) => Promise<void>;
+}) {
+  const saved = experiment?.adjustments ?? signal?.adjustments ?? "";
+  const editable = !experiment || (
+    experiment.status === "building" && !experiment.buildStartedAt && !experiment.coderSessionId && !experiment.buildRef && !experiment.draftPath
+  );
+  const [value, setValue] = useState(saved);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+
+  if (!editable) {
+    return saved ? <p className="border-t border-[#e6e8ec] pt-3 text-xs text-[#374151]"><span className="font-medium">Your notes:</span> {saved}</p> : null;
+  }
+
+  return (
+    <div className="space-y-1.5 border-t border-[#e6e8ec] pt-3 text-xs">
+      <p className="font-medium text-[#111827]">Notes for the build <span className="font-normal text-[#9aa0a8]">· optional</span></p>
+      <textarea
+        value={value}
+        onChange={(event) => { setValue(event.target.value); setMessage(""); }}
+        maxLength={2000}
+        rows={3}
+        placeholder="Anything to change before Kismet builds this? e.g. use the existing Button, keep the copy shorter"
+        className="w-full resize-y rounded border border-[#d5d8de] bg-white px-2.5 py-2 leading-5 text-[#111827] outline-none placeholder:text-[#9aa0a8] focus:border-brand"
+      />
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          disabled={saving || value.trim() === saved}
+          className="text-brand hover:underline disabled:text-[#9aa0a8] disabled:no-underline"
+          onClick={() => {
+            setSaving(true);
+            setMessage("");
+            void onSave(value).then(() => setMessage("Saved")).catch((error: unknown) => {
+              setMessage(error instanceof Error ? error.message : "Could not save your notes.");
+            }).finally(() => setSaving(false));
+          }}
+        >
+          {saving ? "Saving…" : "Save"}
+        </button>
+        {message && <span className="text-[#6b7280]">{message}</span>}
+      </div>
     </div>
   );
 }

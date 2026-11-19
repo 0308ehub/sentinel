@@ -2,11 +2,22 @@ import { buildNext } from "@/lib/autopilot/build";
 import { chosenBuilder } from "@/lib/autopilot/builders";
 import { designSignal } from "@/lib/autopilot/design";
 import { withAutopilotUser } from "@/lib/autopilot/scope";
-import { setSignalStatus } from "@/lib/autopilot/store";
+import { setSignalAdjustments, setSignalStatus } from "@/lib/autopilot/store";
 import { currentUserId } from "@/lib/connections/current";
 
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
+
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const userId = await currentUserId();
+  if (!userId) return Response.json({ error: "Sign in required." }, { status: 401 });
+  const { id } = await params;
+  const body = (await request.json().catch(() => ({}))) as { adjustments?: unknown };
+  if (typeof body.adjustments !== "string") return Response.json({ error: "Notes must be text." }, { status: 400 });
+  const adjustments = body.adjustments.trim().slice(0, 2000) || null;
+  await withAutopilotUser(userId, () => setSignalAdjustments(id, adjustments));
+  return Response.json({ adjustments });
+}
 
 /** Dismisses a problem the account does not want Kismet to work on. */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {

@@ -13,6 +13,11 @@ interface TaskExperiment {
   kind?: "experiment" | "test" | "change" | "fix";
   mode?: "deterministic" | "stochastic";
   metricSpec?: MetricSpec | null;
+  adjustments?: string | null;
+}
+
+function personNotes(adjustments: string | null | undefined): string {
+  return adjustments?.trim() ? `NOTES FROM THE PERSON (follow these)\n${adjustments.trim()}` : "";
 }
 
 interface TaskSignal {
@@ -35,6 +40,7 @@ export function fixTask(experiment: TaskExperiment, signal: TaskSignal | undefin
     `AREA/PAGE: ${experiment.page}`,
     `BROKEN BEHAVIOR: ${experiment.control}`,
     `INTENDED FIX: ${experiment.treatment}`,
+    personNotes(experiment.adjustments),
     "Reproduce or locate the bug by reading the code and cite the relevant path:line in your final response. Make the smallest correct fix of the root cause.",
     "Add or update a test when the repository has tests nearby. Run the project's relevant checks. Never add a feature flag, variant, experiment gate, or A/B test.",
     "Work quickly. Read only the files you need. Check your work with the fastest relevant checks (type-check and lint the files you changed, run the tests that cover them). Do not run a full production build, do not reinstall dependencies unless a check fails because they are missing, and do not explore unrelated parts of the repo.",
@@ -162,6 +168,7 @@ export function experimentTask(
     evidence.length ? `EVIDENCE:\n${evidence.join("\n")}` : "",
     `EXPERIMENT: ${experiment.title}\nHYPOTHESIS: ${experiment.hypothesis}\nPAGE: ${experiment.page}`,
     `CONTROL: ${experiment.control}\nTREATMENT: ${experiment.treatment}`,
+    personNotes(experiment.adjustments),
     `METRIC: ${experiment.metric}\nGUARDRAIL: ${experiment.guardrail}`,
     `RULES: ${fix ? fixRules(experiment.flag) : codeRules(experiment.flag, external)}`,
     checkout
