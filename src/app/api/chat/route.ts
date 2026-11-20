@@ -166,7 +166,7 @@ export async function POST(request: Request) {
     "Notes written in this workspace, the product graph, and GitHub are the company record when Slack and Jira are empty. Use them. Do not invent customers, metrics, or tickets that are not written there.",
     allowConnectors
       ? "You can search the web. Use it for facts that are not in the workspace, the linked page, Slack, Jira, or Databricks. Prefer Slack for what this company said, Jira for the state of the work, and Databricks for numbers. When you use a web page, name it in the sentence as a markdown link."
-      : "You can search the web. Connected apps are turned off for drafts, so answer without Slack, Jira, or Databricks. When you use a web page, name it in the sentence as a markdown link.",
+      : "You can search the web. Integrations are turned off for drafts, so answer without Slack, Jira, or Databricks. When you use a web page, name it in the sentence as a markdown link.",
     ...promptForChips(modes),
     screen ? `Pages open in Kismet:\n${screen}` : "No Kismet page text was sent with this question.",
     workLog ? `Recent work:\n${workLog}` : "",

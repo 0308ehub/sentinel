@@ -1,4 +1,3 @@
-import { currentPersonEmail } from "@/lib/auth/person";
 import { googleAuthUrl, readGoogleConfig } from "@/lib/google/client";
 import { currentAccountId } from "@/lib/connections/current";
 
@@ -11,7 +10,7 @@ export async function GET(request: Request) {
     return Response.redirect(new URL("/settings/connectors/google?error=missing_client", request.url));
   }
   const state = crypto.randomUUID();
-  const target = googleAuthUrl(state, origin, (await currentPersonEmail()) ?? undefined);
+  const target = googleAuthUrl(state, origin);
   if (!target) {
     return Response.redirect(new URL("/settings/connectors/google?error=missing_client", request.url));
   }

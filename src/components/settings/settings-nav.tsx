@@ -28,7 +28,7 @@ const GROUPS = [
     label: "Organization",
     items: [
       { label: "General", href: "/settings", icon: Building2, exact: true },
-      { label: "Connected apps", href: "/settings/connectors", icon: Plug },
+      { label: "Integrations", href: "/settings/connectors", icon: Plug },
       { label: "Plan & billing", href: "/settings/billing", icon: CreditCard },
       { label: "Projects", href: "/settings/projects", icon: FolderKanban },
       { label: "Members", href: "/settings/members", icon: Users },

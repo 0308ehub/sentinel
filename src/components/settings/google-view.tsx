@@ -87,7 +87,7 @@ export function GoogleView() {
         className="mb-4 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="h-3 w-3" />
-        Connected apps
+        Integrations
       </Link>
 
       {notice && <p className="mb-3 text-xs text-muted-foreground">{notice}</p>}
@@ -130,7 +130,7 @@ export function GoogleView() {
           <CardHeader>
             <CardTitle className="text-sm">Sign in with Google</CardTitle>
             <CardDescription className="text-xs leading-relaxed">
-              Connect Google opens Google&apos;s sign-in. Type or choose the Berkeley email you use for Kismet, even if this browser is already signed into another Gmail.
+              Connect Google opens Google's account list. Pick an account there, or choose Use another account and type the Berkeley email.
             </CardDescription>
           </CardHeader>
           <CardContent>

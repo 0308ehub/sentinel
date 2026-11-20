@@ -85,7 +85,7 @@ export function ModelsView() {
                 onCheckedChange={(aiGraph) => updateWorkspace({ aiGraph })}
               />
               <ToggleRow
-                title="Connected apps"
+                title="Integrations"
                 description="Slack, Jira, and Databricks excerpts in a draft."
                 checked={settings.aiConnectors}
                 onCheckedChange={(aiConnectors) => updateWorkspace({ aiConnectors })}

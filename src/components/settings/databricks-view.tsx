@@ -81,7 +81,7 @@ export function DatabricksView() {
         className="mb-4 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="h-3 w-3" />
-        Connected apps
+        Integrations
       </Link>
 
       {!status ? (

@@ -54,7 +54,7 @@ export function readGoogleConfig(origin?: string): GoogleConfig | null {
   return { clientId, clientSecret, redirectUri };
 }
 
-export function googleAuthUrl(state: string, origin: string, loginHint?: string): string | null {
+export function googleAuthUrl(state: string, origin: string): string | null {
   const config = readGoogleConfig(origin);
   if (!config) return null;
   const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
@@ -66,7 +66,6 @@ export function googleAuthUrl(state: string, origin: string, loginHint?: string)
   url.searchParams.set("prompt", "select_account consent");
   url.searchParams.set("include_granted_scopes", "true");
   url.searchParams.set("state", state);
-  if (loginHint && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginHint)) url.searchParams.set("login_hint", loginHint);
   return url.toString();
 }
 

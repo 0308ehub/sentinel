@@ -290,7 +290,7 @@ export const PRODUCT_DOCS: ProductDoc[] = [
         heading: "What the chat reads today",
         paragraphs: [
           "The chat reads Slack, Google, Jira, and Databricks when those are connected. Slack only includes channels the bot has been invited to. If the bot is not in a channel, that channel is invisible. Databricks is the warehouse for read-only SQL.",
-          "To add a Slack channel, invite the bot in Slack and ask again. You can also open Settings, then Connected apps, then Slack, and read the same messages without the model in between.",
+          "To add a Slack channel, invite the bot in Slack and ask again. You can also open Settings, then Integrations, then Slack, and read the same messages without the model in between.",
         ],
       },
       {
@@ -315,7 +315,7 @@ export const PRODUCT_DOCS: ProductDoc[] = [
           "General, plan and billing, projects, and members.",
           "Access and SSO, and content access for what a link can open.",
           "Usage reports, privacy, and data retention.",
-          "Navigation, connected apps, and the AI switches.",
+          "Navigation, integrations, and the AI switches.",
         ],
       },
       {
