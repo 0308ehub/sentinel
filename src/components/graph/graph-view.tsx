@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getGraphNode, getConnectedGraphNodes, useGraphStore } from "@/lib/graph/graph-store";
 import type { NodeType } from "@/types/graph";
-import { Filter } from "lucide-react";
+import { Filter, Loader2 } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
 import { useAgents, type FleetAgent } from "@/lib/agents/fleet";
@@ -252,7 +252,9 @@ function MapGraphView() {
         {query.data && query.data.counts.total > query.data.counts.showing ? ` Showing ${query.data.counts.showing} of ${query.data.counts.total}.` : ""}
       </div>
       {query.isLoading ? (
-        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Loading Kismet’s map…</div>
+        <div className="grid h-full place-items-center" role="status" aria-label="Loading">
+          <Loader2 className="h-5 w-5 animate-spin text-[#9aa0a8]" />
+        </div>
       ) : query.isError ? (
         <div className="flex h-full items-center justify-center text-sm text-muted-foreground">{query.error.message}</div>
       ) : nodes.length === 0 ? (

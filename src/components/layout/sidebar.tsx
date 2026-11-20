@@ -101,6 +101,7 @@ export function Sidebar() {
           <Link
             key={item.href}
             href={item.href}
+            prefetch
             aria-label={item.label}
             title={item.label}
             className={cn(

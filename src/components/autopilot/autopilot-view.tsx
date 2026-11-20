@@ -164,8 +164,8 @@ export function AutopilotView() {
 
   if (!state) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading dashboard…
+      <div className="grid h-full place-items-center" role="status" aria-label="Loading">
+        <Loader2 className="h-5 w-5 animate-spin text-[#9aa0a8]" />
       </div>
     );
   }
