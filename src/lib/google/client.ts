@@ -181,11 +181,20 @@ export async function listGoogleWorkspaceEvidence(): Promise<FiledEvidence[]> {
     listDocs(accessToken).catch(() => [] as GoogleDoc[]),
     listEvents(accessToken).catch(() => [] as GoogleEvent[]),
   ]);
-  return [
-    ...messages.map((message) => mailEvidence(message)),
-    ...docs.map((doc) => docEvidence(doc)),
-    ...events.map((event) => eventEvidence({ ...event, description: event.snippet })),
-  ].filter((item): item is FiledEvidence => item !== null);
+  const items: FiledEvidence[] = [];
+  for (const message of messages) {
+    const item = mailEvidence(message);
+    if (item) items.push(item);
+  }
+  for (const doc of docs) {
+    const item = docEvidence(doc);
+    if (item) items.push(item);
+  }
+  for (const event of events) {
+    const item = eventEvidence({ ...event, description: event.snippet });
+    if (item) items.push(item);
+  }
+  return items;
 }
 
 async function readSource<T>(work: Promise<T[]>): Promise<{ value: T[]; error?: string }> {
