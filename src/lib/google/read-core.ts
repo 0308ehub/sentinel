@@ -19,6 +19,20 @@ export function grantsScope(scopes: string | undefined, scope: string): boolean 
   return (scopes ?? "").split(/\s+/).filter(Boolean).includes(scope);
 }
 
+/** The callback Google will accept is the one for the site the person is using. */
+export function googleRedirectUri(origin: string | undefined, configured: string | undefined): string {
+  const fromOrigin = origin ? `${origin.replace(/\/$/, "")}/api/google/callback` : "";
+  const fromEnv = (configured ?? "").trim();
+  if (!fromOrigin) return fromEnv;
+  if (!fromEnv) return fromOrigin;
+  try {
+    if (new URL(fromEnv).origin === new URL(fromOrigin).origin) return fromEnv;
+  } catch {
+    return fromOrigin;
+  }
+  return fromOrigin;
+}
+
 export interface GoogleMessageInput {
   id: string;
   from: string;

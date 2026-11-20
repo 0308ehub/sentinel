@@ -8,6 +8,7 @@ import {
   DOCS_READONLY,
   GMAIL_READONLY,
   GOOGLE_SCOPES,
+  googleRedirectUri,
   docEvidence,
   eventEvidence,
   grantsScope,
@@ -49,12 +50,11 @@ export function readGoogleConfig(origin?: string): GoogleConfig | null {
   const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
   if (!clientId || !clientSecret) return null;
-  const redirectUri = process.env.GOOGLE_REDIRECT_URI?.trim() || (origin ? `${origin}/api/google/callback` : "");
-  if (!redirectUri) return null;
+  const redirectUri = googleRedirectUri(origin, process.env.GOOGLE_REDIRECT_URI) || "https://app.sentinelai.one/api/google/callback";
   return { clientId, clientSecret, redirectUri };
 }
 
-export function googleAuthUrl(state: string, origin: string): string | null {
+export function googleAuthUrl(state: string, origin: string, loginHint?: string): string | null {
   const config = readGoogleConfig(origin);
   if (!config) return null;
   const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
@@ -66,6 +66,7 @@ export function googleAuthUrl(state: string, origin: string): string | null {
   url.searchParams.set("prompt", "select_account consent");
   url.searchParams.set("include_granted_scopes", "true");
   url.searchParams.set("state", state);
+  if (loginHint && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginHint)) url.searchParams.set("login_hint", loginHint);
   return url.toString();
 }
 
@@ -76,10 +77,12 @@ export async function getGoogleStatus(origin?: string): Promise<GoogleStatus> {
       configured: false,
       connected: false,
       error: "Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to .env, then restart the dev server.",
+      redirectUri: googleRedirectUri(origin, process.env.GOOGLE_REDIRECT_URI) || undefined,
     };
   }
   const stored = await readToken();
-  if (!stored?.refreshToken) return { configured: true, connected: false };
+  const redirectUri = googleRedirectUri(origin, process.env.GOOGLE_REDIRECT_URI);
+  if (!stored?.refreshToken) return { configured: true, connected: false, redirectUri };
   const legacy = !stored.scopes;
   return {
     configured: true,
@@ -89,6 +92,7 @@ export async function getGoogleStatus(origin?: string): Promise<GoogleStatus> {
     gmail: legacy || grantsScope(stored.scopes, GMAIL_READONLY),
     docs: legacy || grantsScope(stored.scopes, DOCS_READONLY),
     calendar: grantsScope(stored.scopes, CALENDAR_READONLY),
+    redirectUri,
   };
 }
 

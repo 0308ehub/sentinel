@@ -5,9 +5,21 @@ import {
   GOOGLE_SCOPES,
   docEvidence,
   eventEvidence,
+  googleRedirectUri,
   grantsScope,
   mailEvidence,
 } from "../src/lib/google/read-core.ts";
+
+test("a localhost redirect setting is not sent from the live app", () => {
+  assert.equal(
+    googleRedirectUri("https://app.sentinelai.one", "http://localhost:3000/api/google/callback"),
+    "https://app.sentinelai.one/api/google/callback",
+  );
+  assert.equal(
+    googleRedirectUri("http://localhost:3000", "http://localhost:3000/api/google/callback"),
+    "http://localhost:3000/api/google/callback",
+  );
+});
 
 test("the Google connection can read Docs, Calendar, and Gmail", () => {
   assert.ok(GOOGLE_SCOPES.includes(CALENDAR_READONLY));

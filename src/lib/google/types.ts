@@ -6,6 +6,7 @@ export interface GoogleStatus {
   gmail?: boolean;
   docs?: boolean;
   calendar?: boolean;
+  redirectUri?: string;
   error?: string;
 }
 

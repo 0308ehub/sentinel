@@ -12,7 +12,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { graphStore } from "@/lib/graph/graph-store";
 import type { GoogleDoc, GoogleEvent, GoogleMessage, GooglePreview, GoogleStatus } from "@/lib/google/types";
 
-const REDIRECT = "your Kismet origin + /api/google/callback";
+const REDIRECTS = [
+  "http://localhost:3000/api/google/callback",
+  "https://app.sentinelai.one/api/google/callback",
+];
 
 export function GoogleView() {
   const [status, setStatus] = useState<GoogleStatus | null>(null);
@@ -118,7 +121,10 @@ export function GoogleView() {
               to the same Workspace. While the app is in testing, add each person as a test user. A Workspace
               admin may also need to allow the app.
             </p>
-            <p>3. Create an OAuth client of type Web application. Set the authorized redirect URI to {REDIRECT}.</p>
+            <p>
+              3. Create an OAuth client of type Web application. Add both authorized redirect URIs:{" "}
+              {REDIRECTS.join(" and ")}.
+            </p>
             <p>
               4. Put the client ID and secret in .env as GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET,
               then restart the dev server and come back here.
@@ -130,13 +136,20 @@ export function GoogleView() {
           <CardHeader>
             <CardTitle className="text-sm">Sign in with Google</CardTitle>
             <CardDescription className="text-xs leading-relaxed">
-              Choose the Gmail account to connect. Google will ask to read Gmail, Docs, Drive, and Calendar, and to create drafts.
+              Google opens the account list. Choose the Berkeley email you use for Kismet, even if this browser is signed into another Gmail.
+              Google then asks to read Gmail, Docs, Drive, and Calendar, and to create drafts.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3">
             <Button asChild size="sm">
               <a href="/api/google/auth">Connect Google</a>
             </Button>
+            {status.redirectUri && (
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                If Google says the request is invalid, add this exact redirect URI to the OAuth client:{" "}
+                <span className="font-mono text-foreground">{status.redirectUri}</span>
+              </p>
+            )}
           </CardContent>
         </Card>
       ) : (
