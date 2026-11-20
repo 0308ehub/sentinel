@@ -26,19 +26,25 @@ export function ProfileSettingsView() {
   const [theme, setTheme] = useState<ThemeName>("light");
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- The saved browser theme is unavailable during server rendering.
     setTheme(readTheme());
   }, []);
 
   useEffect(() => {
     if (account) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- The asynchronously resolved account initializes the editable profile form.
       setName(account.name || CURRENT_USER.name);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- The asynchronously resolved account initializes the editable profile form.
       setEmail(account.email || CURRENT_USER.email);
       return;
     }
     const draft = readOnboarding();
     if (!draft.name) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- The browser-only onboarding draft initializes the editable profile form.
     setName(draft.name);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- The browser-only onboarding draft initializes the editable profile form.
     setEmail(draft.email);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- The browser-only onboarding draft initializes the editable profile form.
     if (draft.role) setTitle(draft.role);
   }, [account]);
 

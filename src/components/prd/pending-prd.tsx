@@ -15,6 +15,7 @@ export function PendingPrd() {
 
   useEffect(() => {
     const pending = takeSharedPrd();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Consuming the browser-only pending share token occurs once after hydration.
     setToken(pending);
     if (!pending) return;
     let cancel = false;

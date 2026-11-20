@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { SettingsShell } from "@/components/settings/settings-shell";
@@ -22,14 +22,16 @@ const PERIODS: { months: RetentionMonths; title: string; description: string }[]
 export function RetentionSettingsView() {
   const settings = useWorkspaceSettings();
   const [months, setMonths] = useState<RetentionMonths>(settings.retentionMonths);
+  const [sourceMonths, setSourceMonths] = useState(settings.retentionMonths);
   const [projectId, setProjectId] = useState(settings.projects[0]?.id ?? "");
   const [overrideMonths, setOverrideMonths] = useState<12 | 24 | 36>(12);
   const [saved, markSaved] = useSavedFlag();
   const hoursLeft = retentionCancelHours(settings.retentionRequestedAt);
 
-  useEffect(() => {
+  if (settings.retentionMonths !== sourceMonths) {
+    setSourceMonths(settings.retentionMonths);
     setMonths(settings.retentionMonths);
-  }, [settings.retentionMonths]);
+  }
 
   function confirm() {
     const same = months === settings.retentionMonths && settings.retentionRequestedAt;

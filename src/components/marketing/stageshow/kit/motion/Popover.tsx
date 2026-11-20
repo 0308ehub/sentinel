@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/refs, react-hooks/set-state-in-effect -- Exit content and timing must be captured synchronously to preserve the first/last transition frames. */
 import { useEffect, useRef, useState, type CSSProperties, type HTMLAttributes, type ReactNode } from 'react'
 import './Popover.css'
 

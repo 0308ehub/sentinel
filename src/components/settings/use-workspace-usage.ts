@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { useAgents } from "@/lib/agents/fleet";
 import { useChatState } from "@/lib/chat/session";
 import { useGraphHydrated, useGraphStore } from "@/lib/graph/graph-store";
@@ -11,11 +11,7 @@ export function useWorkspaceUsage(): UsageReport | null {
   const nodes = useGraphStore((state) => state.nodes);
   const chat = useChatState();
   const agents = useAgents();
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    setReady(true);
-  }, []);
+  const ready = useSyncExternalStore(() => () => {}, () => true, () => false);
 
   if (!ready || !hydrated) return null;
 

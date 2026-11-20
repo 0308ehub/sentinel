@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { Check, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -39,12 +39,14 @@ export function GeneralSettingsView() {
   const settings = useWorkspaceSettings();
   const [orgName, setOrgName] = useState(settings.orgName);
   const [orgUrl, setOrgUrl] = useState(settings.orgUrl);
+  const [sourceOrg, setSourceOrg] = useState({ name: settings.orgName, url: settings.orgUrl });
   const [saved, markSaved] = useSavedFlag();
 
-  useEffect(() => {
+  if (settings.orgName !== sourceOrg.name || settings.orgUrl !== sourceOrg.url) {
+    setSourceOrg({ name: settings.orgName, url: settings.orgUrl });
     setOrgName(settings.orgName);
     setOrgUrl(settings.orgUrl);
-  }, [settings.orgName, settings.orgUrl]);
+  }
 
   function handleSave(event: FormEvent) {
     event.preventDefault();

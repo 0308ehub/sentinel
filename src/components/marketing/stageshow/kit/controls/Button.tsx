@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect -- Icon presence must close in the same layout phase before its size transition. */
 import { useLayoutEffect, useState, type HTMLAttributes, type ReactNode } from 'react'
 import { Roll } from '../motion/Roll'
 import './Button.css'

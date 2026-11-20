@@ -58,11 +58,15 @@ export function FunnelsView() {
   useEffect(() => {
     if (!options) return;
     let cancelled = false;
-    setLoading(true);
-    setError("");
     const base = specFor(steps, withinDays, lastDays, segment);
     const other = compare === false ? null : specFor(steps, withinDays, lastDays, compare);
-    Promise.all([run(base), other ? run(other) : Promise.resolve(null)])
+    Promise.resolve().then(() => {
+      if (!cancelled) {
+        setLoading(true);
+        setError("");
+      }
+      return Promise.all([run(base), other ? run(other) : Promise.resolve(null)]);
+    })
       .then(([left, right]) => {
         if (cancelled) return;
         setPrimary(left);

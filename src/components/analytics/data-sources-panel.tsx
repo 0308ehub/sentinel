@@ -76,15 +76,22 @@ export function DataSourcesPanel({ onInsertQuery }: DataSourcesPanelProps) {
   useEffect(() => {
     if (!selected) return;
     let cancelled = false;
-    setPreview(null);
-    setPreviewError(null);
-    setPreviewLoading(true);
     const name = qualified(selected);
     if (!name) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- A newly selected invalid table must synchronously clear the previous preview.
+      setPreview(null);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Validation feedback belongs to the selected table transition.
       setPreviewError("That table name cannot be previewed.");
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- An invalid selection cannot remain in the loading state.
       setPreviewLoading(false);
       return;
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- A new selection must clear stale preview data before its request starts.
+    setPreview(null);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- A new request supersedes the prior selection's error.
+    setPreviewError(null);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Loading begins when the selected table changes.
+    setPreviewLoading(true);
     const statement = `SELECT * FROM ${name} LIMIT 20`;
     fetch("/api/databricks/query", {
       method: "POST",

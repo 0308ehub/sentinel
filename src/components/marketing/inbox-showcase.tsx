@@ -79,13 +79,17 @@ export function InboxShowcase({ compact = false }: { compact?: boolean }) {
   const rows = useMemo(() => rank(weights), [weights]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- The client locale clock is unavailable during server rendering.
     setClock(new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }));
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
     const initial = rank({});
     const sent = initial.filter((row) => row.sent);
     if (media.matches) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Reduced-motion users should see all staged messages without animation.
       setShown(sent.map((row) => row.id));
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Reduced-motion mode opens the final staged conversation immediately.
       setOpen(sent.at(-1)?.agent.slug ?? "experiments");
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Reduced-motion mode completes the showcase synchronously.
       setReady(true);
       return;
     }
@@ -194,7 +198,7 @@ export function InboxShowcase({ compact = false }: { compact?: boolean }) {
                       <h3 className="font-medium">{active.candidate.title}</h3>
                       <p className="mt-2"><span className="block text-[11px] text-[#8b919a]">I noticed</span>{active.candidate.summary}</p>
                       <p className="mt-2"><span className="block text-[11px] text-[#8b919a]">I think</span>{active.candidate.hypothesis}</p>
-                      <p className="mt-2"><span className="block text-[11px] text-[#8b919a]">I'd do</span>{active.candidate.proposedAction}</p>
+                      <p className="mt-2"><span className="block text-[11px] text-[#8b919a]">I&apos;d do</span>{active.candidate.proposedAction}</p>
                       <p className="mt-2 text-xs text-[#8b919a]">{confidenceLabel(active.candidate.confidence)}</p>
                       <div className="mt-3 flex flex-wrap gap-1">
                         <span className="rounded-full border border-[#e6e6e6] px-2 py-1 text-[11px]">Approve</span>

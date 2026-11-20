@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,11 +13,13 @@ export function AccessSettingsView() {
   const settings = useWorkspaceSettings();
   const clerk = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
   const [domain, setDomain] = useState(settings.allowedDomain);
+  const [sourceDomain, setSourceDomain] = useState(settings.allowedDomain);
   const [saved, markSaved] = useSavedFlag();
 
-  useEffect(() => {
+  if (settings.allowedDomain !== sourceDomain) {
+    setSourceDomain(settings.allowedDomain);
     setDomain(settings.allowedDomain);
-  }, [settings.allowedDomain]);
+  }
 
   function saveDomain() {
     updateWorkspace({ allowedDomain: domain.trim().replace(/^@/, "") });

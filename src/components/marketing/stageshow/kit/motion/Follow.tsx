@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/refs -- The active animation loop needs the newest target without restarting its layout effect. */
 import { useLayoutEffect, useRef, type HTMLAttributes, type ReactNode } from 'react'
 import type { Rect } from '../measure'
 import { useReducedMotion } from '../reduced-motion'

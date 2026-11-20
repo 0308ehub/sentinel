@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/refs -- Closing content must be captured during render to avoid a blank first transition frame. */
 import { useLayoutEffect, useRef, useState, type HTMLAttributes, type ReactNode } from 'react'
 import './Collapse.css'
 

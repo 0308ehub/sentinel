@@ -44,6 +44,15 @@ export interface ClockControl {
 }
 
 type Host = { __stageshow?: { clock?: ClockControl } }
+type VirtualHost = Host & {
+  setTimeout: (fn: unknown, ms?: unknown, ...args: unknown[]) => number
+  setInterval: (fn: unknown, ms?: unknown, ...args: unknown[]) => number
+  clearTimeout: (id: number) => void
+  clearInterval: (id: number) => void
+  requestAnimationFrame: (fn: FrameRequestCallback) => number
+  cancelAnimationFrame: (id: number) => void
+  Date: DateConstructor
+}
 
 /**
  * The clock the kit and its scenes read. Each call goes to the page's global
@@ -80,7 +89,7 @@ export const clock = {
  * in a scene reads the same on every render.
  */
 export function installVirtualClock(opts: { fps?: number; epoch?: number; onLayout?: () => void } = {}): ClockControl {
-  const w = window as any
+  const w = window as unknown as VirtualHost
   if (w.__stageshow?.clock) return w.__stageshow.clock
   const fps = opts.fps ?? 60
   const RealDate = Date
@@ -118,7 +127,7 @@ export function installVirtualClock(opts: { fps?: number; epoch?: number; onLayo
   const dateNow = () => Math.floor(epoch + (vt - BASE))
   const VDate = function (this: unknown, ...a: unknown[]) {
     if (!new.target) return new RealDate(dateNow()).toString()
-    return a.length ? new (RealDate as any)(...a) : new RealDate(dateNow())
+    return a.length ? Reflect.construct(RealDate, a) as Date : new RealDate(dateNow())
   } as unknown as DateConstructor
   Object.assign(VDate, { prototype: RealDate.prototype, now: dateNow, parse: RealDate.parse, UTC: RealDate.UTC })
   w.Date = VDate

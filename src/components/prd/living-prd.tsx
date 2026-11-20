@@ -30,19 +30,19 @@ export function LivingPrd({ featureId }: { featureId: string }) {
   const [asking, setAsking] = useState(false);
   const [writing, setWriting] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [draftKey, setDraftKey] = useState("");
 
   useEffect(() => {
     if (!hydrated || !featureId) return;
     graphStore.getState().ensureFeaturePrd(featureId);
   }, [hydrated, featureId]);
 
-  useEffect(() => {
-    if (!feature || !prd) return;
+  const nextDraftKey = feature && prd ? `${feature.id}:${prd.id}` : "";
+  if (feature && prd && nextDraftKey !== draftKey) {
+    setDraftKey(nextDraftKey);
     setTitle(feature.title);
     setDoc(readLiving(prd.metadata, { bet: feature.description ?? "", changes: prd.description ?? "" }));
-    // Reload only when opening a different feature. Saves update the same nodes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [feature?.id, prd?.id]);
+  }
 
   const evidence = useMemo(() => (feature ? evidenceFor(feature.id, nodes, edges) : []), [feature, nodes, edges]);
   const links = useMemo(() => (feature && prd ? linksFor(feature.id, prd.id, nodes, edges) : []), [feature, prd, nodes, edges]);
@@ -61,6 +61,7 @@ export function LivingPrd({ featureId }: { featureId: string }) {
       record: [doc.record, lines].filter(Boolean).join("\n"),
       appliedSources: [...doc.appliedSources, ...fresh.map((item) => item.id)],
     };
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Newly connected evidence must be folded into the open auto-updating draft.
     setDoc(next);
     graphStore.getState().saveLivingPrd(prd.id, next);
   }, [doc, prd, recordSources]);

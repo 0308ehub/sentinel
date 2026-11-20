@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable react-hooks/refs -- Drag ordering needs the latest rendered list and active pointer id before pointer-up. */
 
 import { useEffect, useRef, useState } from "react";
 import { ThreadFaces } from "@/components/inbox/thread-faces";

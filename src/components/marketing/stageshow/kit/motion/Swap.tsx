@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/refs, react-hooks/set-state-in-effect -- Swap snapshots and cleanup are synchronized to CSS transition frames. */
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { useReducedMotion } from '../reduced-motion'
 import './Swap.css'

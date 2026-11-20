@@ -152,7 +152,7 @@ export function InboxSettingsView() {
           </div>
         </div>
         <div>
-          <h2 className="text-sm font-medium">What they've learned</h2>
+          <h2 className="text-sm font-medium">What they&apos;ve learned</h2>
           <div className="mt-2 space-y-2">
             {prefs.weights.map((weight) => (
               <div key={weight.type} className="flex items-center justify-between gap-3 text-sm">

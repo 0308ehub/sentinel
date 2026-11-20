@@ -45,7 +45,11 @@ export function ThreadRow({
   }
 
   useEffect(() => {
-    if (!revealed) moveTo(0);
+    if (!revealed) {
+      xRef.current = 0;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Closing a sibling's swipe must reset this row's controlled offset.
+      setX(0);
+    }
   }, [revealed]);
 
   function finish(next: number) {

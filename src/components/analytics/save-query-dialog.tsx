@@ -7,7 +7,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 interface SaveQueryDialogProps {
   open: boolean;
@@ -24,11 +24,12 @@ export function SaveQueryDialog({
   onSave,
   isUpdate,
 }: SaveQueryDialogProps) {
-  const [name, setName] = useState(defaultName);
-
-  useEffect(() => {
-    if (open) setName(defaultName);
-  }, [open, defaultName]);
+  const [draft, setDraft] = useState({ open, defaultName, name: defaultName });
+  if (draft.open !== open || (open && draft.defaultName !== defaultName)) {
+    setDraft({ open, defaultName, name: defaultName });
+  }
+  const name = draft.open === open && draft.defaultName === defaultName ? draft.name : defaultName;
+  const setName = (value: string) => setDraft({ open, defaultName, name: value });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, Check, ChevronDown, Loader2, Minus, Plus } from "lucide-react";
 import type { AutopilotState, Experiment } from "@/lib/autopilot/types";
@@ -40,7 +40,7 @@ export function TimelineView() {
   const [page, setPage] = useState("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [viewport, setViewport] = useState(0);
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
   const scroller = useRef<HTMLDivElement>(null);
   const centerDay = useRef<number | null>(null);
   const pxRef = useRef(0);
@@ -49,7 +49,9 @@ export function TimelineView() {
   const rangeStart = useMemo(() => new Date(year - 1, 11, 1), [year]);
   const totalDays = useMemo(() => daysBetween(rangeStart, new Date(year + 1, 1, 1)), [rangeStart, year]);
   const px = viewport > LABEL + 80 ? Math.max(2, (viewport - LABEL) / ZOOMS[zoom].days) : 6;
-  pxRef.current = px;
+  useLayoutEffect(() => {
+    pxRef.current = px;
+  }, [px]);
   const timelineWidth = totalDays * px;
 
   const pages = useMemo(() => {
@@ -77,8 +79,6 @@ export function TimelineView() {
     }
     return [...values].sort();
   }, [experiments, nowYear]);
-
-  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     const el = scroller.current;

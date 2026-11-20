@@ -59,6 +59,7 @@ export function AgentDemo() {
   useEffect(() => {
     if (held.current) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Reduced-motion users should see the animation's completed state immediately.
       setApproved(true);
       return;
     }
@@ -115,7 +116,7 @@ export function AgentDemo() {
           <p className="ks-agent-action">{beat.done}</p>
         ) : (
           <p className="ks-agent-action">
-            <span>I'd do</span>
+            <span>I&apos;d do</span>
             {beat.action}
           </p>
         )}

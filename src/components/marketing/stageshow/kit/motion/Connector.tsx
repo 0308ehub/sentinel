@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect -- Arrival resets with the SVG path layout measurement to preserve reveal timing. */
 import { useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import type { Point } from '../measure'
 import './Connector.css'

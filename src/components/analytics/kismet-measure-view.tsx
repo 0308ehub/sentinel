@@ -1,8 +1,10 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { MeasureChart, MeasureExperimentResponse, MeasureOverviewResponse, MeasurePoint } from "@/lib/autopilot/measure-types";
+import { GoalEditor } from "@/components/autopilot/goal-editor";
 
 async function loadMeasure<T>(experimentId?: string): Promise<T> {
   const url = experimentId ? `/api/autopilot/measure?experiment=${encodeURIComponent(experimentId)}` : "/api/autopilot/measure";
@@ -22,17 +24,22 @@ export function KismetMeasureView({ experimentId }: { experimentId: string | nul
   if (query.error) return <div className="p-6 text-sm text-red-700">{query.error.message}</div>;
   return experimentId
     ? <ExperimentMeasure data={query.data as MeasureExperimentResponse} />
-    : <MeasureOverview data={query.data as MeasureOverviewResponse} />;
+    : <MeasureOverview data={query.data as MeasureOverviewResponse} onGoalsChanged={() => query.refetch()} />;
 }
 
-function MeasureOverview({ data }: { data: MeasureOverviewResponse }) {
+function MeasureOverview({ data, onGoalsChanged }: { data: MeasureOverviewResponse; onGoalsChanged: () => Promise<unknown> }) {
+  const [editingGoals, setEditingGoals] = useState(false);
   return (
     <main className="min-h-0 flex-1 overflow-auto bg-white p-6 text-[#111827]">
       <div className="mx-auto max-w-5xl">
         <h2 className="text-lg font-semibold">Kismet</h2>
         <p className="mt-1 text-sm text-[#6b7280]">Measure whether changes improve the outcomes that matter.</p>
         <section className="mt-7">
-          <h3 className="text-sm font-medium">Goals</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-medium">Goals</h3>
+            <button type="button" className="text-xs text-brand hover:underline" onClick={() => setEditingGoals((value) => !value)}>Edit goals</button>
+          </div>
+          {editingGoals ? <GoalEditor onChanged={onGoalsChanged} /> : null}
           {data.goals.length === 0 ? (
             <p className="mt-3 text-sm text-[#6b7280]">No goals yet — Kismet proposes them once it has seen enough visitors.</p>
           ) : (

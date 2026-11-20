@@ -33,6 +33,8 @@ const FEATURE_OPTIONS = nodes
   .filter((n) => n.type === "FEATURE")
   .map((n) => ({ id: n.id, title: n.title }));
 
+const queryClock = () => performance.now();
+
 export function QueryEditorPanel() {
   const {
     tabs,
@@ -78,7 +80,7 @@ export function QueryEditorPanel() {
 
   const runSqlCell = async (cellId: string, source: string) => {
     setRunningCellId(cellId);
-    const started = Date.now();
+    const started = queryClock();
     try {
       const res = await fetch("/api/databricks/query", {
         method: "POST",
@@ -106,7 +108,7 @@ export function QueryEditorPanel() {
         columns: body.columns ?? [],
         rows: body.rows ?? [],
         rowCount: body.rowCount ?? 0,
-        durationMs: body.durationMs ?? Date.now() - started,
+        durationMs: body.durationMs ?? queryClock() - started,
       });
       setLastRunSuccessful(true);
       return body.rows ?? [];

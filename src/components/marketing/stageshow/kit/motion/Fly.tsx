@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/refs -- Flight endpoints must freeze in the initiating render before surrounding UI moves. */
 import { useEffect, useRef, type ReactNode } from 'react'
 import { useReducedMotion } from '../reduced-motion'
 import type { Rect } from '../measure'

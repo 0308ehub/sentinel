@@ -58,6 +58,7 @@ export function ExploreView({ preset }: { preset?: ExploreSpec | null }) {
   const [adding, setAdding] = useState(false);
   const [audience, setAudience] = useState<Audience | null>(null);
   const [notice, setNotice] = useState("");
+  const [appliedPresetKey, setAppliedPresetKey] = useState("");
   const segments = useAnalyticsLibrary((state) => state.segments);
   const saveMetric = useAnalyticsLibrary((state) => state.saveMetric);
   const ensureDashboard = useAnalyticsLibrary((state) => state.ensureDashboard);
@@ -103,18 +104,19 @@ export function ExploreView({ preset }: { preset?: ExploreSpec | null }) {
   }, []);
 
   const presetKey = preset ? JSON.stringify(preset) : "";
-  useEffect(() => {
-    if (preset) setSpec(preset);
-    // presetKey is the stable identity of the chart a definition asked to open.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [presetKey]);
+  if (preset && presetKey !== appliedPresetKey) {
+    setAppliedPresetKey(presetKey);
+    setSpec(preset);
+  }
 
   const specKey = spec ? JSON.stringify(spec) : "";
 
   useEffect(() => {
     if (!spec) return;
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- A changed query must show loading before its request resolves.
     setLoading(true);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- A new query supersedes the previous query error.
     setError("");
     fetch("/api/analytics/explore", {
       method: "POST",
@@ -550,4 +552,3 @@ function SegmentControls({
     </section>
   );
 }
-

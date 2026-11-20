@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/refs, react-hooks/set-state-in-effect -- The deterministic stage runner mirrors live state and resets synchronously at scene boundaries. */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import './stage.css'
 import { checkSeam, createAct, Stopped, type Script } from './act'

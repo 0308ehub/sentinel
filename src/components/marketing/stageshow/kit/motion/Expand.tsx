@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/refs -- Transition continuity depends on comparing the current target with the last committed target. */
 import { useLayoutEffect, useRef, useState, type HTMLAttributes, type ReactNode } from 'react'
 import { useReducedMotion } from '../reduced-motion'
 import type { Rect } from '../measure'

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import Script from "next/script";
 
 interface CalendlyApi {
@@ -26,7 +26,9 @@ function pageHeight(data: unknown): number | null {
 export function CalendlyEmbed({ url }: { url: string }) {
   const parentRef = useRef<HTMLDivElement>(null);
   const urlRef = useRef(url);
-  urlRef.current = url;
+  useLayoutEffect(() => {
+    urlRef.current = url;
+  }, [url]);
 
   function mount() {
     const parent = parentRef.current;

@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/refs -- The fading chip must retain its previous text in the same render that clears it. */
 import { useLayoutEffect, useRef, useState, type HTMLAttributes, type ReactNode } from 'react'
 import { Icon } from '../parts/Icon'
 import './Field.css'

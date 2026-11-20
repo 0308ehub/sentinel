@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { ExperimentLab } from "@/components/experiments/experiment-lab";
 import { ShipPullRequest } from "@/components/experiments/ship-pull-request";
@@ -32,11 +32,11 @@ export function WorkDetail({
   const edges = useGraphStore((s) => s.edges);
   const timeline = useGraphStore((s) => s.timeline);
   const products = useGraphStore((s) => s.explorerTree.products);
-  const [ready, setReady] = useState(false);
+  const ready = useSyncExternalStore(() => () => {}, () => true, () => false);
   const [title, setTitle] = useState("");
   const [lede, setLede] = useState("");
   const [body, setBody] = useState("");
-  useEffect(() => setReady(true), []);
+  const [draftNodeId, setDraftNodeId] = useState("");
   const node = nodes.find((item) => item.id === nodeId);
 
   const connected = edges
@@ -47,18 +47,16 @@ export function WorkDetail({
     })
     .filter((item): item is GraphNode => Boolean(item && item.type !== "PRODUCT"));
 
-  useEffect(() => {
-    if (!node) return;
+  if (node && node.id !== draftNodeId) {
     const prd = connected.find((item) => item.type === "PRD");
     const repro = text(node.metadata.repro);
     const description = node.description ?? "";
     const long = repro || prd?.description || "";
+    setDraftNodeId(node.id);
     setTitle(node.title);
     setLede(!repro && description && description !== long ? description : "");
     setBody(long || description);
-    // Reload the draft only when opening a different item.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [node?.id]);
+  }
 
   if (!ready) return <div className="h-full bg-background" />;
 

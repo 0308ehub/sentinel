@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import Link from "next/link";
 import { Check, ChevronDown, Circle, Loader2, MoreHorizontal, Play } from "lucide-react";
 import { BuilderMenu, useAccountBuilder } from "@/components/autopilot/builder-menu";
 import { ExperimentDetail } from "@/components/autopilot/experiment-detail";
@@ -21,7 +22,7 @@ import type { RolloutPhase } from "@/lib/autopilot/rollout-plan";
 import { useVariant } from "@/lib/autopilot/variant";
 import { formatRelativeTime } from "@/lib/utils";
 import { setupSteps } from "@/lib/autopilot/setup-core";
-import type { AutopilotState, Experiment, Goal, Learning, Signal, SuggestionRating } from "@/lib/autopilot/types";
+import type { AutopilotState, Experiment, Learning, Signal, SuggestionRating } from "@/lib/autopilot/types";
 
 const ENDED = new Set<Experiment["status"]>(["rolled_out", "stopped", "rejected", "failed"]);
 const SUGGESTED_STATUS = new Set<Experiment["status"]>(["building", "awaiting_approval"]);
@@ -75,14 +76,7 @@ export function ExperimentBoard({
   const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState<Selection | null>(null);
   const initialExperiments = useRef(state.experiments);
-  // Goals come from the server; a local copy only holds the result of an edit made here. (Keying the
-  // whole board on goals instead remounted it and closed whatever experiment was open.)
-  const [editedGoals, setGoals] = useState<Goal[] | null>(null);
-  const goals = editedGoals ?? state.goals;
-  const [editingGoals, setEditingGoals] = useState(false);
-  const [goalName, setGoalName] = useState("");
-  const [goalKind, setGoalKind] = useState<"click" | "visit" | "event">("click");
-  const [goalValue, setGoalValue] = useState("");
+  const goals = state.goals;
   const [renderedAt] = useState(() => Date.now());
   const variant = useVariant("ap-add-first-experiment-guidance-to-the-exp-v1");
   const setup = setupSteps(state.setup);
@@ -103,23 +97,6 @@ export function ExperimentBoard({
   const suggestions = state.signals.filter(
     (signal) => signal.status !== "dismissed" && signal.status !== "stale" && signal.status !== "resolved" && !taken.has(signal.id),
   );
-
-  async function addGoal() {
-    const metric = goalKind === "click"
-      ? { kind: "click", text: goalValue }
-      : goalKind === "event"
-        ? { kind: "event", name: goalValue.trim() }
-        : { kind: "visit", path: goalValue };
-    const response = await fetch("/api/autopilot/goals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: goalName, metric }) });
-    if (!response.ok) return;
-    const latest = await fetch("/api/autopilot/goals", { cache: "no-store" }).then((r) => r.json()) as { goals: Goal[] };
-    setGoals(latest.goals); setGoalName(""); setGoalValue("");
-  }
-
-  async function removeGoal(id: string) {
-    const response = await fetch("/api/autopilot/goals", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
-    if (response.ok) setGoals(goals.filter((goal) => goal.id !== id));
-  }
 
   const rows = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -230,20 +207,8 @@ export function ExperimentBoard({
               )}
             </p>
             <div className="mt-2 text-xs text-[#6b7280]">
-              {goals.length ? <>Goals: {goals.map((goal, index) => <span key={goal.id} title={describeMetric(goal.spec)}>{index > 0 && " · "}{goal.name} ({(goal.baselineRate * 100).toFixed(1)}%)</span>)}</> : <>Kismet will propose goals once it has seen enough visitors. </>}
-              <button type="button" className="ml-1 text-brand hover:underline" onClick={() => setEditingGoals((value) => !value)}>{goals.length ? "Edit" : "Add one"}</button>
+              {goals.length ? <>Goals: {goals.map((goal, index) => <span key={goal.id} title={describeMetric(goal.spec)}>{index > 0 && " · "}{goal.name}</span>)} · <Link href="/analytics" className="text-brand hover:underline">Manage in Analytics →</Link></> : <>Kismet will propose goals once it has seen enough visitors. <Link href="/analytics" className="text-brand hover:underline">Manage in Analytics →</Link></>}
             </div>
-            {editingGoals && (
-              <div className="mt-2 max-w-2xl rounded border border-[#e1e4e8] p-2 text-xs">
-                {goals.map((goal) => <div key={goal.id} className="flex items-center justify-between py-1"><span>{goal.name}</span><button type="button" aria-label={`Remove ${goal.name}`} className="text-[#6b7280] hover:text-red-600" onClick={() => void removeGoal(goal.id)}>Remove</button></div>)}
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <input aria-label="Goal name" value={goalName} onChange={(e) => setGoalName(e.target.value)} maxLength={60} placeholder="Goal name" className="h-8 rounded border px-2" />
-                  <select aria-label="Goal metric kind" value={goalKind} onChange={(e) => setGoalKind(e.target.value as "click" | "visit" | "event")} className="h-8 rounded border px-2"><option value="click">Click</option><option value="visit">Visit</option><option value="event">Event</option></select>
-                  <input aria-label={goalKind === "click" ? "Click label" : goalKind === "event" ? "Event name" : "Visit path"} value={goalValue} onChange={(e) => setGoalValue(e.target.value)} placeholder={goalKind === "click" ? "Button label" : goalKind === "event" ? "purchase" : "/path"} className="h-8 rounded border px-2" />
-                  <button type="button" disabled={!goalName.trim() || !goalValue.trim() || goals.length >= 5} className="h-8 rounded border px-3 disabled:opacity-50" onClick={() => void addGoal()}>Add</button>
-                </div>
-              </div>
-            )}
             {variant === "treatment" && state.experiments.length === 0 && (
               <p data-track="ap-add-first-experiment-guidance-to-the-exp-v1" className="mt-2 max-w-xl text-sm text-[#374151]">
                 Experiments help you compare product changes and measure outcomes. Start by letting Kismet suggest a safe first

@@ -34,13 +34,13 @@ export function ExperimentLab({ node }: { node: GraphNode }) {
   const [readout, setReadout] = useState<ExperimentReadout | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [planNodeId, setPlanNodeId] = useState(node.id);
   const control = label(text(node.metadata.control), "Control");
 
-  useEffect(() => {
+  if (node.id !== planNodeId) {
+    setPlanNodeId(node.id);
     setPlan(parseAllocation(node.metadata.allocation, text(node.metadata.treatment), text(node.metadata.control)));
-    // Opening a different experiment reloads its saved allocation.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [node.id]);
+  }
 
   useEffect(() => {
     let cancelled = false;

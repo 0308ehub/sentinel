@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect -- Rolling text alignment and reduced-motion resets are synchronized to measured layout. */
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { useReducedMotion } from '../reduced-motion'
 import './Roll.css'

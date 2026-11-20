@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/refs -- Digit-strip state is mirrored during render so interrupted rolls resume without a jump. */
 import { useLayoutEffect, useEffect, useRef, useState, type HTMLAttributes } from 'react'
 import { useReducedMotion } from '../reduced-motion'
 import './Count.css'

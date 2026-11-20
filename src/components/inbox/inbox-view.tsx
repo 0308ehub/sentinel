@@ -53,6 +53,10 @@ export function InboxView() {
     }
     setError("");
     setData(body);
+    if (!opened.current && body.threads.length) {
+      opened.current = true;
+      setSelected(body.threads.find((thread) => thread.unread > 0)?.id ?? body.threads[0].id);
+    }
   }
 
   async function loadMessages(id: string) {
@@ -63,6 +67,7 @@ export function InboxView() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- The initial inbox request only updates state after its fetch resolves.
     void loadList();
     const source = new EventSource("/api/inbox/stream");
     source.onmessage = (event) => {
@@ -73,13 +78,8 @@ export function InboxView() {
   }, []);
 
   useEffect(() => {
-    if (opened.current || !data?.threads.length || selected) return;
-    opened.current = true;
-    setSelected(data.threads.find((thread) => thread.unread > 0)?.id ?? data.threads[0].id);
-  }, [data, selected]);
-
-  useEffect(() => {
     if (!selected) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Thread messages update only after the selected thread request resolves.
     void loadMessages(selected);
   }, [selected, data?.threads.find((thread) => thread.id === selected)?.updatedAt, data?.threads.find((thread) => thread.id === selected)?.typing]);
 
