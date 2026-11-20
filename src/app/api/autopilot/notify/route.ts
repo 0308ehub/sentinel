@@ -1,12 +1,12 @@
 import { getNotifyPrefs, saveNotifyPrefs } from "@/lib/autopilot/notify";
 import { withAutopilotUser } from "@/lib/autopilot/scope";
-import { currentUserId } from "@/lib/connections/current";
+import { currentAccountId } from "@/lib/connections/current";
 import { CHANNEL_ID_PATTERN, postSlackMessage, SlackApiError } from "@/lib/slack/client";
 
 export const dynamic = "force-dynamic";
 
 async function signedInUser(): Promise<string | Response> {
-  const userId = await currentUserId();
+  const userId = await currentAccountId();
   return userId ?? Response.json({ error: "Sign in required." }, { status: 401 });
 }
 

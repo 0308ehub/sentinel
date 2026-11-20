@@ -1,6 +1,6 @@
 import "server-only";
 
-import { currentUserId } from "@/lib/connections/current";
+import { currentAccountId } from "@/lib/connections/current";
 import { deleteConnection, getConnection, saveConnection } from "@/lib/connections/store";
 import type { GoogleDoc, GoogleMessage, GooglePreview, GoogleStatus } from "@/lib/google/types";
 
@@ -104,7 +104,7 @@ export async function exchangeGoogleCode(code: string, origin: string): Promise<
 }
 
 export async function disconnectGoogle(): Promise<void> {
-  const userId = await currentUserId();
+  const userId = await currentAccountId();
   if (!userId) throw new Error("Unauthorized");
   await deleteConnection(userId, "google");
 }
@@ -277,7 +277,7 @@ async function googleGet<T>(accessToken: string, url: string): Promise<T> {
 }
 
 async function readToken(): Promise<(StoredToken & { email?: string }) | null> {
-  const userId = await currentUserId();
+  const userId = await currentAccountId();
   if (!userId) return null;
   const connection = await getConnection<StoredToken>(userId, "google");
   return connection
@@ -289,7 +289,7 @@ async function readToken(): Promise<(StoredToken & { email?: string }) | null> {
 }
 
 async function writeToken(token: StoredToken & { email?: string }): Promise<void> {
-  const userId = await currentUserId();
+  const userId = await currentAccountId();
   if (!userId) throw new Error("Unauthorized");
   const { email, ...secret } = token;
   await saveConnection(userId, "google", secret, { email });

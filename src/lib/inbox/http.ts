@@ -1,8 +1,8 @@
-import { currentUserId } from "@/lib/connections/current";
+import { currentAccountId } from "@/lib/connections/current";
 import { InboxError } from "@/lib/inbox/store";
 
 export async function inboxUser(): Promise<string | null> {
-  return currentUserId();
+  return currentAccountId();
 }
 
 export function inboxFailure(error: unknown): Response {

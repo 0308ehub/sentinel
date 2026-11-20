@@ -1,10 +1,10 @@
-import { currentUserId } from "@/lib/connections/current";
+import { currentAccountId } from "@/lib/connections/current";
 import { saveConnection } from "@/lib/connections/store";
 import { githubAccount } from "@/lib/github/client";
 import { connectErrorMessage } from "@/lib/connections/errors";
 
 export async function POST(request: Request) {
-  const userId = await currentUserId();
+  const userId = await currentAccountId();
   if (!userId) return Response.json({ error: "Sign in required." }, { status: 401 });
 
   try {

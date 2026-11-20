@@ -1,12 +1,12 @@
 import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
-import { currentUserId } from "@/lib/connections/current";
+import { currentAccountId } from "@/lib/connections/current";
 import { githubAppConfigured } from "@/lib/github/app";
 import { githubAppInstallUrl, githubAuthorizeUrl } from "@/lib/github/app-core";
 import { validOAuthReturnPath } from "@/lib/slack/oauth-return";
 
 export async function GET(request: Request) {
-  if (!(await currentUserId())) return Response.json({ error: "Sign in required." }, { status: 401 });
+  if (!(await currentAccountId())) return Response.json({ error: "Sign in required." }, { status: 401 });
   const requestUrl = new URL(request.url);
   if (!githubAppConfigured()) {
     return NextResponse.redirect(new URL("/settings/connectors/github?error=not_configured", requestUrl.origin));

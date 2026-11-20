@@ -2,7 +2,7 @@ import "server-only";
 
 import { type ActivityRow } from "@/lib/autopilot/activity-core";
 import { db, newId } from "@/lib/autopilot/db";
-import { autopilotUser } from "@/lib/autopilot/scope";
+import { autopilotUser, siteAutopilotUser } from "@/lib/autopilot/scope";
 import { parseMetricSpec, type Arm, type FlagState, type MetricSpec } from "@/lib/autopilot/assign";
 import { chosenBuilder, isOutsideBuilder, type Builder, type OutsideBuilder } from "@/lib/autopilot/builders";
 import { ANALYTICS_FRESH_DAYS, ELEMENT_GONE_DAYS, otherFreshDays } from "@/lib/autopilot/freshness";
@@ -38,8 +38,7 @@ function scopeUser(): string {
 
 /** Rows written before accounts were split belong to the deployment owner. */
 export async function claimLegacyRows(userId: string): Promise<void> {
-  const named = process.env.KISMET_AUTOPILOT_USER_ID?.trim();
-  const owner = named || (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.NODE_ENV !== "production" ? "local" : "");
+  const owner = await siteAutopilotUser();
   if (!owner || userId !== owner) return;
   const sql = await db();
   await sql`update kismet.evidence set user_id = ${userId} where user_id = ''`;

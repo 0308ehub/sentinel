@@ -263,12 +263,14 @@ function PreviewBody({ experiment, changes, liveOrigin, isLive, when, addedText 
   );
   const control = previewHref(liveOrigin, experiment.page, experiment.flag, "control", isLive);
   const treatmentOrigin = isLive ? liveOrigin : changes.previewUrl;
-  const treatment = treatmentOrigin ? previewHref(treatmentOrigin, experiment.page, experiment.flag, "treatment", isLive) : null;
+  // Kismet's own preview builds have no sign-in (Clerk is configured for production only), so the link
+  // would only show "Sign-in is not configured". Other sites' preview builds are fine to open.
+  const treatment = treatmentOrigin && !changes.ownRepo ? previewHref(treatmentOrigin, experiment.page, experiment.flag, "treatment", isLive) : null;
   if (!isLive) return (
     <div className="flex flex-wrap items-center gap-3 rounded border border-[#e1e4e8] bg-[#f8f9fa] p-3 text-sm">
       {treatment && <a href={treatment} target="_blank" rel="noreferrer" className="text-brand hover:underline">Open new version (preview build) ↗</a>}
       <a href={control} target="_blank" rel="noreferrer" className="text-brand hover:underline">Open current version ↗</a>
-      <span className="w-full text-xs text-[#6b7280]">{treatment ? "Preview builds can ask you to sign in." : "The preview build is not available yet."}</span>
+      <span className="w-full text-xs text-[#6b7280]">{treatment ? "Preview builds can ask you to sign in." : changes.ownRepo ? "Kismet's preview builds can't sign in, so use the sample render above." : "The preview build is not available yet."}</span>
     </div>
   );
   if (!treatment) return null;
@@ -377,7 +379,9 @@ function PreviewSwitcher({ control, treatment, when, addedText, sample = false }
     </button>
   );
   const hasNewText = Boolean(comparison?.onlyInTreatment.length);
-  const pagesMatch = comparison !== null
+  // A sample render is the comparison itself; a layout-only change has identical text but still looks
+  // different, so never hide the sample frames.
+  const pagesMatch = !sample && comparison !== null
     && comparison.onlyInTreatment.length === 0
     && comparison.onlyInControl.length === 0;
   return (

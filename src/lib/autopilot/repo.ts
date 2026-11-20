@@ -2,7 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/autopilot/db";
 import { siteAutopilotUser, tryAutopilotUser } from "@/lib/autopilot/scope";
-import { currentUserId } from "@/lib/connections/current";
+import { currentAccountId } from "@/lib/connections/current";
 import { repoOwner } from "@/lib/connections/ownership";
 import { repoName } from "@/lib/github/client";
 
@@ -26,7 +26,7 @@ async function selectedRepo(userId: string): Promise<string | null> {
   const rows = await sql<{ repo: string }[]>`select repo from kismet.autopilot_repo where user_id = ${userId} limit 1`;
   const explicit = rows[0]?.repo?.trim() ?? "";
   if (repoName(explicit)) return explicit;
-  return userId === siteAutopilotUser() ? defaultAutopilotRepo() : null;
+  return userId === await siteAutopilotUser() ? defaultAutopilotRepo() : null;
 }
 
 /**
@@ -34,7 +34,7 @@ async function selectedRepo(userId: string): Promise<string | null> {
  * Only the deployment owner falls back to the default; other accounts ship nowhere until they choose.
  */
 export async function chosenAutopilotRepo(): Promise<string | null> {
-  const userId = tryAutopilotUser() ?? (await currentUserId());
+  const userId = tryAutopilotUser() ?? (await currentAccountId());
   if (!userId) return null;
   const repo = await selectedRepo(userId);
   if (!repo) return null;
@@ -44,7 +44,7 @@ export async function chosenAutopilotRepo(): Promise<string | null> {
 
 /** Why the current account cannot use its selected repository, if ownership is the blocker. */
 export async function chosenAutopilotRepoReason(): Promise<string | null> {
-  const userId = tryAutopilotUser() ?? (await currentUserId());
+  const userId = tryAutopilotUser() ?? (await currentAccountId());
   if (!userId) return null;
   const repo = await selectedRepo(userId);
   if (!repo) return null;

@@ -1,11 +1,11 @@
 import { experimentMeasure, measureOverview } from "@/lib/autopilot/measure-data";
 import { withAutopilotUser } from "@/lib/autopilot/scope";
-import { currentUserId } from "@/lib/connections/current";
+import { currentAccountId } from "@/lib/connections/current";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const userId = await currentUserId();
+  const userId = await currentAccountId();
   if (!userId) return Response.json({ error: "Sign in required." }, { status: 401 });
   try {
     const id = new URL(request.url).searchParams.get("experiment")?.trim();

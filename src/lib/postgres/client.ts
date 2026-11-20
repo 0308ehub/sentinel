@@ -2,7 +2,7 @@ import "server-only";
 
 import postgres from "postgres";
 import { autopilotConfigured } from "@/lib/autopilot/db";
-import { currentUserId } from "@/lib/connections/current";
+import { currentAccountId } from "@/lib/connections/current";
 import { deleteConnection, getConnection, saveConnection } from "@/lib/connections/store";
 import { pooledDatabase } from "@/lib/db/url";
 import { databaseLabel, postgresUrl } from "@/lib/postgres/url";
@@ -30,7 +30,7 @@ let cache: { at: number; userId: string; status: PostgresStatus } | null = null;
 
 export async function getPostgresStatus(): Promise<PostgresStatus> {
   if (!autopilotConfigured()) return { configured: false, connected: false, error: NEEDS_APP_DB };
-  const userId = await currentUserId();
+  const userId = await currentAccountId();
   if (!userId) return { configured: true, connected: false, error: "Sign in required." };
   if (cache && cache.userId === userId && Date.now() - cache.at < 60_000) return cache.status;
   const saved = await getConnection<SavedSecret>(userId, "postgres").catch((error) => {
@@ -46,7 +46,7 @@ export async function getPostgresStatus(): Promise<PostgresStatus> {
 
 export async function connectPostgres(rawUrl: string): Promise<PostgresStatus> {
   if (!autopilotConfigured()) return { configured: false, connected: false, error: NEEDS_APP_DB };
-  const userId = await currentUserId();
+  const userId = await currentAccountId();
   if (!userId) return { configured: true, connected: false, error: "Sign in required." };
   const url = postgresUrl(rawUrl);
   if (!url) return { configured: true, connected: false, error: "Paste a postgres:// connection URL, including the database name." };
@@ -58,7 +58,7 @@ export async function connectPostgres(rawUrl: string): Promise<PostgresStatus> {
 }
 
 export async function disconnectPostgres(): Promise<void> {
-  const userId = await currentUserId();
+  const userId = await currentAccountId();
   if (!userId) return;
   await deleteConnection(userId, "postgres");
   cache = null;

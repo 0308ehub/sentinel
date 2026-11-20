@@ -1,6 +1,6 @@
 import "server-only";
 
-import { currentUserId } from "@/lib/connections/current";
+import { currentAccountId } from "@/lib/connections/current";
 import { getConnection, saveConnection } from "@/lib/connections/store";
 import { framesInFile, layoutFromFigma, parseFigmaUrl, type FigmaNode, type Layout } from "@/lib/design/scene";
 
@@ -16,7 +16,7 @@ export class FigmaApiError extends Error {
 }
 
 async function storedToken(): Promise<string> {
-  const userId = await currentUserId();
+  const userId = await currentAccountId();
   if (userId) {
     try {
       const stored = await getConnection<{ token?: unknown }>(userId, "figma");
@@ -44,7 +44,7 @@ export async function figmaStatus(): Promise<{ connected: boolean; handle: strin
 export async function connectFigma(token: string): Promise<{ handle: string; saved: boolean }> {
   const me = await figmaFetch<{ handle?: string }>("/v1/me", token);
   const handle = me.handle?.trim() || "";
-  const userId = await currentUserId();
+  const userId = await currentAccountId();
   if (!userId) return { handle, saved: false };
   try {
     await saveConnection(userId, "figma", { token }, { handle });

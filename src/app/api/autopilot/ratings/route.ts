@@ -1,12 +1,12 @@
 import { withAutopilotUser } from "@/lib/autopilot/scope";
 import { getExperiment, listSignals, log, rateSuggestion, setSignalStatus } from "@/lib/autopilot/store";
 import type { SuggestionRatingValue, SuggestionTargetKind } from "@/lib/autopilot/types";
-import { currentUserId } from "@/lib/connections/current";
+import { currentAccountId } from "@/lib/connections/current";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  const userId = await currentUserId();
+  const userId = await currentAccountId();
   if (!userId) return Response.json({ error: "Sign in required." }, { status: 401 });
   const body = (await request.json().catch(() => ({}))) as {
     targetKind?: SuggestionTargetKind;

@@ -20,7 +20,7 @@ export async function GET(request: Request) {
   const headers = key === null ? undefined : CORS;
   let userId: string | null;
   try {
-    userId = key === null ? siteAutopilotUser() : await userForSiteKey(key);
+    userId = key === null ? await siteAutopilotUser() : await userForSiteKey(key);
   } catch (error) {
     console.error("[autopilot] flags site", error);
     return Response.json({ flags: [] }, { headers });

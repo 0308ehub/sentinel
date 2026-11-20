@@ -1,11 +1,11 @@
 import { db } from "@/lib/autopilot/db";
-import { currentUserId } from "@/lib/connections/current";
+import { currentAccountId } from "@/lib/connections/current";
 
 export const dynamic = "force-dynamic";
 
 /** The full file Autopilot wrote for an experiment, as plain text. */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const userId = await currentUserId();
+  const userId = await currentAccountId();
   if (!userId) return new Response("Sign in required.", { status: 401 });
   const { id } = await params;
   const cleanup = new URL(request.url).searchParams.get("cleanup") === "1";

@@ -2,11 +2,11 @@ import { randomUUID } from "node:crypto";
 import { splitSetupContext } from "@/lib/autopilot/context";
 import { withAutopilotUser } from "@/lib/autopilot/scope";
 import { addEvidence } from "@/lib/autopilot/store";
-import { currentUserId } from "@/lib/connections/current";
+import { currentAccountId } from "@/lib/connections/current";
 import { addWorkspaceNote } from "@/lib/workspace/cloud";
 
 export async function POST(request: Request) {
-  const userId = await currentUserId();
+  const userId = await currentAccountId();
   if (!userId) return Response.json({ error: "Sign in required." }, { status: 401 });
 
   let body: { text?: unknown };

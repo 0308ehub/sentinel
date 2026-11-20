@@ -5,7 +5,7 @@ import { chosenAutopilotRepo, defaultAutopilotRepo } from "@/lib/autopilot/repo"
 import { withAutopilotUser } from "@/lib/autopilot/scope";
 import { siteUrlFor } from "@/lib/autopilot/sites";
 import { experimentDraft, getExperiment, setExperimentChangeSummary } from "@/lib/autopilot/store";
-import { currentUserId } from "@/lib/connections/current";
+import { currentAccountId } from "@/lib/connections/current";
 import { compareFiles, pullChanges, repoDefaultBranch } from "@/lib/github/client";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +18,7 @@ function validSummary(value: ModelSummary): boolean {
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const userId = await currentUserId();
+  const userId = await currentAccountId();
   if (!userId) return Response.json({ error: "Sign in required." }, { status: 401 });
   const { id } = await params;
   return withAutopilotUser(userId, async () => {

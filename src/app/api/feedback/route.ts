@@ -18,7 +18,7 @@ function firstLine(message: string): string {
 export async function POST(request: Request): Promise<Response> {
   const reporterId = await currentUserId();
   if (!reporterId) return error("Sign in required.", 401);
-  const owner = siteAutopilotUser();
+  const owner = await siteAutopilotUser();
   if (!owner) return error("Feedback is not set up.", 503);
 
   let input: unknown;

@@ -1,4 +1,4 @@
-import { currentUserId } from "@/lib/connections/current";
+import { currentAccountId } from "@/lib/connections/current";
 import { autopilotConfigured } from "@/lib/autopilot/db";
 import {
   addWorkspaceNote,
@@ -9,7 +9,7 @@ import {
 export const maxDuration = 30;
 
 export async function GET() {
-  const userId = await currentUserId();
+  const userId = await currentAccountId();
   if (!userId) return Response.json({ error: "Sign in required." }, { status: 401 });
   if (!autopilotConfigured()) return Response.json({ configured: false });
   try {
@@ -22,7 +22,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const userId = await currentUserId();
+  const userId = await currentAccountId();
   if (!userId) return Response.json({ error: "Sign in required." }, { status: 401 });
   if (!autopilotConfigured()) return Response.json({ error: "Add the Supabase connection string." }, { status: 503 });
   let body: {

@@ -5,9 +5,10 @@ import { approve, reject, rollout, scheduleRollout, stop } from "@/lib/autopilot
 import type { RolloutPhase } from "@/lib/autopilot/rollout-plan";
 import { withAutopilotUser } from "@/lib/autopilot/scope";
 import { srmCheck } from "@/lib/autopilot/stats";
-import { experimentActivity, getExperiment, listFlags, updateExperiment } from "@/lib/autopilot/store";
-import { currentUserId } from "@/lib/connections/current";
+import { experimentActivity, getExperiment, listFlags, log, updateExperiment } from "@/lib/autopilot/store";
+import { currentAccountId } from "@/lib/connections/current";
 import { GitHubApiError } from "@/lib/github/client";
+import { attributed, currentPersonName } from "@/lib/auth/person";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ const ACTIONS = ["approve", "reject", "cancel", "rollout", "schedule", "stop", "
 type Action = (typeof ACTIONS)[number];
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const userId = await currentUserId();
+  const userId = await currentAccountId();
   if (!userId) return Response.json({ error: "Sign in required." }, { status: 401 });
   const { id } = await params;
   return withAutopilotUser(userId, async () => {
@@ -39,7 +40,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const userId = await currentUserId();
+  const userId = await currentAccountId();
   if (!userId) return Response.json({ error: "Sign in required." }, { status: 401 });
   const { id } = await params;
   const body = (await request.json().catch(() => ({}))) as { adjustments?: unknown };
@@ -53,22 +54,24 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
     const adjustments = requestedAdjustments.trim().slice(0, 2000) || null;
     await updateExperiment(id, { adjustments });
+    await log("person", attributed(`Saved build notes for “${experiment.title}”`, await currentPersonName()), id);
     return Response.json({ adjustments });
   });
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const userId = await currentUserId();
+  const userId = await currentAccountId();
   if (!userId) return Response.json({ error: "Sign in required." }, { status: 401 });
   const { id } = await params;
   const body = (await request.json().catch(() => ({}))) as { action?: string; phases?: RolloutPhase[] };
   const action = ACTIONS.find((a) => a === body.action) as Action | undefined;
   if (!action) return Response.json({ error: "Unknown action." }, { status: 400 });
 
-  return withAutopilotUser(userId, () => act(id, action, body.phases));
+  const name = await currentPersonName();
+  return withAutopilotUser(userId, () => act(id, action, body.phases, name));
 }
 
-async function act(id: string, action: Action, phases?: RolloutPhase[]): Promise<Response> {
+async function act(id: string, action: Action, phases: RolloutPhase[] | undefined, name: string): Promise<Response> {
   const experiment = await getExperiment(id);
   if (!experiment) return Response.json({ error: "Experiment not found." }, { status: 404 });
 
@@ -83,6 +86,9 @@ async function act(id: string, action: Action, phases?: RolloutPhase[]): Promise
     else {
       await stop(experiment, "Turned off by you.", false);
       message = "Turned off. Everyone sees the current version.";
+    }
+    if (["approve", "reject", "rollout", "approve-cleanup", "dismiss-cleanup"].includes(action)) {
+      await log("person", attributed(`${action === "reject" ? "Declined" : action === "rollout" ? "Merged" : "Approved"} “${experiment.title}”`, name), id);
     }
     return Response.json({ message });
   } catch (error) {

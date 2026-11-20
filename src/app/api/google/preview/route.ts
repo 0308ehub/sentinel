@@ -1,10 +1,10 @@
 import { loadGooglePreview } from "@/lib/google/client";
-import { currentUserId } from "@/lib/connections/current";
+import { currentAccountId } from "@/lib/connections/current";
 
 export const maxDuration = 60;
 
 export async function GET() {
-  if (!await currentUserId()) {
+  if (!await currentAccountId()) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {

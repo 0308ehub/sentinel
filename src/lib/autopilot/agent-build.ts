@@ -157,7 +157,8 @@ export async function finishBuild(
   await log("build", `Opened PR #${pull.number} for “${experiment.title}”.`, experiment.id);
   const summary = experiment.changeSummary;
   const codeIsLive = false;
-  if (!fix && summary?.kind === "ui" && (Boolean(summary.when.trim()) || !codeIsLive)) {
+  // Fixes get a sample render too, started now rather than when someone opens the page.
+  if (summary?.kind === "ui" && (Boolean(summary.when.trim()) || !codeIsLive)) {
     await startSnapshot(
       { ...experiment, status: "awaiting_approval", prUrl: pull.url, prNumber: pull.number, branch },
       summary,

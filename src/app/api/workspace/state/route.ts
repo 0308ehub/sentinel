@@ -1,5 +1,6 @@
+import { isPersonalStateKey, STATE_KEYS, type StateKey } from "@/lib/workspace/keys";
 import { autopilotConfigured } from "@/lib/autopilot/db";
-import { currentUserId } from "@/lib/connections/current";
+import { currentAccountId, currentUserId } from "@/lib/connections/current";
 import { isStateKey, loadStates, saveState } from "@/lib/workspace/state-store";
 
 export const dynamic = "force-dynamic";
@@ -17,17 +18,34 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 async function identity(): Promise<string | Response> {
-  const userId = await currentUserId();
+  const userId = await currentAccountId();
   if (!userId) return errorResponse("sign_in_required", 401);
   if (!autopilotConfigured()) return errorResponse("not_configured", 503);
   return userId;
+}
+
+/** Chats and personal setup stay with the person; everything else belongs to the (possibly shared) account. */
+async function ownerFor(key: StateKey, accountId: string): Promise<string> {
+  return isPersonalStateKey(key) ? (await currentUserId()) ?? accountId : accountId;
 }
 
 export async function GET(): Promise<Response> {
   const userId = await identity();
   if (userId instanceof Response) return userId;
   try {
-    return Response.json({ userId, states: await loadStates(userId) });
+    const person = (await currentUserId()) ?? userId;
+    const [shared, personal] = await Promise.all([
+      loadStates(userId),
+      person === userId ? Promise.resolve({}) : loadStates(person),
+    ]);
+    const states = Object.fromEntries(
+      STATE_KEYS.flatMap((key) => {
+        const source = isPersonalStateKey(key) && person !== userId ? personal : shared;
+        const value = (source as Record<string, unknown>)[key];
+        return value === undefined ? [] : [[key, value]];
+      }),
+    );
+    return Response.json({ userId, states });
   } catch (error) {
     console.error("[workspace]", error);
     return errorResponse("unknown_error", 500);
@@ -47,7 +65,7 @@ export async function PUT(request: Request): Promise<Response> {
     if (!Number.isInteger(body.baseVersion) || (body.baseVersion as number) < 0) {
       return errorResponse("bad_request", 400);
     }
-    const result = await saveState(userId, body.key, body.data, body.baseVersion as number);
+    const result = await saveState(await ownerFor(body.key, userId), body.key, body.data, body.baseVersion as number);
     return result.ok
       ? Response.json({ version: result.version })
       : Response.json({ data: result.data, version: result.version }, { status: 409 });

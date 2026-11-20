@@ -35,8 +35,33 @@ function client(): Sql {
 }
 
 // Everything lives in its own schema so the shared Neon database's other tables are never touched.
+// Unless explicitly private (for example coder_sessions), user_id stores a Kismet account id:
+// an active Clerk organization id, or a person id when using Kismet personally.
 const SCHEMA = `
 create schema if not exists kismet;
+
+create table if not exists kismet.account_versions (
+  account_id text primary key,
+  version bigint not null default 0,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists kismet.presence (
+  account_id text not null,
+  user_id text not null,
+  name text not null,
+  image_url text not null default '',
+  location text not null default '',
+  seen_at timestamptz not null default now(),
+  primary key (account_id, user_id)
+);
+create index if not exists presence_account_seen_idx on kismet.presence (account_id, seen_at desc);
+
+create table if not exists kismet.account_moves (
+  from_id text primary key,
+  to_id text not null,
+  moved_at timestamptz not null default now()
+);
 
 create table if not exists kismet.ai_spend (
   bucket text not null,
@@ -485,6 +510,69 @@ create table if not exists kismet.workspace_state (
   updated_at timestamptz not null default now(),
   primary key (user_id, key)
 );
+
+create or replace function kismet.bump_account_version()
+returns trigger
+language plpgsql
+as $$
+declare
+  new_account text;
+  old_account text;
+begin
+  if TG_TABLE_NAME = 'workspace_state' then
+    if TG_OP <> 'DELETE' and NEW.key in ('chats', 'onboarding', 'notifications') then
+      new_account := null;
+    elsif TG_OP <> 'DELETE' then
+      new_account := NEW.user_id;
+    end if;
+    if TG_OP <> 'INSERT' and OLD.key in ('chats', 'onboarding', 'notifications') then
+      old_account := null;
+    elsif TG_OP <> 'INSERT' then
+      old_account := OLD.user_id;
+    end if;
+  else
+    if TG_OP <> 'DELETE' then new_account := NEW.user_id; end if;
+    if TG_OP <> 'INSERT' then old_account := OLD.user_id; end if;
+  end if;
+
+  if new_account is not null then
+    insert into kismet.account_versions (account_id, version, updated_at)
+    values (new_account, 1, now())
+    on conflict (account_id) do update
+      set version = kismet.account_versions.version + 1, updated_at = now();
+  end if;
+  if old_account is not null and old_account is distinct from new_account then
+    insert into kismet.account_versions (account_id, version, updated_at)
+    values (old_account, 1, now())
+    on conflict (account_id) do update
+      set version = kismet.account_versions.version + 1, updated_at = now();
+  end if;
+  return null;
+end;
+$$;
+
+do $$
+declare table_name text;
+begin
+  foreach table_name in array array[
+    'experiments', 'signals', 'evidence', 'activity', 'autopilot_goals',
+    'autopilot_learnings', 'connections', 'autopilot_repo',
+    'suggestion_ratings', 'workspace_state'
+  ]
+  loop
+    -- Only create it when missing: this runs on every server start, and dropping/re-creating triggers
+    -- would lock busy tables each time.
+    if not exists (
+      select 1 from pg_trigger
+      where tgname = 'bump_account_version' and tgrelid = format('kismet.%I', table_name)::regclass
+    ) then
+      execute format(
+        'create trigger bump_account_version after insert or update or delete on kismet.%I for each row execute function kismet.bump_account_version()',
+        table_name
+      );
+    end if;
+  end loop;
+end $$;
 
 create table if not exists kismet.coder_sessions (
   session_id text primary key,

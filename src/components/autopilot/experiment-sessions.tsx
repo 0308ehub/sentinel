@@ -13,6 +13,9 @@ import { workSession, type WorkBucket, type WorkSession, type WorkTone } from "@
 import type { Experiment } from "@/lib/autopilot/types";
 import { cn } from "@/lib/utils";
 import { prefetchExperiment } from "@/components/autopilot/experiment-queries";
+import { usePresence } from "@/components/workspace/live-sync";
+import { PresenceAvatar } from "@/components/workspace/presence-avatar";
+import { formatLocation, presenceHere, type PresenceEntry } from "@/lib/workspace/live-sync-core";
 
 type SessionFilter = "active" | "review" | "working" | "running" | "ended";
 
@@ -75,6 +78,7 @@ export function ExperimentSessions({
   onRun: () => void;
 }) {
   const queryClient = useQueryClient();
+  const presence = usePresence();
   const [filter, setFilter] = useState<SessionFilter>("active");
   const rows = useMemo(() => {
     return experiments
@@ -172,6 +176,7 @@ export function ExperimentSessions({
               <li key={session.id}>
                 <SessionRow
                   session={session}
+                  viewers={presenceHere(presence, formatLocation("/experiments", session.id)).slice(0, 3)}
                   selected={session.id === selectedId}
                   onPrefetch={() => { void prefetchExperiment(queryClient, experiment); }}
                   onOpen={() => onOpen(session.id)}
@@ -202,12 +207,14 @@ function SessionRow({
   onOpen,
   onPrefetch,
   onStop,
+  viewers,
 }: {
   session: WorkSession;
   selected: boolean;
   onOpen: () => void;
   onPrefetch: () => void;
   onStop: () => void;
+  viewers: PresenceEntry[];
 }) {
   return (
     <div
@@ -230,6 +237,11 @@ function SessionRow({
           </span>
         </span>
       </button>
+      {viewers.length > 0 && (
+        <span className="mt-1 flex shrink-0 -space-x-1" aria-label={`${viewers.length} viewing`}>
+          {viewers.map((person) => <PresenceAvatar key={person.userId} person={person} />)}
+        </span>
+      )}
       {session.canStop && (
         <button
           type="button"

@@ -1,7 +1,7 @@
 import { withAutopilotUser } from "@/lib/autopilot/scope";
 import { rotateSiteKey, setSiteUrl, siteDetailsFor } from "@/lib/autopilot/sites";
 import { eventsSince } from "@/lib/autopilot/store";
-import { currentUserId } from "@/lib/connections/current";
+import { currentAccountId } from "@/lib/connections/current";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +11,7 @@ function snippetFor(key: string, origin: string): string {
 }
 
 export async function GET(request: Request) {
-  const userId = await currentUserId();
+  const userId = await currentAccountId();
   if (!userId) return Response.json({ error: "Sign in required." }, { status: 401 });
   try {
     const [key, recentEvents] = await Promise.all([
@@ -26,7 +26,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const userId = await currentUserId();
+  const userId = await currentAccountId();
   if (!userId) return Response.json({ error: "Sign in required." }, { status: 401 });
   const body = (await request.json().catch(() => null)) as { action?: unknown; siteUrl?: unknown } | null;
   if (body?.action === "site_url") {

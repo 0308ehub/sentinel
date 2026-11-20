@@ -10,7 +10,7 @@ import { SlackApiError } from "@/lib/slack/client";
 import { recentRepoNotes } from "@/lib/github/client";
 import { workspaceBrief } from "@/lib/workspace/cloud";
 import { postgresBrief } from "@/lib/postgres/client";
-import { currentUserId } from "@/lib/connections/current";
+import { currentAccountId } from "@/lib/connections/current";
 
 export const maxDuration = 120;
 
@@ -139,7 +139,7 @@ export async function POST(request: Request) {
   }
 
   const [company, github, database] = await Promise.all([
-    workspaceBrief(await currentUserId()),
+    workspaceBrief(await currentAccountId()),
     allowConnectors ? recentRepoNotes().catch((error) => {
       console.error("[chat] github context", error);
       return "";
