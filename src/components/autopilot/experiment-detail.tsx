@@ -5,7 +5,7 @@ import { ExternalLink, Loader2 } from "lucide-react";
 import { BuildLive } from "@/components/autopilot/build-live";
 import { CodeChange } from "@/components/autopilot/code-change";
 import { WhatChanges } from "@/components/autopilot/what-changes";
-import { useVisitorSeries } from "@/components/autopilot/experiment-queries";
+import { useVisitorSeries, type ExperimentActivity } from "@/components/autopilot/experiment-queries";
 import { BuilderMenu, useAccountBuilder } from "@/components/autopilot/builder-menu";
 import { RolloutScheduleDialog } from "@/components/autopilot/rollout-schedule";
 import { Button } from "@/components/ui/button";
@@ -789,13 +789,17 @@ function ResultsCanvas({
   names: { control: string; treatment: string };
   showChart: boolean;
 }) {
-  const compare = control && treatment ? rateInterval(control, treatment) : null;
+  const live = useVisitorSeries(showChart ? experiment : null);
+  const activity = live.data?.activity ?? null;
+  const controlShown = activity ? liveArm(activity.totals.control, "control") : control;
+  const treatmentShown = activity ? liveArm(activity.totals.treatment, "treatment") : treatment;
+  const compare = controlShown && treatmentShown ? rateInterval(controlShown, treatmentShown) : null;
   const start = experiment?.startedAt ?? experiment?.createdAt ?? signal?.createdAt ?? null;
   return (
     <div className="text-[#374151]">
       <div className="flex flex-wrap items-center gap-x-6 gap-y-1 border-b border-[#e6e8ec] px-4 py-3 text-xs text-[#6b7280]">
         <ToolbarLabel label="Date range" value={rangeLabel(start)} />
-        <ToolbarLabel label="Segment" value="All visitors" />
+        <ToolbarLabel label="Segment" value={segmentLabel(activity)} />
         <ToolbarLabel label="Baseline" value={names.control} />
         <ToolbarLabel label="Metric" value={experiment?.metric || "Conversion"} />
       </div>
@@ -815,7 +819,8 @@ function ResultsCanvas({
             <ResultRow
               name={names.control}
               color="#5c6570"
-              arm={control}
+              arm={controlShown}
+              detail={activity?.totals.control ?? null}
               improvement={null}
               interval={null}
               significance="Baseline"
@@ -824,18 +829,33 @@ function ResultsCanvas({
             <ResultRow
               name={names.treatment}
               color="#db2777"
-              arm={treatment}
+              arm={treatmentShown}
+              detail={activity?.totals.treatment ?? null}
               improvement={compare?.lift ?? readout?.lift ?? null}
               interval={compare}
               significance={significanceLabel(readout?.sequentialP ?? null)}
-              remaining={treatment ? Math.max(0, (experiment?.estimate?.perArm ?? DECISION_VISITORS) - treatment.visitors) : null}
+              remaining={treatmentShown ? Math.max(0, (experiment?.estimate?.perArm ?? DECISION_VISITORS) - treatmentShown.visitors) : null}
             />
           </tbody>
         </table>
         <p className="mt-2 text-[11px] text-[#9aa0a8]">
-          Peeking-safe: checking early won&apos;t create false winners. Decisions wait at least {readout?.minimumDays ?? 7} days.
+          Counts refresh as people arrive. A winner is only called on Kismet&apos;s check, after at least {readout?.minimumDays ?? 7} days, so looking early cannot invent one.
         </p>
-        {readout?.srm && (
+        {live.isError && (
+          <p className="mt-2 text-xs text-red-700">Could not load live traffic. The last saved result is still shown.</p>
+        )}
+        {activity && activity.humanVisitors === 0 && activity.syntheticVisitors > 0 && (
+          <p className="mt-2 text-xs text-[#6b7280]">No human visitors yet. These numbers are sample traffic, so they do not decide the experiment.</p>
+        )}
+        {activity && activity.humanVisitors > 0 && activity.syntheticVisitors > 0 && (
+          <p className="mt-2 text-xs text-[#6b7280]">{activity.syntheticVisitors.toLocaleString("en-US")} automated or sample visits are left out. The counts are people.</p>
+        )}
+        {activity ? <VariantSplit activity={activity} names={names} /> : null}
+        {activity?.uneven ? (
+          <div className="mt-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">
+            The split is off: {activity.totals.control.visitors.toLocaleString("en-US")} people on {names.control} and {activity.totals.treatment.visitors.toLocaleString("en-US")} on {names.treatment}, against a {activity.treatmentPct}% plan for the new version.
+          </div>
+        ) : readout?.srm && (
           <div className="mt-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">
             The visitor split looks broken ({readout.srm.observed[0].toLocaleString("en-US")} vs {readout.srm.observed[1].toLocaleString("en-US")}, expected about even). Results are paused until it&apos;s fixed.
           </div>
@@ -850,11 +870,20 @@ function ResultsCanvas({
             </span>
           </div>
         )}
-        {readout && readout.syntheticShare > 0 && (
+        {!activity && readout && readout.syntheticShare > 0 && (
           <p className="mt-2 text-xs text-[#6b7280]">{Math.round(readout.syntheticShare * 100)}% of this traffic is synthetic.</p>
         )}
       </div>
-      {showChart && experiment && <VisitorChart experiment={experiment} names={names} />}
+      {showChart && experiment && (
+        <VisitorChart
+          experiment={experiment}
+          names={names}
+          loading={live.isLoading}
+          refreshing={live.isFetching && !live.isPending}
+          series={live.data?.series ?? []}
+          activity={activity}
+        />
+      )}
     </div>
   );
 }
@@ -863,6 +892,7 @@ function ResultRow({
   name,
   color,
   arm,
+  detail,
   improvement,
   interval,
   significance,
@@ -871,6 +901,7 @@ function ResultRow({
   name: string;
   color: string;
   arm: ArmResult | null;
+  detail: { views: number; clicks: number } | null;
   improvement: number | null;
   interval: { low: number; high: number; lift: number } | null;
   significance: string;
@@ -887,7 +918,10 @@ function ResultRow({
       </td>
       <td className="py-3">
         <div>{arm ? arm.conversions.toLocaleString("en-US") : "—"}</div>
-        <div className="text-xs text-[#9aa0a8]">{arm ? `${arm.visitors.toLocaleString("en-US")} visitors` : ""}</div>
+        <div className="text-xs text-[#9aa0a8]">
+          {arm ? `${arm.visitors.toLocaleString("en-US")} people` : ""}
+          {detail ? ` · ${detail.views.toLocaleString("en-US")} viewed · ${detail.clicks.toLocaleString("en-US")} clicked` : ""}
+        </div>
       </td>
       <td className="py-3 tabular-nums">{rate == null ? "—" : rate.toFixed(3)}</td>
       <td className="py-3 tabular-nums">{improvement == null ? "—" : signedPercent(improvement)}</td>
@@ -916,16 +950,37 @@ function IntervalMark({ lift, low, high }: { lift: number; low: number; high: nu
   );
 }
 
+type TrendMetric = "visitors" | "views" | "clicks" | "conversions";
+
+const TRENDS: { id: TrendMetric; label: string }[] = [
+  { id: "visitors", label: "People" },
+  { id: "views", label: "Page views" },
+  { id: "clicks", label: "Clicks" },
+  { id: "conversions", label: "Conversions" },
+];
+
 function VisitorChart({
   experiment,
   names,
+  loading,
+  refreshing,
+  series,
+  activity,
 }: {
   experiment: Experiment;
   names: { control: string; treatment: string };
+  loading: boolean;
+  refreshing: boolean;
+  series: DailyVisitors[];
+  activity: ExperimentActivity | null;
 }) {
   const [open, setOpen] = useState(true);
-  const series = useVisitorSeries(experiment);
-  const points = series.isPending ? null : fillDays(experiment.startedAt, series.data ?? []);
+  const [metric, setMetric] = useState<TrendMetric>("visitors");
+  const source = activity
+    ? activity.days.map((point) => ({ day: point.day, control: point.control[metric], treatment: point.treatment[metric] }))
+    : series;
+  const points = loading ? null : fillDays(experiment.startedAt, source);
+  const trend = TRENDS.find((item) => item.id === metric) ?? TRENDS[0];
 
   return (
     <section className="border-t border-[#e6e8ec] px-4 py-3">
@@ -934,14 +989,28 @@ function VisitorChart({
       </button>
       {open && (
         <>
-          <div className="mb-2 flex items-center justify-between text-sm">
-            <span className="inline-flex items-center gap-1 font-medium">
-              Visitors over time
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm">
+            <span className="inline-flex items-center gap-2 font-medium">
+              {trend.label} over time
+              {refreshing && <span className="text-xs font-normal text-[#9aa0a8]">Updating</span>}
             </span>
             <span className="flex items-center gap-4 text-xs text-[#6b7280]">
               <Legend color="#5c6570" label={names.control} />
               <Legend color="#db2777" label={names.treatment} />
             </span>
+          </div>
+          <div className="mb-3 flex flex-wrap gap-1" role="group" aria-label="What to chart">
+            {TRENDS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setMetric(item.id)}
+                className={`rounded px-2 py-1 text-xs ${metric === item.id ? "bg-[#111827] text-white" : "text-[#6b7280] hover:bg-[#f3f4f6]"}`}
+                aria-pressed={metric === item.id}
+              >
+                {item.label}
+              </button>
+            ))}
           </div>
           {points == null ? (
             <div className="min-h-64 animate-pulse rounded-md bg-[#f8f9fa] p-4" role="status">
@@ -949,7 +1018,7 @@ function VisitorChart({
               <div className="h-full min-h-56 rounded border border-[#e6e8ec] bg-[#eceef1]" />
             </div>
           ) : (
-            <div className="animate-in fade-in duration-150"><VisitorLines points={points} /></div>
+            <div className="animate-in fade-in duration-150"><VisitorLines points={points} label={`${trend.label} over time`} /></div>
           )}
         </>
       )}
@@ -957,7 +1026,56 @@ function VisitorChart({
   );
 }
 
-function VisitorLines({ points }: { points: DailyVisitors[] }) {
+function VariantSplit({ activity, names }: { activity: ExperimentActivity; names: { control: string; treatment: string } }) {
+  const control = activity.totals.control.visitors;
+  const treatment = activity.totals.treatment.visitors;
+  const scale = Math.max(control, treatment, 1);
+  return (
+    <div className="mt-4 border-t border-[#eef0f3] pt-3">
+      <p className="text-xs font-medium text-[#111827]">People on each version</p>
+      <p className="mt-1 text-xs text-[#6b7280]">{splitSentence(control, treatment, activity.treatmentPct, names.treatment)}</p>
+      <div className="mt-3 space-y-2">
+        <SplitBar label={names.control} count={control} width={(control / scale) * 100} color="#5c6570" />
+        <SplitBar label={names.treatment} count={treatment} width={(treatment / scale) * 100} color="#db2777" />
+      </div>
+    </div>
+  );
+}
+
+function SplitBar({ label, count, width, color }: { label: string; count: number; width: number; color: string }) {
+  return (
+    <div className="grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)_auto] items-center gap-3 text-xs">
+      <span className="truncate text-[#374151]">{label}</span>
+      <span className="h-2 rounded-full bg-[#f3f4f6]">
+        <span className="block h-2 rounded-full" style={{ width: `${Math.max(count > 0 ? 4 : 0, width)}%`, background: color }} />
+      </span>
+      <span className="tabular-nums text-[#111827]">{count.toLocaleString("en-US")}</span>
+    </div>
+  );
+}
+
+function liveArm(arm: ExperimentActivity["totals"]["control"], name: "control" | "treatment"): ArmResult {
+  return { arm: name, visitors: arm.visitors, conversions: arm.conversions, rate: arm.visitors ? arm.conversions / arm.visitors : null };
+}
+
+function segmentLabel(activity: ExperimentActivity | null): string {
+  if (!activity) return "All visitors";
+  if (activity.humanVisitors === 0 && activity.syntheticVisitors > 0) return "Sample traffic";
+  return "Human visitors";
+}
+
+function splitSentence(control: number, treatment: number, treatmentPct: number, treatmentName: string): string {
+  const total = control + treatment;
+  if (total === 0) return "No one has been counted yet. Open the site in a browser, then again in a private window. Each person shows up here within a few seconds.";
+  const expected = Math.round((total * treatmentPct) / 100);
+  const delta = treatment - expected;
+  if (delta === 0) return `The split matches the plan: about ${treatmentPct}% see ${treatmentName}.`;
+  const count = Math.abs(delta).toLocaleString("en-US");
+  const people = Math.abs(delta) === 1 ? "person" : "people";
+  return `${treatmentName} has ${count} ${delta > 0 ? "more" : "fewer"} ${people} than the ${treatmentPct}% plan.`;
+}
+
+function VisitorLines({ points, label }: { points: DailyVisitors[]; label: string }) {
   const width = 720;
   const height = 260;
   const pad = { l: 44, r: 12, t: 12, b: 28 };
@@ -973,7 +1091,7 @@ function VisitorLines({ points }: { points: DailyVisitors[] }) {
   const labelAt = (index: number) => points[index]?.day.slice(5).replace("-", "/");
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="h-64 w-full" role="img" aria-label="Visitors over time">
+    <svg viewBox={`0 0 ${width} ${height}`} className="h-64 w-full" role="img" aria-label={label}>
       {ticks.map((tick) => (
         <g key={tick}>
           <line x1={pad.l} x2={width - pad.r} y1={yAt(tick)} y2={yAt(tick)} stroke="#e6e8ec" />

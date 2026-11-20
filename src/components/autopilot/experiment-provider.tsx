@@ -39,6 +39,8 @@ export function ExperimentProvider({ children }: { children: React.ReactNode }) 
   const pathname = usePathname();
   const [visitor] = useState(() => (typeof document === "undefined" ? "" : readVisitor()));
   const queue = useRef<TrackedEvent[]>([]);
+  const pendingClicks = useRef<{ page: string; element: string }[]>([]);
+  const flagsReadyRef = useRef(false);
   const [overrides, setOverrides] = useState<PreviewOverrides>({});
   const [embedded, setEmbedded] = useState(false);
   const [previewReady, setPreviewReady] = useState(false);
@@ -95,6 +97,9 @@ export function ExperimentProvider({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     armsRef.current = arms;
   }, [arms]);
+  useEffect(() => {
+    flagsReadyRef.current = flags.isFetched;
+  }, [flags.isFetched]);
 
   // Wait for the flags so each view is tagged with the experiments this visitor is in.
   const flagsReady = flags.isFetched;
@@ -106,17 +111,25 @@ export function ExperimentProvider({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     if (!visitor || !previewReady || previewing) {
       queue.current = [];
+      pendingClicks.current = [];
       return;
     }
     const onClick = (event: MouseEvent) => {
       if (!(event.target instanceof Element)) return;
       const label = labelFor(event.target);
-      if (label) queue.current.push({ name: "click", page: window.location.pathname, element: label, arms: armsRef.current });
+      if (!label) return;
+      const page = window.location.pathname;
+      // A click before the flags load would be stored with no version, so it waits and is stamped later.
+      if (!flagsReadyRef.current) {
+        if (pendingClicks.current.length < 50) pendingClicks.current.push({ page, element: label });
+        return;
+      }
+      queue.current.push({ name: "click", page, element: label, arms: armsRef.current });
     };
     const flush = () => {
       if (queue.current.length === 0) return;
       const events = queue.current.splice(0, 50);
-      const body = JSON.stringify({ visitor, events });
+      const body = JSON.stringify({ visitor, events, automated: navigator.webdriver === true });
       if (document.visibilityState === "hidden" && navigator.sendBeacon) {
         navigator.sendBeacon("/api/autopilot/events", new Blob([body], { type: "application/json" }));
       } else {
@@ -145,6 +158,9 @@ export function ExperimentProvider({ children }: { children: React.ReactNode }) 
     if (!canRecord) return;
     for (const item of pendingTracks.current.splice(0)) {
       queue.current.push({ name: "track", page: item.page, element: item.name, arms: armsRef.current });
+    }
+    for (const item of pendingClicks.current.splice(0)) {
+      queue.current.push({ name: "click", page: item.page, element: item.element, arms: armsRef.current });
     }
   }, [canRecord]);
 

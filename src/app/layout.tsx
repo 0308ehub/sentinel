@@ -52,7 +52,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
   },
   icons: {
-    icon: [{ url: "/favicon.ico" }, { url: "/kismet-mark.png", type: "image/png" }],
+    icon: [{ url: "/kismet-mark.png", type: "image/png", sizes: "any" }, { url: "/favicon.ico" }],
     apple: "/apple-touch-icon.png",
   },
 };

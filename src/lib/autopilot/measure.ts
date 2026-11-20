@@ -128,6 +128,9 @@ export async function measureRunning(): Promise<string | null> {
     }
     const result = await readout(experiment, (flags.get(experiment.flag)?.treatmentPct ?? 50) / 100);
     if (!result) continue;
+    // Sample traffic can fill the chart before anyone real arrives. It never wins, loses, or ends the test.
+    const counted = result.arms.reduce((sum, arm) => sum + arm.visitors, 0);
+    if (counted > 0 && result.syntheticShare >= 1) result.verdict = "collecting";
     if (result.srm) {
       const [controlVisitors, treatmentVisitors] = result.srm.observed;
       const note = `The visitor split looks broken (${controlVisitors} vs ${treatmentVisitors}, expected about even). Results are paused until it's fixed.`;

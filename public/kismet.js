@@ -103,6 +103,8 @@
   }
 
   var visitor = visitorId();
+  var automated = false;
+  try { automated = navigator.webdriver === true; } catch (e) {}
   var arms = {};
   var queue = [];
   var resolveReady;
@@ -122,14 +124,16 @@
 
   function record(name, page, element) {
     if (previewing) return;
-    var snapshot = {};
-    Object.keys(arms).forEach(function (key) { snapshot[key] = arms[key]; });
-    queue.push({ name: name, page: page, element: element, arms: snapshot });
+    // Clicks can happen before the flags arrive. Wait, then stamp the version this person is in.
+    ready.then(function () {
+      var snapshot = {};
+      Object.keys(arms).forEach(function (key) { snapshot[key] = arms[key]; });
+      queue.push({ name: name, page: page, element: element, arms: snapshot });
+    });
   }
 
   function view() {
-    var page = window.location.pathname;
-    ready.then(function () { record("view", page, ""); });
+    record("view", window.location.pathname, "");
   }
 
   function flush() {
@@ -138,7 +142,7 @@
     fetch(origin + "/api/autopilot/events", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ site: site, visitor: visitor, events: events }),
+      body: JSON.stringify({ site: site, visitor: visitor, automated: automated, events: events }),
       keepalive: true
     }).catch(function () {});
   }
@@ -155,7 +159,10 @@
   document.addEventListener("click", function (event) {
     if (!(event.target instanceof Element)) return;
     var label = labelFor(event.target);
-    if (label) record("click", window.location.pathname, label);
+    if (!label) return;
+    // Wait for assignment. A click before the flags arrive has no version, so it would never count.
+    var page = window.location.pathname;
+    ready.then(function () { record("click", page, label); });
   }, true);
   wrapHistory("pushState");
   wrapHistory("replaceState");

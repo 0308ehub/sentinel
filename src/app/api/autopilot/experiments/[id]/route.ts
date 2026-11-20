@@ -1,9 +1,11 @@
 import { cancelBuild } from "@/lib/autopilot/agent-build";
+import { foldActivity } from "@/lib/autopilot/activity-core";
 import { approveCleanup, dismissCleanup } from "@/lib/autopilot/cleanup";
 import { approve, reject, rollout, scheduleRollout, stop } from "@/lib/autopilot/lifecycle";
 import type { RolloutPhase } from "@/lib/autopilot/rollout-plan";
 import { withAutopilotUser } from "@/lib/autopilot/scope";
-import { getExperiment, updateExperiment, visitorSeries } from "@/lib/autopilot/store";
+import { srmCheck } from "@/lib/autopilot/stats";
+import { experimentActivity, getExperiment, listFlags, updateExperiment } from "@/lib/autopilot/store";
 import { currentUserId } from "@/lib/connections/current";
 import { GitHubApiError } from "@/lib/github/client";
 
@@ -19,8 +21,20 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   return withAutopilotUser(userId, async () => {
     const experiment = await getExperiment(id);
     if (!experiment) return Response.json({ error: "Experiment not found." }, { status: 404 });
-    const series = experiment.startedAt ? await visitorSeries(experiment.flag, experiment.startedAt) : [];
-    return Response.json({ series });
+    if (!experiment.startedAt) return Response.json({ series: [], activity: null });
+    const [counted, flags] = await Promise.all([
+      experimentActivity(experiment.flag, experiment.startedAt, experiment.metricSpec),
+      listFlags(),
+    ]);
+    const treatmentPct = flags.find((flag) => flag.key === experiment.flag)?.treatmentPct ?? 50;
+    const mix = { human: counted.human, synthetic: counted.synthetic };
+    const drafted = foldActivity(counted.rows, mix, treatmentPct);
+    const visitors = drafted.totals.control.visitors + drafted.totals.treatment.visitors;
+    const split = srmCheck(drafted.totals.control.visitors, drafted.totals.treatment.visitors, treatmentPct / 100);
+    const activity = foldActivity(counted.rows, mix, treatmentPct, visitors >= 100 && split.pValue < 0.001);
+    const byDay = new Map<string, { day: string; control: number; treatment: number }>();
+    for (const point of activity.days) byDay.set(point.day, { day: point.day, control: point.control.visitors, treatment: point.treatment.visitors });
+    return Response.json({ series: [...byDay.values()], activity });
   });
 }
 

@@ -1,8 +1,11 @@
 "use client";
 
 import { useQuery, type QueryClient } from "@tanstack/react-query";
+import type { ExperimentActivity } from "@/lib/autopilot/activity-core";
 import type { ChangeSummary } from "@/lib/autopilot/change-summary";
 import type { Experiment } from "@/lib/autopilot/types";
+
+export type { ExperimentActivity };
 
 export type ChangeFile = { filename?: string; status?: string; additions?: number; deletions?: number; patch?: string };
 export type ExperimentChanges = {
@@ -88,22 +91,33 @@ export function snapshotQueryOptions(experiment: Experiment) {
   };
 }
 
-export function visitorSeriesQueryOptions(experiment: Experiment) {
+export interface VisitorActivity {
+  series: DailyVisitors[];
+  activity: ExperimentActivity | null;
+}
+
+const LIVE_STATUS = new Set<Experiment["status"]>(["queued", "running", "awaiting_rollout", "rolling_out"]);
+
+export function visitorSeriesQueryOptions(experiment: Experiment | null) {
+  const live = experiment != null && LIVE_STATUS.has(experiment.status);
   return {
-    queryKey: experimentQueryKeys.visitors(experiment),
+    queryKey: experiment ? experimentQueryKeys.visitors(experiment) : (["experiment", "visitors", "none"] as const),
+    enabled: Boolean(experiment?.startedAt),
     queryFn: async ({ signal }: { signal: AbortSignal }) => {
-      const body = await jsonRequest<{ series?: DailyVisitors[] }>(`/api/autopilot/experiments/${experiment.id}`, "Could not load visitors.", signal);
-      return body.series ?? [];
+      if (!experiment) return { series: [], activity: null } satisfies VisitorActivity;
+      const body = await jsonRequest<{ series?: DailyVisitors[]; activity?: ExperimentActivity | null }>(`/api/autopilot/experiments/${experiment.id}`, "Could not load visitors.", signal);
+      return { series: body.series ?? [], activity: body.activity ?? null } satisfies VisitorActivity;
     },
-    staleTime: STALE_TIME,
+    staleTime: 10_000,
     gcTime: GC_TIME,
+    refetchInterval: (live ? 15_000 : false) as number | false,
   };
 }
 
 export function useExperimentSummary(experiment: Experiment) { return useQuery(summaryQueryOptions(experiment)); }
 export function useExperimentChanges(experiment: Experiment, options: { cleanup?: boolean } = {}) { return useQuery(changesQueryOptions(experiment, options.cleanup)); }
 export function useExperimentSnapshot(experiment: Experiment) { return useQuery(snapshotQueryOptions(experiment)); }
-export function useVisitorSeries(experiment: Experiment) { return useQuery(visitorSeriesQueryOptions(experiment)); }
+export function useVisitorSeries(experiment: Experiment | null) { return useQuery(visitorSeriesQueryOptions(experiment)); }
 
 export async function prefetchExperiment(queryClient: QueryClient, experiment: Experiment) {
   const requests = [

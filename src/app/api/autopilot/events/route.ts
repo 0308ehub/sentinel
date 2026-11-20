@@ -2,6 +2,7 @@ import { autopilotConfigured } from "@/lib/autopilot/db";
 import { siteAutopilotUser, withAutopilotUser } from "@/lib/autopilot/scope";
 import { userForSiteKey } from "@/lib/autopilot/sites";
 import { addEvents, type NewEvent } from "@/lib/autopilot/store";
+import { isBotUserAgent } from "@/lib/autopilot/traffic-core";
 import { EVENT_NAME, type Arm } from "@/lib/autopilot/assign";
 
 export const dynamic = "force-dynamic";
@@ -62,7 +63,7 @@ function cleanArms(value: unknown): Record<string, Arm> {
 }
 
 export async function POST(request: Request) {
-  const body = (await request.json().catch(() => null)) as { site?: unknown; visitor?: unknown; events?: unknown } | null;
+  const body = (await request.json().catch(() => null)) as { site?: unknown; visitor?: unknown; events?: unknown; automated?: unknown } | null;
   const key = typeof body?.site === "string" ? body.site : null;
   const headers = key === null ? undefined : CORS;
   if (!autopilotConfigured()) return new Response(null, { status: 204, headers });
@@ -80,6 +81,7 @@ export async function POST(request: Request) {
   if (!VISITOR.test(visitor) || !Array.isArray(body?.events)) {
     return Response.json({ error: "bad_request" }, { status: 400, headers });
   }
+  const synthetic = body.automated === true || isBotUserAgent(request.headers.get("user-agent"));
   const events: NewEvent[] = [];
   for (const raw of body.events.slice(0, MAX_EVENTS) as Record<string, unknown>[]) {
     const name = raw?.name;
@@ -95,7 +97,7 @@ export async function POST(request: Request) {
       page: typeof raw.page === "string" ? raw.page.slice(0, 200) : "",
       element,
       arms: cleanArms(raw.arms),
-      synthetic: false,
+      synthetic,
     });
   }
   try {

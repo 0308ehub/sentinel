@@ -1,5 +1,6 @@
 import "server-only";
 
+import { type ActivityRow } from "@/lib/autopilot/activity-core";
 import { db, newId } from "@/lib/autopilot/db";
 import { autopilotUser } from "@/lib/autopilot/scope";
 import { parseMetricSpec, type Arm, type FlagState, type MetricSpec } from "@/lib/autopilot/assign";
@@ -779,19 +780,33 @@ export interface ArmCount {
   syntheticVisitors: number;
 }
 
-/** Visitors and converted visitors per arm since the experiment started, counted from tracked events. */
+/**
+ * Visitors and converted visitors per arm since the experiment started.
+ * Sample and automated visits are left out once a real person has been counted. When nobody real
+ * has arrived yet, the sample visits are counted so a dry run still has numbers, and those visitors
+ * are marked synthetic.
+ */
 export async function countArms(flag: string, since: string, spec: MetricSpec): Promise<ArmCount[]> {
   const sql = await db();
+  const userId = scopeUser();
   const rows = await sql`
-    with exposed as (
+    with mode as (
+      select not exists (
+        select 1 from kismet.events
+        where user_id = ${userId} and at >= ${since} and arms ? ${flag} and synthetic = false
+      ) as include_synthetic
+    ),
+    exposed as (
       select visitor, min(arms ->> ${flag}) as arm, bool_or(synthetic) as synthetic
-      from kismet.events
-      where user_id = ${scopeUser()} and at >= ${since} and arms ? ${flag}
+      from kismet.events, mode
+      where user_id = ${userId} and at >= ${since} and arms ? ${flag}
+        and (not synthetic or mode.include_synthetic)
       group by visitor
     ),
     converted as (
-      select distinct e.visitor from kismet.events e
-      where e.user_id = ${scopeUser()} and e.at >= ${since} and e.arms ? ${flag} and ${converts(sql, spec)}
+      select distinct e.visitor from kismet.events e, mode
+      where e.user_id = ${userId} and e.at >= ${since} and e.arms ? ${flag}
+        and (not e.synthetic or mode.include_synthetic) and ${converts(sql, spec)}
     )
     select x.arm,
            count(*)::int as visitors,
@@ -997,32 +1012,94 @@ export async function retentionCohort(): Promise<{ eligible: number; returned: n
   return { eligible: Number(row?.eligible ?? 0), returned: Number(row?.returned ?? 0) };
 }
 
-export interface DailyVisitors {
-  day: string;
-  control: number;
-  treatment: number;
+export interface ExperimentActivityRows {
+  rows: ActivityRow[];
+  human: number;
+  synthetic: number;
 }
 
-/** Distinct visitors per arm, one point per day, since the experiment started. */
-export async function visitorSeries(flag: string, since: string): Promise<DailyVisitors[]> {
+/**
+ * People, page views, clicks, and conversions per arm, by UTC day and for the whole run.
+ * Uses the same human-first rule as the decision: sample traffic fills in only when no person has arrived.
+ * Totals are distinct people, not a sum of the days, so someone who returns is counted once.
+ */
+export async function experimentActivity(flag: string, since: string, spec: MetricSpec | null): Promise<ExperimentActivityRows> {
   const sql = await db();
-  const rows = await sql<{ day: string; arm: string; visitors: number }[]>`
-    select to_char(date_trunc('day', at), 'YYYY-MM-DD') as day,
-           coalesce(arms ->> ${flag}, '') as arm,
-           count(distinct visitor)::int as visitors
-    from kismet.events
-    where user_id = ${scopeUser()} and at >= ${since} and arms ? ${flag}
-    group by 1, 2
-    order by 1
-  `;
-  const byDay = new Map<string, DailyVisitors>();
-  for (const row of rows) {
-    const point = byDay.get(row.day) ?? { day: row.day, control: 0, treatment: 0 };
-    if (row.arm === "control") point.control = Number(row.visitors);
-    else if (row.arm === "treatment") point.treatment = Number(row.visitors);
-    byDay.set(row.day, point);
-  }
-  return [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day));
+  const userId = scopeUser();
+  const convertedOnDay = spec ? converts(sql, spec) : sql`false`;
+  const convertedOverall = spec ? converts(sql, spec) : sql`false`;
+  const [rows, mix] = await Promise.all([
+    sql<{ grain: string; day: string; arm: string; visitors: number; views: number; clicks: number; conversions: number }[]>`
+      with mode as (
+        select not exists (
+          select 1 from kismet.events
+          where user_id = ${userId} and at >= ${since} and arms ? ${flag} and synthetic = false
+        ) as include_synthetic
+      ),
+      eligible as (
+        select (e.at at time zone 'utc')::date as day, e.visitor, e.name, e.page, e.element, e.arms ->> ${flag} as arm
+        from kismet.events e, mode
+        where e.user_id = ${userId} and e.at >= ${since} and e.arms ? ${flag}
+          and (not e.synthetic or mode.include_synthetic)
+          and e.arms ->> ${flag} in ('control', 'treatment')
+      ),
+      daily_visitors as (
+        select day, arm, visitor,
+               bool_or(name = 'view') as viewed,
+               bool_or(name = 'click') as clicked,
+               bool_or(${convertedOnDay}) as converted
+        from eligible
+        group by day, arm, visitor
+      ),
+      overall_visitors as (
+        select arm, visitor,
+               bool_or(name = 'view') as viewed,
+               bool_or(name = 'click') as clicked,
+               bool_or(${convertedOverall}) as converted
+        from eligible
+        group by arm, visitor
+      )
+      select 'day' as grain, to_char(day, 'YYYY-MM-DD') as day, arm,
+             count(*)::int as visitors,
+             count(*) filter (where viewed)::int as views,
+             count(*) filter (where clicked)::int as clicks,
+             count(*) filter (where converted)::int as conversions
+      from daily_visitors
+      group by day, arm
+      union all
+      select 'total', '', arm,
+             count(*)::int,
+             count(*) filter (where viewed)::int,
+             count(*) filter (where clicked)::int,
+             count(*) filter (where converted)::int
+      from overall_visitors
+      group by arm
+    `,
+    sql<{ human: number; synthetic: number }[]>`
+      with visitors as (
+        select visitor, bool_or(not synthetic) as human
+        from kismet.events
+        where user_id = ${userId} and at >= ${since} and arms ? ${flag}
+        group by visitor
+      )
+      select count(*) filter (where human)::int as human,
+             count(*) filter (where not human)::int as synthetic
+      from visitors
+    `,
+  ]);
+  return {
+    rows: rows.map((row) => ({
+      grain: row.grain === "total" ? "total" as const : "day" as const,
+      day: String(row.day ?? ""),
+      arm: String(row.arm ?? ""),
+      visitors: Number(row.visitors),
+      views: Number(row.views),
+      clicks: Number(row.clicks),
+      conversions: Number(row.conversions),
+    })),
+    human: Number(mix[0]?.human ?? 0),
+    synthetic: Number(mix[0]?.synthetic ?? 0),
+  };
 }
 
 export interface DailyMetricCount {
@@ -1047,6 +1124,7 @@ export async function dailyMetricCounts(
     with mode as (
       select not exists (
         select 1 from kismet.events where user_id = ${userId} and at >= ${from} and at < ${to} and synthetic = false
+          and (${flag}::text is null or arms ? ${flag})
       ) as include_synthetic
     ), eligible as (
       select e.* from kismet.events e, mode
