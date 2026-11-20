@@ -348,11 +348,12 @@ function Votes({ ratings, experiment, signal, onRated }: {
   const targetId = experiment?.id ?? signal?.id ?? "";
   const targetKind = experiment ? "experiment" : "signal";
   const fromProps = voteTally(ratings, voterId);
-  const [pending, setPending] = useState<ReturnType<typeof voteTally> | null>(null);
-  const [saving, setSaving] = useState(false);
   const signature = ratings.map((rating) => `${rating.voterId}:${rating.rating}`).join("|");
-  useEffect(() => { setPending(null); }, [signature]);
-  const view = pending ?? fromProps;
+  // An optimistic tally lasts until the ratings it was made against change.
+  const [pending, setPendingState] = useState<{ signature: string; tally: ReturnType<typeof voteTally> } | null>(null);
+  const setPending = (tally: ReturnType<typeof voteTally> | null) => setPendingState(tally ? { signature, tally } : null);
+  const [saving, setSaving] = useState(false);
+  const view = pending && pending.signature === signature ? pending.tally : fromProps;
   if (!targetId) return null;
 
   async function vote(value: "good" | "not_useful") {
