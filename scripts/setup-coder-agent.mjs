@@ -58,9 +58,29 @@ const RENDERER = {
   tools: AGENT.tools,
 };
 
+// Preinstalled so sample renders and agent builds can skip most dependency installs (63-89s per render).
+// Versions track this repo's package.json; keep them in step when React/Tailwind majors change.
+const RENDER_PACKAGES = [
+  "react@19.2.4",
+  "react-dom@19.2.4",
+  "typescript@5",
+  "tsx@4",
+  "esbuild@0.25",
+  "tailwindcss@4",
+  "@tailwindcss/postcss@4",
+  "@tailwindcss/cli@4",
+  "postcss@8",
+  "lucide-react@1",
+  "clsx@2",
+  "tailwind-merge@3",
+  "class-variance-authority@0.7",
+];
+
+const PACKAGES = { type: "packages", apt: ["git"], npm: RENDER_PACKAGES };
+
 const ENVIRONMENT = {
   name: "kismet-coder",
-  config: { type: "cloud", networking: { type: "limited", allow_package_managers: true } },
+  config: { type: "cloud", networking: { type: "limited", allow_package_managers: true }, packages: PACKAGES },
 };
 
 async function main() {
@@ -91,8 +111,9 @@ async function main() {
 
   let environment;
   if (environmentId) {
-    environment = await client.beta.environments.retrieve(environmentId);
-    console.log(`Using environment ${environment.id}`);
+    // Only packages are updated; omitted fields (networking and its allowed hosts) keep their live values.
+    environment = await client.beta.environments.update(environmentId, { config: { type: "cloud", packages: PACKAGES } });
+    console.log(`Updated environment ${environment.id} packages`);
   } else {
     environment = await client.beta.environments.create(ENVIRONMENT);
     console.log(`Created environment ${environment.id}`);
