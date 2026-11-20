@@ -89,6 +89,7 @@ function connectionBody(provider: LiveProvider, values: Record<string, string>):
 }
 
 export function ConnectorCatalog({ onConnectionsChange }: { onConnectionsChange?: (anyConnected: boolean) => void }) {
+  const router = useRouter();
   const productId = useUIStore((s) => s.activeProductId);
   const [query, setQuery] = useState("");
   const [savedIds, setSavedIds] = useState<string[]>(() => readSavedConnectors().map((item) => item.id));
@@ -208,7 +209,8 @@ export function ConnectorCatalog({ onConnectionsChange }: { onConnectionsChange?
                         type="button"
                         size="sm"
                         variant={connected || locallyConnected || browserOnly ? "outline" : "default"}
-                        onClick={() => setOpenId(connector.id)}
+                        // A connected app with its own settings page opens that page; the dialog is only for connecting.
+                        onClick={() => (connected && connector.setupHref ? router.push(connector.setupHref) : setOpenId(connector.id))}
                       >
                         {connected || locallyConnected || browserOnly ? "Edit" : "Connect"}
                       </Button>
