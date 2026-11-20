@@ -93,7 +93,14 @@ test("a bug fix posts each stage while it is current, with stable text and keys"
 
 test("an idea gets the idea-specific received update", () => {
   const [update] = threadUpdates(input([signal({ kind: "idea", title: "Add saved carts" })], []));
-  assert.equal(update.text, "Got it. Kismet filed this under “Add saved carts”. It acts on ideas once a few more people ask for them, or when someone starts it in Kismet.");
+  assert.equal(update.text, "Got it. Kismet filed this as an idea: “Add saved carts”. Kismet usually waits for a few more people to ask. Want it to try now?");
+  assert.equal(update.tryFor, "sig_1");
+});
+
+test("a bug keeps its received text and has no try action", () => {
+  const [update] = threadUpdates(input([signal()], []));
+  assert.equal(update.text, "Got it. Kismet is looking into this as a bug: “Checkout payments fail”.");
+  assert.equal(update.tryFor, undefined);
 });
 
 test("a no-change outcome uses the reason from its note", () => {

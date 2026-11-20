@@ -1,12 +1,15 @@
 import { after } from "next/server";
 
 import { runTick } from "@/lib/autopilot/loop";
+import { hasClaim } from "@/lib/autopilot/notify";
 import { addEvidence, knownEvidenceUrls, lastRunAt, log } from "@/lib/autopilot/store";
+import { listSignals } from "@/lib/autopilot/store";
 import { withAutopilotUser } from "@/lib/autopilot/scope";
 import { tickTriggerDue } from "@/lib/autopilot/tick-trigger-core";
 import { listUsersForSlackTeam } from "@/lib/connections/store";
-import { slackChannelName } from "@/lib/slack/client";
-import { messageEvidence, verifySlackSignature } from "@/lib/slack/events-core";
+import { postSlackMessage, slackChannelName } from "@/lib/slack/client";
+import { messageEvidence, tryReply, verifySlackSignature, type SlackTryReply } from "@/lib/slack/events-core";
+import { startSignalFromSlack } from "@/lib/slack/start-signal";
 
 interface SlackEnvelope {
   type?: unknown;
@@ -42,9 +45,34 @@ async function fileEventForUser(userId: string, event: SlackEnvelope["event"]): 
   });
 }
 
+async function startTryReplyForUser(
+  userId: string,
+  reply: SlackTryReply,
+): Promise<void> {
+  await withAutopilotUser(userId, async () => {
+    const parentUrl = `slack://${reply.channel}/${reply.threadTs}`;
+    const signals = await listSignals();
+    for (const signal of signals) {
+      if (signal.status !== "open" || signal.kind !== "idea" ||
+        !signal.evidence.some((item) => item.source === "slack" && item.url === parentUrl)) continue;
+      const receivedKey = `received:${signal.id}:${reply.channel}:${reply.threadTs}`;
+      if (!(await hasClaim(receivedKey))) continue;
+      const result = await startSignalFromSlack(signal.id, reply.slackUserId);
+      if (result.status !== "started") return;
+      await postSlackMessage(reply.channel, "On it — Kismet is designing this now.", reply.threadTs);
+      return;
+    }
+  });
+}
+
 async function fileSlackEvent(teamId: string, event: SlackEnvelope["event"]): Promise<void> {
   try {
     const userIds = await listUsersForSlackTeam(teamId);
+    const reply = tryReply(event);
+    if (reply) {
+      for (const userId of userIds) await startTryReplyForUser(userId, reply);
+      return;
+    }
     for (const userId of userIds) {
       if (await fileEventForUser(userId, event)) await runTick(userId);
     }

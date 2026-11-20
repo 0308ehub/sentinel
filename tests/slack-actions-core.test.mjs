@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { handledActionBlocks, parseActionPayload, reviewActionBlocks } from "../src/lib/slack/actions-core.ts";
+import { handledActionBlocks, parseActionPayload, reviewActionBlocks, tryActionBlocks } from "../src/lib/slack/actions-core.ts";
 
 test("reviewActionBlocks builds approve and decline buttons", () => {
   const blocks = reviewActionBlocks("Review this", "exp-123");
@@ -20,6 +20,18 @@ test("reviewActionBlocks builds approve and decline buttons", () => {
     { id: decline.action_id, value: decline.value },
     { id: "kismet_decline", value: "exp-123" },
   );
+});
+
+test("tryActionBlocks builds the idea start button", () => {
+  const blocks = tryActionBlocks("Try this idea", "sig-123");
+  assert.equal(blocks[0].text.text, "Try this idea");
+  assert.deepEqual(blocks[1].elements[0], {
+    type: "button",
+    text: { type: "plain_text", text: "Try it now" },
+    style: "primary",
+    action_id: "kismet_try",
+    value: "sig-123",
+  });
 });
 
 function form(overrides = {}) {

@@ -20,6 +20,7 @@ export interface ThreadUpdate {
   text: string;
   stage: ThreadUpdateStage;
   actionsFor?: string;
+  tryFor?: string;
 }
 
 interface ThreadUpdatesInput {
@@ -117,7 +118,7 @@ export function threadUpdates({ signals, experiments, appUrl }: ThreadUpdatesInp
         stage: "received",
         text: signal.kind === "bug"
           ? `Got it. Kismet is looking into this as a bug: “${signal.title}”.`
-          : `Got it. Kismet filed this under “${signal.title}”. It acts on ideas once a few more people ask for them, or when someone starts it in Kismet.`,
+          : `Got it. Kismet filed this as an idea: “${signal.title}”. Kismet usually waits for a few more people to ask. Want it to try now?`,
       });
     }
     if (experiment) stages.push(...experimentUpdates(experiment, appUrl));
@@ -133,6 +134,7 @@ export function threadUpdates({ signals, experiments, appUrl }: ThreadUpdatesInp
           ...stage,
           key,
           ...(stage.stage === "review" && experiment ? { actionsFor: experiment.id } : {}),
+          ...(stage.stage === "received" && signal.kind === "idea" ? { tryFor: signal.id } : {}),
         });
       }
     }

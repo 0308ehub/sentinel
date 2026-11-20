@@ -2,20 +2,22 @@ import { after } from "next/server";
 
 import { approve, reject } from "@/lib/autopilot/lifecycle";
 import { withAutopilotUser } from "@/lib/autopilot/scope";
-import { getExperiment, log } from "@/lib/autopilot/store";
-import type { Experiment } from "@/lib/autopilot/types";
+import { getExperiment, listSignals, log } from "@/lib/autopilot/store";
+import type { Experiment, Signal } from "@/lib/autopilot/types";
 import { getConnection, listUsersForSlackTeam } from "@/lib/connections/store";
 import { GitHubApiError } from "@/lib/github/client";
-import { handledActionBlocks, parseActionPayload, type SlackActionPayload } from "@/lib/slack/actions-core";
+import { handledActionBlocks, parseActionPayload, startedActionBlocks, type SlackActionPayload } from "@/lib/slack/actions-core";
 import { verifySlackSignature } from "@/lib/slack/events-core";
+import { startSignalFromSlack } from "@/lib/slack/start-signal";
 
-const ACTIONS = new Set(["kismet_approve", "kismet_decline"]);
+const ACTIONS = new Set(["kismet_approve", "kismet_decline", "kismet_try"]);
 const RECONNECT_MESSAGE = "To approve from Slack, reconnect Slack in Kismet (Settings → Connectors → Slack) once.";
 
 interface AccountMatch {
   userId: string;
   installerUserId?: string;
   experiment?: Experiment;
+  signal?: Signal;
 }
 
 function originalMessageText(body: string): string {
@@ -68,6 +70,38 @@ async function accountMatches(payload: SlackActionPayload): Promise<AccountMatch
     });
   }
   return matches;
+}
+
+async function signalAccountMatches(payload: SlackActionPayload): Promise<AccountMatch[]> {
+  const userIds = await listUsersForSlackTeam(payload.teamId);
+  return Promise.all(userIds.map(async (userId) => {
+    const signals = await withAutopilotUser(userId, () => listSignals());
+    return { userId, signal: signals.find((signal) => signal.id === payload.experimentId) };
+  }));
+}
+
+async function handleTry(payload: SlackActionPayload, originalText: string): Promise<void> {
+  try {
+    const accounts = await signalAccountMatches(payload);
+    const owner = accounts.find((account) => account.signal);
+    if (!owner?.signal) {
+      await ephemeral(payload, "Kismet is already on this.");
+      return;
+    }
+    const result = await withAutopilotUser(owner.userId, () =>
+      startSignalFromSlack(owner.signal!.id, payload.slackUserId));
+    if (result.status === "already") {
+      await ephemeral(payload, "Kismet is already on this.");
+      return;
+    }
+    await respond(payload.responseUrl, {
+      replace_original: true,
+      text: originalText,
+      blocks: startedActionBlocks(originalText, payload.slackUserId),
+    });
+  } catch (error) {
+    await ephemeral(payload, `Couldn't start: ${readableError(error)}`).catch(() => {});
+  }
 }
 
 async function handleAction(payload: SlackActionPayload, originalText: string): Promise<void> {
@@ -130,6 +164,8 @@ export async function POST(request: Request) {
   const payload = parseActionPayload(body);
   if (!payload || !ACTIONS.has(payload.actionId)) return new Response(null, { status: 200 });
   const originalText = originalMessageText(body);
-  after(() => handleAction(payload, originalText));
+  after(() => payload.actionId === "kismet_try"
+    ? handleTry(payload, originalText)
+    : handleAction(payload, originalText));
   return new Response(null, { status: 200 });
 }

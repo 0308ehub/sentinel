@@ -18,6 +18,7 @@ interface SlackMessageEvent {
   user?: unknown;
   bot_id?: unknown;
   subtype?: unknown;
+  thread_ts?: unknown;
 }
 
 function slackTime(ts: string): string {
@@ -44,6 +45,31 @@ export function isPersonMessage(message: { botId?: unknown; subtype?: unknown; u
   if (message.botId != null) return false;
   if (message.subtype != null && message.subtype !== "thread_broadcast" && message.subtype !== "file_share") return false;
   return typeof message.userId === "string" && message.userId.length > 0;
+}
+
+/** A short reply that unambiguously asks Kismet to start. */
+export function isTryYes(text: unknown): boolean {
+  if (typeof text !== "string" || text.length > 40) return false;
+  const normalized = text
+    .toLowerCase()
+    .replace(/[\p{P}\p{S}\s]+$/gu, "")
+    .trim();
+  return /^(?:yes|yep|yeah|sure|do it|try it|go ahead|please do)$/.test(normalized);
+}
+
+export interface SlackTryReply {
+  channel: string;
+  threadTs: string;
+  slackUserId: string;
+}
+
+export function tryReply(event: unknown): SlackTryReply | null {
+  if (!event || typeof event !== "object") return null;
+  const message = event as SlackMessageEvent;
+  if (message.type !== "message" || typeof message.channel !== "string" || typeof message.ts !== "string" ||
+    typeof message.thread_ts !== "string" || message.thread_ts === message.ts || !isTryYes(message.text) ||
+    !isPersonMessage({ botId: message.bot_id, subtype: message.subtype, userId: message.user })) return null;
+  return { channel: message.channel, threadTs: message.thread_ts, slackUserId: message.user as string };
 }
 
 export function messageEvidence(event: SlackMessageEvent, channelName: string): FiledEvidence | null {

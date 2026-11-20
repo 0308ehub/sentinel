@@ -70,6 +70,16 @@ export async function claim(eventKey: string): Promise<boolean> {
   return rows.length > 0;
 }
 
+export async function hasClaim(eventKey: string): Promise<boolean> {
+  const sql = await db();
+  const rows = await sql`
+    select 1 from kismet.autopilot_notifications
+    where user_id = ${autopilotUser()} and event_key = ${eventKey}
+    limit 1
+  `;
+  return rows.length > 0;
+}
+
 export async function release(eventKey: string): Promise<void> {
   const sql = await db();
   await sql`delete from kismet.autopilot_notifications where user_id = ${autopilotUser()} and event_key = ${eventKey}`;

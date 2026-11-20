@@ -48,6 +48,29 @@ export function reviewActionBlocks(text: string, experimentId: string): unknown[
   ];
 }
 
+export function tryActionBlocks(text: string, signalId: string): unknown[] {
+  return [
+    { type: "section", text: { type: "mrkdwn", text } },
+    {
+      type: "actions",
+      elements: [{
+        type: "button",
+        text: { type: "plain_text", text: "Try it now" },
+        style: "primary",
+        action_id: "kismet_try",
+        value: signalId,
+      }],
+    },
+  ];
+}
+
+export function startedActionBlocks(text: string, slackUserId: string): unknown[] {
+  return [
+    { type: "section", text: { type: "mrkdwn", text } },
+    { type: "context", elements: [{ type: "mrkdwn", text: `<@${slackUserId}> asked Kismet to try this · designing…` }] },
+  ];
+}
+
 export function parseActionPayload(body: string): SlackActionPayload | null {
   let envelope: BlockActionEnvelope;
   try {

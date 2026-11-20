@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import test from "node:test";
 
-import { isPersonMessage, messageEvidence, verifySlackSignature } from "../src/lib/slack/events-core.ts";
+import { isPersonMessage, isTryYes, messageEvidence, tryReply, verifySlackSignature } from "../src/lib/slack/events-core.ts";
 
 const secret = "signing-secret";
 const timestamp = "1800000000";
@@ -83,4 +83,25 @@ test("history polling keeps only messages people wrote", () => {
   assert.equal(isPersonMessage({ subtype: "bot_message" }), false);
   assert.equal(isPersonMessage({ userId: "U1", subtype: "channel_join" }), false);
   assert.equal(isPersonMessage({}), false);
+});
+
+test("recognizes only short, unambiguous try replies", () => {
+  for (const text of ["yes", "Yep!", "yeah 👍", "sure", "do it.", "try it 🚀", "go ahead!!", "please do 🙏"]) {
+    assert.equal(isTryYes(text), true, text);
+  }
+  for (const text of ["no", "yes but wait", "yes, but…", "sure if the team agrees", "please do this after we update the spec", "y".repeat(41), ""]) {
+    assert.equal(isTryYes(text), false, text);
+  }
+});
+
+test("extracts affirmative replies only from person-authored thread messages", () => {
+  const reply = event({ ts: "1700000001.000", thread_ts: "1700000000.123400", text: "yes!" });
+  assert.deepEqual(tryReply(reply), {
+    channel: "C123",
+    threadTs: "1700000000.123400",
+    slackUserId: "U123",
+  });
+  assert.equal(tryReply(event({ text: "yes!" })), null);
+  assert.equal(tryReply(event({ thread_ts: "1700000000.123400", text: "yes!" })), null);
+  assert.equal(tryReply(event({ ts: "1700000001.000", thread_ts: "1700000000.123400", text: "yes!", bot_id: "B1" })), null);
 });
