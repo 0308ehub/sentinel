@@ -326,7 +326,8 @@ function CreditLine({ label, credit }: { label: string; credit: Credit }) {
     <p className="flex items-center justify-end gap-1.5 text-xs text-[#374151]">
       <span className="text-[#9aa0a8]">{label}</span>
       {credit.kind === "agent" ? (
-        <img src={AGENT_MARK[credit.builder]} alt="" className="h-3.5 w-3.5 object-contain" />
+        // Kismet's name stands on its own; other builders keep their logo so they're easy to tell apart.
+        credit.builder === "kismet" ? null : <img src={AGENT_MARK[credit.builder]} alt="" className="h-3.5 w-3.5 object-contain" />
       ) : (
         <span className="inline-flex h-4 w-4 items-center justify-center overflow-hidden rounded-full bg-[#eef1f4] text-[8px] font-medium text-[#374151]">
           {credit.imageUrl ? <img src={credit.imageUrl} alt="" className="h-full w-full object-cover" /> : initialsFor(credit.name)}
