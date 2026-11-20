@@ -12,11 +12,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { graphStore } from "@/lib/graph/graph-store";
 import type { GoogleDoc, GoogleEvent, GoogleMessage, GooglePreview, GoogleStatus } from "@/lib/google/types";
 
-const REDIRECTS = [
-  "http://localhost:3000/api/google/callback",
-  "https://app.sentinelai.one/api/google/callback",
-];
-
 export function GoogleView() {
   const [status, setStatus] = useState<GoogleStatus | null>(null);
   const [preview, setPreview] = useState<GooglePreview | null>(null);
@@ -122,8 +117,7 @@ export function GoogleView() {
               admin may also need to allow the app.
             </p>
             <p>
-              3. Create an OAuth client of type Web application. Add both authorized redirect URIs:{" "}
-              {REDIRECTS.join(" and ")}.
+              3. Create a Web application OAuth client. Under Authorized redirect URIs, add the address of this site plus /api/google/callback. That address is only for Google to return to. Opening it yourself does not connect an account.
             </p>
             <p>
               4. Put the client ID and secret in .env as GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET,
@@ -136,20 +130,13 @@ export function GoogleView() {
           <CardHeader>
             <CardTitle className="text-sm">Sign in with Google</CardTitle>
             <CardDescription className="text-xs leading-relaxed">
-              Google opens the account list. Choose the Berkeley email you use for Kismet, even if this browser is signed into another Gmail.
-              Google then asks to read Gmail, Docs, Drive, and Calendar, and to create drafts.
+              Connect Google opens Google's sign-in. Type or choose the Berkeley email you use for Kismet, even if this browser is already signed into another Gmail.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent>
             <Button asChild size="sm">
               <a href="/api/google/auth">Connect Google</a>
             </Button>
-            {status.redirectUri && (
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                If Google says the request is invalid, add this exact redirect URI to the OAuth client:{" "}
-                <span className="font-mono text-foreground">{status.redirectUri}</span>
-              </p>
-            )}
           </CardContent>
         </Card>
       ) : (
@@ -315,6 +302,8 @@ function DocRow({ doc }: { doc: GoogleDoc; }) {
 function errorMessage(code: string): string {
   if (code === "missing_client") return "Add the Google client ID and secret to .env, then restart the server.";
   if (code === "access_denied") return "Google sign-in was cancelled.";
-  if (code === "state") return "The Google sign-in expired. Connect again.";
+  if (code === "open_connect") return "That address is only for Google to return to. Click Connect Google, then choose your Berkeley email.";
+  if (code === "state") return "The Google sign-in expired. Click Connect Google and choose your Berkeley email.";
+  if (code === "redirect_uri_mismatch") return "Google blocked the connection because this site's return address is not allowed on the OAuth client yet.";
   return code;
 }

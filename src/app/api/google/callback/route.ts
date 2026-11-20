@@ -17,7 +17,7 @@ export async function GET(request: Request) {
   const state = url.searchParams.get("state");
   const cookie = readCookie(request.headers.get("cookie"), "kismet_google_state");
   if (!code || !state || !cookie || state !== cookie) {
-    destination.searchParams.set("error", "state");
+    destination.searchParams.set("error", code || state ? "state" : "open_connect");
     return NextResponse.redirect(destination);
   }
   try {
