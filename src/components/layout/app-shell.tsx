@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { Suspense, useSyncExternalStore } from "react";
 
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
@@ -13,6 +13,7 @@ import { PendingPrd } from "@/components/prd/pending-prd";
 import { MentionWatcher } from "@/components/slack/mention-watcher";
 import { InboxPresence } from "@/components/inbox/inbox-presence";
 import { WorkspaceSync } from "@/components/layout/workspace-sync";
+import { LiveSyncProvider } from "@/components/workspace/live-sync";
 
 export function AppShell({
   children,
@@ -26,7 +27,7 @@ export function AppShell({
     () => new URLSearchParams(window.location.search).get("kismet_embed") === "1",
     () => false,
   );
-  return (
+  const shell = (
     <div className="flex h-screen overflow-hidden bg-background">
       {!embedded && <Sidebar />}
       <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -44,4 +45,5 @@ export function AppShell({
       <AgentRunner />
     </div>
   );
+  return <Suspense fallback={shell}><LiveSyncProvider>{shell}</LiveSyncProvider></Suspense>;
 }

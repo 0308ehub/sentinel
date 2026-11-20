@@ -15,6 +15,9 @@ import type { RolloutPhase } from "@/lib/autopilot/rollout-plan";
 import { maxExperimentDays } from "@/lib/autopilot/thresholds";
 import { ageLabel } from "@/lib/autopilot/work-sessions";
 import type { ArmResult, Experiment, Learning, Readout, Signal, SuggestionRating } from "@/lib/autopilot/types";
+import { usePresence } from "@/components/workspace/live-sync";
+import { PresenceAvatar } from "@/components/workspace/presence-avatar";
+import { formatLocation, presenceHere } from "@/lib/workspace/live-sync-core";
 
 const DECISION_VISITORS = 200;
 const PANEL_KEY = "kismet-experiment-panel-width";
@@ -99,6 +102,8 @@ export function ExperimentDetail({
   onSaveAdjustments: (adjustments: string) => Promise<void>;
 }) {
   const title = experiment?.title ?? signal?.title ?? "Experiment";
+  const presence = usePresence();
+  const here = experiment ? presenceHere(presence, formatLocation("/experiments", experiment.id)) : [];
   const readout = experiment?.readout ?? null;
   const control = readout?.arms.find((arm) => arm.arm === "control") ?? null;
   const treatment = readout?.arms.find((arm) => arm.arm === "treatment") ?? null;
@@ -185,6 +190,12 @@ export function ExperimentDetail({
         </div>
         <div>
           <h1 className="text-xl leading-tight text-[#111827]">{title}</h1>
+          {here.length > 0 && (
+            <div className="mt-1.5 flex items-center gap-1.5 text-xs text-[#6b7280]">
+              <span className="flex -space-x-1">{here.slice(0, 3).map((person) => <PresenceAvatar key={person.userId} person={person} />)}</span>
+              <span>{here[0].name}{here.length === 1 ? " is here too" : ` and ${here.length - 1} ${here.length === 2 ? "other are" : "others are"} here too`}</span>
+            </div>
+          )}
           <p className="mt-2 text-xs text-[#6b7280]">
             {experiment?.kind === "fix" ? "Fix" : experiment?.kind === "change" ? "Change" : experiment ? "A/B Test" : "Suggestion"}
             {experiment?.mode === "stochastic" ? " · varies each request" : ""} · <span className={status === "Running" || status === "Rolling out" ? "text-[#1f9d55]" : "text-[#374151]"}>{status}</span>

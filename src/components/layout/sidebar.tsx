@@ -40,6 +40,7 @@ import { BrandLogo } from "@/components/marketing/brand-logo";
 import { useAccount } from "@/lib/auth/use-account";
 import { ReportProblem } from "@/components/feedback/report-problem";
 import { OrganizationSwitcher } from "@clerk/nextjs";
+import { usePresence } from "@/components/workspace/live-sync";
 
 type NavItem = { id: string; label: string; href: string; icon: typeof LayoutDashboard };
 
@@ -95,6 +96,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const account = useAccount();
+  const presence = usePresence();
   const { sidebarCollapsed, toggleSidebar, setChatDockOpen } = useUIStore();
   // Read after hydration so the server and client render the same first frame.
   const draftName = useSyncExternalStore(noSubscribe, () => readOnboarding().name, () => "");
@@ -188,12 +190,25 @@ export function Sidebar() {
       <Separator />
       <div className="p-2">
         {process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && !sidebarCollapsed && (
-          <OrganizationSwitcher
-            hidePersonal={false}
-            afterSelectOrganizationUrl={pathname}
-            afterSelectPersonalUrl={pathname}
-            appearance={{ elements: { rootBox: "w-full mb-1", organizationSwitcherTrigger: "w-full justify-start rounded-md border-0 bg-transparent px-2 py-1.5 text-xs shadow-none hover:bg-sidebar-accent" } }}
-          />
+          <div className="mb-1">
+            <OrganizationSwitcher
+              hidePersonal={false}
+              afterSelectOrganizationUrl={pathname}
+              afterSelectPersonalUrl={pathname}
+              appearance={{ elements: { rootBox: "w-full", organizationSwitcherTrigger: "w-full justify-start rounded-md border-0 bg-transparent px-2 py-1.5 text-xs shadow-none hover:bg-sidebar-accent" } }}
+            />
+            {presence.length > 0 && (
+              <div className="flex items-center gap-1.5 px-2 pt-1 text-[10px] text-muted-foreground">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                <span>{presence.length} online</span>
+              </div>
+            )}
+          </div>
+        )}
+        {sidebarCollapsed && presence.length > 0 && (
+          <div className="mb-1 flex justify-center" title={`${presence.length} online`}>
+            <span className="h-2 w-2 rounded-full bg-emerald-500" />
+          </div>
         )}
         <ReportProblem>
           <button

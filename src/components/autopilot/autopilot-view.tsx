@@ -10,7 +10,7 @@ import { MoveInCard } from "@/components/workspace/move-in-card";
 
 /** Refresh quickly while Kismet is building something, and steadily otherwise. Hidden tabs pause. */
 const ACTIVE_REFRESH_MS = 4000;
-const IDLE_REFRESH_MS = 15000;
+const IDLE_REFRESH_MS = 60_000;
 
 function isActive(state: AutopilotState | undefined): boolean {
   return Boolean(state?.experiments.some((experiment) =>

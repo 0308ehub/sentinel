@@ -235,7 +235,8 @@ export function startWorkspaceSync(): void {
   void waitForStores().then(bootstrap);
 }
 
-async function refreshFromServer(): Promise<void> {
+export async function refreshWorkspaceSync(): Promise<void> {
+  if (!started || stopped) return;
   try {
     const response = await fetch(API);
     if (response.status === 401) {
@@ -263,7 +264,7 @@ async function refreshFromServer(): Promise<void> {
 function onVisibilityChange(): void {
   if (document.visibilityState !== "visible" || Date.now() - lastRefresh < 30_000) return;
   lastRefresh = Date.now();
-  void refreshFromServer();
+  void refreshWorkspaceSync();
 }
 
 function flushOnPageHide(): void {

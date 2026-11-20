@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { activitySummary, formatCountdown, formatDollars, nextDailyReset, spendTotal, type ActivityCount, type SpendAmounts } from "@/lib/autopilot/spend-core";
 
 interface SpendDay extends SpendAmounts {
@@ -21,22 +22,18 @@ interface Overview {
 const COLORS = { build: "#2563eb", render: "#60a5fa", model: "#9ca3af", chat: "#374151" } as const;
 
 export function SpendOverview() {
-  const [data, setData] = useState<Overview | null>(null);
-  const [error, setError] = useState("");
+  const query = useQuery({
+    queryKey: ["autopilot-spend"],
+    queryFn: async () => {
+      const response = await fetch("/api/autopilot/spend", { cache: "no-store" });
+      const body = await response.json() as Overview & { error?: string };
+      if (!response.ok) throw new Error(body.error || "Kismet could not load spending.");
+      return body;
+    },
+  });
+  const data = query.data ?? null;
 
-  useEffect(() => {
-    let active = true;
-    fetch("/api/autopilot/spend", { cache: "no-store" })
-      .then(async (response) => {
-        const body = await response.json() as Overview & { error?: string };
-        if (!response.ok) throw new Error(body.error || "Kismet could not load spending.");
-        if (active) setData(body);
-      })
-      .catch((reason) => active && setError(reason instanceof Error ? reason.message : "Kismet could not load spending."));
-    return () => { active = false; };
-  }, []);
-
-  if (error) return <p className="py-8 text-sm text-red-600">{error}</p>;
+  if (query.error) return <p className="py-8 text-sm text-red-600">{query.error.message}</p>;
   if (!data) return <p className="py-8 text-sm text-[#6b7280]">Loading spend overview…</p>;
 
   const hasSpend = data.days.some((day) => spendTotal(day) > 0);
