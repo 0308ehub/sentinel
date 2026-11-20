@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useState } from "react";
 import { ExternalLink, Loader2 } from "lucide-react";
 import { BuildLive } from "@/components/autopilot/build-live";
 import { CodeChange } from "@/components/autopilot/code-change";
@@ -20,37 +20,6 @@ import { PresenceAvatar } from "@/components/workspace/presence-avatar";
 import { formatLocation, presenceHere } from "@/lib/workspace/live-sync-core";
 
 const DECISION_VISITORS = 200;
-const PANEL_KEY = "kismet-experiment-panel-width";
-const DEFAULT_PANEL_WIDTH = 360;
-const panelListeners = new Set<() => void>();
-
-function clampPanelWidth(width: number) {
-  return Math.min(600, Math.max(280, Math.round(width)));
-}
-
-function readPanelWidth() {
-  try {
-    const width = Number(localStorage.getItem(PANEL_KEY));
-    return Number.isFinite(width) && width > 0 ? clampPanelWidth(width) : DEFAULT_PANEL_WIDTH;
-  } catch {
-    return DEFAULT_PANEL_WIDTH;
-  }
-}
-
-function writePanelWidth(width: number) {
-  try {
-    localStorage.setItem(PANEL_KEY, String(clampPanelWidth(width)));
-  } catch {
-    // Storage can be blocked; resizing still works for the current pointer interaction.
-  }
-  panelListeners.forEach((listener) => listener());
-}
-
-function subscribePanelWidth(listener: () => void) {
-  panelListeners.add(listener);
-  return () => panelListeners.delete(listener);
-}
-
 interface DailyVisitors {
   day: string;
   control: number;
@@ -135,6 +104,20 @@ export function ExperimentDetail({
   const [pickedWriter, setPickedWriter] = useState<Builder | null>(null);
   const writer = pickedWriter ?? accountBuilder;
   const writtenBy = experiment?.builder ?? experiment?.buildWith ?? null;
+  const facts = [
+    ...(writtenBy ? [{ label: "Written by", value: BUILDER_NAME[writtenBy] }] : []),
+    ...(experiment?.kind === "fix" ? [{
+      label: experiment.status === "rejected" && experiment.rejectedBy === "kismet" ? "Decision" : "Ships",
+      value: experiment.status === "rejected" && experiment.rejectedBy === "kismet"
+        ? "No change needed"
+        : experiment.status === "rolled_out" ? "Everyone" : "Everyone, once you approve",
+    }] : [{ label: "Audiences", value: "Everyone" }]),
+    ...(!suggested ? [{ label: "Last publish", value: formatDay(experiment?.startedAt ?? experiment?.createdAt ?? null) }] : []),
+    ...(!suggested && experiment?.kind !== "fix" ? [
+      { label: "Days running", value: daysRunning(experiment) },
+      { label: "Experiment visitors", value: visitors ? visitors.toLocaleString("en-US") : "—" },
+    ] : []),
+  ];
   const decisions = (
     <Decisions
       experiment={experiment}
@@ -155,38 +138,14 @@ export function ExperimentDetail({
       onRated={onRated}
     />
   );
-  const panelWidth = useSyncExternalStore(subscribePanelWidth, readPanelWidth, () => DEFAULT_PANEL_WIDTH);
-
-  function startResize(event: React.PointerEvent<HTMLDivElement>) {
-    event.currentTarget.setPointerCapture(event.pointerId);
-    const startX = event.clientX;
-    const startWidth = panelWidth;
-    const move = (moveEvent: PointerEvent) => writePanelWidth(startWidth + moveEvent.clientX - startX);
-    const finish = () => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", finish);
-    };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", finish);
-  }
-
-  // A fix with no code yet has nothing for the right panel but buttons and one line of follow-up,
-  // so it reads as a single column instead of leaving a mostly empty pane.
-  const singleColumn = experiment?.kind === "fix" && !hasCodeChange(experiment);
-
   return (
-    <div className="flex h-full min-h-0 bg-white text-[#1c1c1c]">
-      <aside
-        className={singleColumn ? "flex min-w-0 flex-1 flex-col overflow-auto px-6 py-4" : "flex shrink-0 flex-col gap-4 overflow-auto px-4 py-4"}
-        style={singleColumn ? undefined : { width: panelWidth }}
-      >
-        {/* One column fills the pane and scrolls at its edge; the text stays a readable width, centered. */}
-        <div className={singleColumn ? "mx-auto flex w-full max-w-4xl flex-col gap-4" : "contents"}>
+    <div className="h-full min-h-0 overflow-auto bg-white px-4 py-4 text-[#1c1c1c] [scrollbar-gutter:stable] sm:px-6">
+      <main className="mx-auto flex w-full max-w-5xl flex-col gap-4">
         <div className="flex items-center justify-between gap-3">
           <button type="button" onClick={onBack} className="text-left text-xs text-brand hover:underline">
             ‹ Dashboard
           </button>
-          {singleColumn && decisions}
+          {decisions}
         </div>
         <div>
           <h1 className="text-xl leading-tight text-[#111827]">{title}</h1>
@@ -207,10 +166,18 @@ export function ExperimentDetail({
           )}
           {experiment && showBuildProgress(experiment) && <BuildProgress experiment={experiment} />}
         </div>
+        {experiment?.status === "building" && experiment.coderSessionId && <BuildLive experimentId={experiment.id} />}
         {!experiment && signal && <BuilderMenu value={writer} onChange={setPickedWriter} />}
-        <dl className="space-y-3 text-xs">
-          {!suggested && <Fact label="Last publish" value={formatDay(experiment?.startedAt ?? experiment?.createdAt ?? null)} />}
-          {writtenBy && <Fact label="Written by" value={BUILDER_NAME[writtenBy]} />}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+          {facts.map((fact, index) => (
+            <span key={fact.label} className="contents">
+              {index > 0 && <span className="text-[#c4c8cf]">·</span>}
+              <InlineFact label={fact.label} value={fact.value} />
+            </span>
+          ))}
+          <InlineLinks experiment={experiment} />
+        </div>
+        <div className="space-y-3 text-xs">
           {experiment?.status === "awaiting_approval" && experiment.kind !== "fix" && (
             <div className="space-y-1.5">
               <p className="font-medium text-[#111827]">Before this can launch</p>
@@ -227,15 +194,6 @@ export function ExperimentDetail({
               ))}
             </div>
           )}
-          {experiment?.kind === "fix" ? (
-            experiment.status === "rejected" && experiment.rejectedBy === "kismet"
-              ? <Fact label="Decision" value="No change needed" />
-              : <Fact label="Ships" value={experiment.status === "rolled_out" ? "Everyone" : "Everyone, once you approve"} />
-          ) : (
-            <>
-          {!suggested && <Fact label="Days running" value={daysRunning(experiment)} />}
-          <Fact label="Audiences" value="Everyone" />
-          {!suggested && <Fact label="Experiment visitors" value={visitors ? visitors.toLocaleString("en-US") : "—"} />}
           {experiment?.estimate && experiment.kind === "test" && (
             <div>
               <Fact label="Expected result" value={`~${experiment.estimate.days} days`} />
@@ -244,37 +202,11 @@ export function ExperimentDetail({
               </p>
             </div>
           )}
-            </>
-          )}
-        </dl>
+        </div>
         <Autonomous experiment={experiment} signal={signal} learning={learning} suggested={suggested} lastFailed={lastFailed} />
         {(suggested || experiment?.adjustments) && (
           <AdjustmentNotes experiment={experiment} signal={signal} onSave={onSaveAdjustments} />
         )}
-        {singleColumn && experiment && <FixFollowUp experiment={experiment} signal={signal} className="border-t border-[#e6e8ec] pt-3" />}
-        </div>
-      </aside>
-      {!singleColumn && (<>
-      <div
-        role="separator"
-        aria-label="Resize details panel"
-        aria-orientation="vertical"
-        aria-valuemin={280}
-        aria-valuemax={600}
-        aria-valuenow={panelWidth}
-        tabIndex={0}
-        onPointerDown={startResize}
-        onKeyDown={(event) => {
-          if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
-            event.preventDefault();
-            writePanelWidth(panelWidth + (event.key === "ArrowLeft" ? -24 : 24));
-          }
-        }}
-        className="group relative w-1.5 shrink-0 cursor-col-resize border-x border-transparent outline-none hover:bg-[#dbe7ff] focus:bg-[#dbe7ff]"
-      >
-        <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-[#e6e8ec] group-hover:bg-brand group-focus:bg-brand" />
-      </div>
-      <div className="min-w-0 flex-1 overflow-auto">
         <MainPanel
           experiment={experiment}
           signal={signal}
@@ -284,10 +216,8 @@ export function ExperimentDetail({
           names={names}
           suggested={suggested}
           showChart={runningLook}
-          decisions={decisions}
         />
-      </div>
-      </>)}
+      </main>
       {experiment && (
         <RolloutScheduleDialog
           open={scheduling}
@@ -396,11 +326,7 @@ function hasCodeChange(experiment: Experiment | null): boolean {
   return Boolean(experiment && (experiment.prNumber || experiment.branch || experiment.draftPath));
 }
 
-/**
- * The results and the code change on one page, never in tabs. Before there are results the change
- * leads, because that is what the person is deciding on; once the experiment runs, results lead.
- * The decision buttons sit right above the code they act on.
- */
+/** The substantive sections share the page's single reading column. */
 function MainPanel(props: {
   experiment: Experiment | null;
   signal: Signal | null;
@@ -410,39 +336,22 @@ function MainPanel(props: {
   names: { control: string; treatment: string };
   suggested: boolean;
   showChart: boolean;
-  decisions: React.ReactNode;
 }) {
-  const { experiment, decisions, suggested, ...results } = props;
+  const { experiment, suggested, ...results } = props;
   const hasChange = hasCodeChange(experiment);
   const hasResults = Boolean(
     experiment?.kind === "fix" || props.readout || experiment?.status === "running" || experiment?.status === "awaiting_rollout" || experiment?.status === "rolling_out" || experiment?.endedAt,
   );
-  const change = experiment && hasChange ? (
-    <section>
-      <WhatChanges key={`summary-${experiment.id}`} experiment={experiment} />
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e6e8ec] px-4 py-3">
-        <h2 className="text-sm font-medium text-[#111827]">Code change</h2>
-        {decisions}
-      </div>
-      <CodeChange key={experiment.id} experiment={experiment} />
-    </section>
-  ) : null;
-
-  if (change && !hasResults) {
-    return (
-      <div>
-        {change}
-        <p className="border-t border-[#e6e8ec] px-4 py-3 text-xs text-[#6b7280]">
-          {experiment?.kind === "fix" ? "After merging, Kismet watches whether these complaints stop for 14 days." : "Results appear here once the experiment is live and counting visitors."}
-        </p>
-      </div>
-    );
-  }
   return (
-    <div>
-      {!change && decisions && <div className="flex justify-end border-b border-[#e6e8ec] px-4 py-3">{decisions}</div>}
-      {experiment?.kind === "fix" ? <FixFollowUp experiment={experiment} signal={props.signal} /> : experiment?.kind === "change" ? <ChangeFollowUp experiment={experiment} /> : suggested ? <NotPublishedYet /> : <ResultsCanvas experiment={experiment} {...results} />}
-      {change && <div className="border-t border-[#e6e8ec]">{change}</div>}
+    <div className="space-y-4">
+      {experiment && hasChange && <WhatChanges key={`summary-${experiment.id}`} experiment={experiment} />}
+      {hasResults && experiment?.kind !== "fix" && (experiment?.kind === "change" ? <ChangeFollowUp experiment={experiment} /> : <ResultsCanvas experiment={experiment} {...results} />)}
+      {!hasResults && suggested && <NotPublishedYet />}
+      {experiment && hasChange && <CodeChange key={experiment.id} experiment={experiment} />}
+      {experiment && !hasResults && !suggested && (
+        <p className="border-t border-[#e6e8ec] pt-3 text-xs text-[#6b7280]">Results appear here once the experiment is live and counting visitors.</p>
+      )}
+      {experiment?.kind === "fix" && <FixFollowUp experiment={experiment} signal={props.signal} className="border-t border-[#e6e8ec] pt-3" />}
     </div>
   );
 }
@@ -460,9 +369,11 @@ function Autonomous({
   suggested: boolean;
   lastFailed: Experiment | null;
 }) {
+  const [expanded, setExpanded] = useState(false);
   return (
     <div className="space-y-3 border-t border-[#e6e8ec] pt-3 text-xs">
-      <p className="font-medium text-[#374151]">Kismet</p>
+      <p className="font-medium text-[#374151]">Why</p>
+      <div className={expanded ? "space-y-3" : "space-y-3 overflow-hidden [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:4]"}>
       {signal && (
         <div className="text-[#374151]">
           <p>
@@ -505,8 +416,10 @@ function Autonomous({
           <p className="mt-1 leading-5">{learning.learning}</p>
         </div>
       )}
-      {experiment?.status === "building" && experiment.coderSessionId && <BuildLive experimentId={experiment.id} />}
-      <Links experiment={experiment} />
+      </div>
+      <button type="button" className="text-brand hover:underline" onClick={() => setExpanded((value) => !value)}>
+        {expanded ? "Show less" : "Show more"}
+      </button>
     </div>
   );
 }
@@ -700,32 +613,32 @@ function RatingControls({
   );
 }
 
-function Links({ experiment }: { experiment: Experiment | null }) {
+function InlineLinks({ experiment }: { experiment: Experiment | null }) {
   if (!experiment) return null;
   const cleanup = experiment.cleanup;
   return (
-    <div className="space-y-1 text-brand">
+    <>
       {experiment.startedAt && (
-        <a className="block text-xs hover:underline" href={`/analytics?experiment=${encodeURIComponent(experiment.id)}`}>
+        <><span className="text-[#c4c8cf]">·</span><a className="text-brand hover:underline" href={`/analytics?experiment=${encodeURIComponent(experiment.id)}`}>
           See in Analytics →
-        </a>
+        </a></>
       )}
       {experiment.buildUrl && (
-        <a className="flex items-center gap-1 hover:underline" href={experiment.buildUrl} target="_blank" rel="noreferrer">
+        <><span className="text-[#c4c8cf]">·</span><a className="inline-flex items-center gap-1 text-brand hover:underline" href={experiment.buildUrl} target="_blank" rel="noreferrer">
           Watch the build <ExternalLink className="h-3 w-3" />
-        </a>
+        </a></>
       )}
       {experiment.prUrl && (
-        <a className="flex items-center gap-1 hover:underline" href={experiment.prUrl} target="_blank" rel="noreferrer">
+        <><span className="text-[#c4c8cf]">·</span><a className="inline-flex items-center gap-1 text-brand hover:underline" href={experiment.prUrl} target="_blank" rel="noreferrer">
           Pull request #{experiment.prNumber} <ExternalLink className="h-3 w-3" />
-        </a>
+        </a></>
       )}
       {cleanup?.status === "awaiting" && cleanup.prUrl && (
-        <a className="flex items-center gap-1 hover:underline" href={cleanup.prUrl} target="_blank" rel="noreferrer">
+        <><span className="text-[#c4c8cf]">·</span><a className="inline-flex items-center gap-1 text-brand hover:underline" href={cleanup.prUrl} target="_blank" rel="noreferrer">
           Cleanup pull request #{cleanup.prNumber} <ExternalLink className="h-3 w-3" />
-        </a>
+        </a></>
       )}
-    </div>
+    </>
   );
 }
 
@@ -1157,6 +1070,15 @@ function Fact({ label, value }: { label: string; value: string }) {
       <dt className="text-[#9aa0a8]">{label}</dt>
       <dd className="mt-0.5 text-[#1c1c1c]">{value}</dd>
     </div>
+  );
+}
+
+function InlineFact({ label, value }: { label: string; value: string }) {
+  return (
+    <span className="inline-flex items-baseline gap-1">
+      <span className="text-[#9aa0a8]">{label}</span>
+      <span className="text-[#1c1c1c]">{value}</span>
+    </span>
   );
 }
 

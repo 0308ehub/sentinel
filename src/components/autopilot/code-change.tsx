@@ -33,10 +33,22 @@ type Changes =
     };
 
 export function CodeChange({ experiment }: { experiment: Experiment }) {
+  const [open, setOpen] = useState(false);
   const [cleanup, setCleanup] = useState(false);
   const hasCleanup = Boolean(experiment.cleanup?.prNumber);
+  const summary = useExperimentChanges(experiment, { cleanup });
   return (
-    <div className="px-4 py-4 text-[#374151]">
+    <section className="border-y border-[#e6e8ec] text-[#374151]">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+        className="flex w-full items-center gap-1 px-4 py-3 text-left text-sm font-medium text-[#111827]"
+      >
+        <span>Code change</span>
+        <span className="font-normal text-[#6b7280]">· {changeTotals(summary.data as Changes | undefined)} {open ? "▾" : "▸"}</span>
+      </button>
+      {open && <div className="border-t border-[#e6e8ec] px-4 py-4">
       {hasCleanup && (
         <div className="mb-4 inline-flex rounded border border-[#e6e8ec] p-0.5 text-xs">
           <SwitchButton active={!cleanup} onClick={() => setCleanup(false)}>Experiment change</SwitchButton>
@@ -44,8 +56,19 @@ export function CodeChange({ experiment }: { experiment: Experiment }) {
         </div>
       )}
       <ChangeLoader key={cleanup ? "cleanup" : "experiment"} experiment={experiment} cleanup={cleanup} />
-    </div>
+      </div>}
+    </section>
   );
+}
+
+function changeTotals(changes: Changes | undefined): string {
+  if (!changes || changes.source === "none") return "Loading change…";
+  if (changes.source === "pull") {
+    const { additions, deletions, changedFiles } = changes.pull;
+    return `+${additions} −${deletions} across ${changedFiles} ${changedFiles === 1 ? "file" : "files"}`;
+  }
+  const totals = fileTotals(changes.files);
+  return `+${totals.additions} −${totals.deletions} across ${changes.files.length} ${changes.files.length === 1 ? "file" : "files"}`;
 }
 
 function ChangeLoader({ experiment, cleanup }: { experiment: Experiment; cleanup: boolean }) {
