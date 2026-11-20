@@ -2,17 +2,18 @@ import "server-only";
 
 import { currentAccountId } from "@/lib/connections/current";
 import { deleteConnection, getConnection, saveConnection } from "@/lib/connections/store";
-import type { GoogleDoc, GoogleMessage, GooglePreview, GoogleStatus } from "@/lib/google/types";
-
-const SCOPES = [
-  "openid",
-  "email",
-  "profile",
-  "https://www.googleapis.com/auth/gmail.readonly",
-  "https://www.googleapis.com/auth/gmail.compose",
-  "https://www.googleapis.com/auth/documents.readonly",
-  "https://www.googleapis.com/auth/drive.readonly",
-];
+import type { FiledEvidence } from "@/lib/autopilot/workspace-evidence";
+import {
+  CALENDAR_READONLY,
+  DOCS_READONLY,
+  GMAIL_READONLY,
+  GOOGLE_SCOPES,
+  docEvidence,
+  eventEvidence,
+  grantsScope,
+  mailEvidence,
+} from "@/lib/google/read-core";
+import type { GoogleDoc, GoogleEvent, GoogleMessage, GooglePreview, GoogleStatus } from "@/lib/google/types";
 
 interface GoogleConfig {
   clientId: string;
@@ -30,12 +31,18 @@ interface TokenResponse {
   access_token?: string;
   refresh_token?: string;
   expires_in?: number;
+  scope?: string;
   error?: string;
   error_description?: string;
 }
 
+interface AccountProfile {
+  email?: string;
+  hd?: string;
+}
+
 export function googleScopes(): string[] {
-  return SCOPES;
+  return GOOGLE_SCOPES;
 }
 
 export function readGoogleConfig(origin?: string): GoogleConfig | null {
@@ -54,7 +61,7 @@ export function googleAuthUrl(state: string, origin: string): string | null {
   url.searchParams.set("client_id", config.clientId);
   url.searchParams.set("redirect_uri", config.redirectUri);
   url.searchParams.set("response_type", "code");
-  url.searchParams.set("scope", SCOPES.join(" "));
+  url.searchParams.set("scope", GOOGLE_SCOPES.join(" "));
   url.searchParams.set("access_type", "offline");
   url.searchParams.set("prompt", "consent");
   url.searchParams.set("include_granted_scopes", "true");
@@ -73,7 +80,16 @@ export async function getGoogleStatus(origin?: string): Promise<GoogleStatus> {
   }
   const stored = await readToken();
   if (!stored?.refreshToken) return { configured: true, connected: false };
-  return { configured: true, connected: true, email: stored.email };
+  const legacy = !stored.scopes;
+  return {
+    configured: true,
+    connected: true,
+    email: stored.email,
+    hostedDomain: stored.hostedDomain,
+    gmail: legacy || grantsScope(stored.scopes, GMAIL_READONLY),
+    docs: legacy || grantsScope(stored.scopes, DOCS_READONLY),
+    calendar: grantsScope(stored.scopes, CALENDAR_READONLY),
+  };
 }
 
 export async function exchangeGoogleCode(code: string, origin: string): Promise<void> {
@@ -94,12 +110,14 @@ export async function exchangeGoogleCode(code: string, origin: string): Promise<
   if (!refreshToken || !token.access_token) {
     throw new Error(token.error_description || "Google did not return an access token.");
   }
-  const email = await fetchEmail(token.access_token);
+  const profile = await fetchProfile(token.access_token);
   await writeToken({
     refreshToken,
     accessToken: token.access_token,
     expiresAt: Date.now() + (token.expires_in ?? 3600) * 1000,
-    email,
+    email: profile.email,
+    hostedDomain: profile.hd,
+    scopes: token.scope || GOOGLE_SCOPES.join(" "),
   });
 }
 
@@ -137,9 +155,45 @@ export async function createGmailDraft(input: {
 
 export async function loadGooglePreview(): Promise<GooglePreview> {
   const accessToken = await accessTokenOrThrow();
-  const email = (await readToken())?.email;
-  const [messages, docs] = await Promise.all([listInbox(accessToken), listDocs(accessToken)]);
-  return { email, messages, docs };
+  const stored = await readToken();
+  const [messages, docs, events] = await Promise.all([
+    readSource(listInbox(accessToken)),
+    readSource(listDocs(accessToken)),
+    readSource(listEvents(accessToken)),
+  ]);
+  return {
+    email: stored?.email,
+    hostedDomain: stored?.hostedDomain,
+    messages: messages.value,
+    docs: docs.value,
+    events: events.value,
+    errors: { mail: messages.error, docs: docs.error, calendar: events.error },
+  };
+}
+
+/** Docs, calendar events, and inbox mail for the autopilot to file. Empty when Google is not connected. */
+export async function listGoogleWorkspaceEvidence(): Promise<FiledEvidence[]> {
+  const stored = await readToken();
+  if (!stored?.refreshToken) return [];
+  const accessToken = await accessTokenOrThrow();
+  const [messages, docs, events] = await Promise.all([
+    listInbox(accessToken).catch(() => [] as GoogleMessage[]),
+    listDocs(accessToken).catch(() => [] as GoogleDoc[]),
+    listEvents(accessToken).catch(() => [] as GoogleEvent[]),
+  ]);
+  return [
+    ...messages.map((message) => mailEvidence(message)),
+    ...docs.map((doc) => docEvidence(doc)),
+    ...events.map((event) => eventEvidence({ ...event, description: event.snippet })),
+  ].filter((item): item is FiledEvidence => item !== null);
+}
+
+async function readSource<T>(work: Promise<T[]>): Promise<{ value: T[]; error?: string }> {
+  try {
+    return { value: await work };
+  } catch (error) {
+    return { value: [], error: error instanceof Error ? error.message : "Could not read this." };
+  }
 }
 
 async function accessTokenOrThrow(): Promise<string> {
@@ -176,19 +230,18 @@ async function requestToken(config: GoogleConfig, fields: Record<string, string>
   return (await res.json()) as TokenResponse;
 }
 
-async function fetchEmail(accessToken: string): Promise<string | undefined> {
+async function fetchProfile(accessToken: string): Promise<AccountProfile> {
   const res = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  if (!res.ok) return undefined;
-  const body = (await res.json()) as { email?: string };
-  return body.email;
+  if (!res.ok) return {};
+  return (await res.json()) as AccountProfile;
 }
 
 async function listInbox(accessToken: string): Promise<GoogleMessage[]> {
   const list = await googleGet<{ messages?: { id: string }[] }>(
     accessToken,
-    "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=6&q=in:inbox",
+    "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=10&q=in:inbox%20newer_than:21d",
   );
   const messages = await Promise.all(
     (list.messages ?? []).map(async (item) => {
@@ -215,24 +268,97 @@ async function listInbox(accessToken: string): Promise<GoogleMessage[]> {
   return messages;
 }
 
+interface DriveFile {
+  id: string;
+  name: string;
+  modifiedTime?: string;
+  webViewLink?: string;
+}
+
 async function listDocs(accessToken: string): Promise<GoogleDoc[]> {
-  const query = encodeURIComponent("mimeType='application/vnd.google-apps.document' and trashed=false");
-  const listed = await googleGet<{
-    files?: { id: string; name: string; modifiedTime?: string; webViewLink?: string }[];
-  }>(
-    accessToken,
-    `https://www.googleapis.com/drive/v3/files?q=${query}&orderBy=modifiedTime desc&pageSize=6&fields=files(id,name,modifiedTime,webViewLink)`,
+  const query = "mimeType='application/vnd.google-apps.document' and trashed=false";
+  const [mine, shared] = await Promise.all([
+    driveFiles(accessToken, `${query}`, true),
+    driveFiles(accessToken, `${query} and modifiedTime > '${daysAgo(45)}'`, false).catch(() => [] as DriveFile[]),
+  ]);
+  const files = [...mine, ...shared]
+    .filter((file, index, all) => all.findIndex((item) => item.id === file.id) === index)
+    .sort((a, b) => (b.modifiedTime ?? "").localeCompare(a.modifiedTime ?? ""))
+    .slice(0, 8);
+  const excerpts = await Promise.all(
+    files.slice(0, 4).map(async (file) => [file.id, await docExcerpt(accessToken, file.id).catch(() => undefined)] as const),
   );
-  const files = listed.files ?? [];
-  const first = files[0];
-  const excerpt = first ? await docExcerpt(accessToken, first.id) : undefined;
+  const excerptFor = new Map(excerpts);
   return files.map((file) => ({
     id: file.id,
     name: file.name,
     modified: file.modifiedTime ?? "",
     link: file.webViewLink,
-    excerpt: file.id === first?.id ? excerpt : undefined,
+    excerpt: excerptFor.get(file.id),
   }));
+}
+
+async function driveFiles(accessToken: string, query: string, mine: boolean): Promise<DriveFile[]> {
+  const params = new URLSearchParams({
+    q: query,
+    pageSize: "8",
+    fields: "files(id,name,modifiedTime,webViewLink)",
+    supportsAllDrives: "true",
+    includeItemsFromAllDrives: "true",
+  });
+  if (mine) params.set("orderBy", "modifiedTime desc");
+  else params.set("corpora", "allDrives");
+  const listed = await googleGet<{ files?: DriveFile[] }>(
+    accessToken,
+    `https://www.googleapis.com/drive/v3/files?${params}`,
+  );
+  return listed.files ?? [];
+}
+
+function daysAgo(days: number): string {
+  return new Date(Date.now() - days * 86_400_000).toISOString();
+}
+
+async function listEvents(accessToken: string): Promise<GoogleEvent[]> {
+  const params = new URLSearchParams({
+    singleEvents: "true",
+    orderBy: "startTime",
+    maxResults: "12",
+    timeMin: new Date(Date.now() - 14 * 86_400_000).toISOString(),
+    timeMax: new Date(Date.now() + 21 * 86_400_000).toISOString(),
+    fields: "items(id,summary,description,location,status,htmlLink,start,end,organizer(email,displayName))",
+  });
+  const listed = await googleGet<{
+    items?: {
+      id?: string;
+      summary?: string;
+      description?: string;
+      location?: string;
+      status?: string;
+      htmlLink?: string;
+      start?: { dateTime?: string; date?: string };
+      end?: { dateTime?: string; date?: string };
+      organizer?: { email?: string; displayName?: string };
+    }[];
+  }>(accessToken, `https://www.googleapis.com/calendar/v3/calendars/primary/events?${params}`);
+  return (listed.items ?? []).flatMap((item) => {
+    if (!item.id || !item.summary || item.status === "cancelled") return [];
+    const allDay = Boolean(item.start?.date && !item.start.dateTime);
+    const start = item.start?.dateTime || item.start?.date;
+    const end = item.end?.dateTime || item.end?.date || start;
+    if (!start || !end) return [];
+    return [{
+      id: item.id,
+      title: item.summary,
+      start,
+      end,
+      allDay,
+      location: item.location,
+      snippet: item.description?.replace(/\s+/g, " ").trim().slice(0, 280),
+      link: item.htmlLink,
+      organizer: item.organizer?.displayName || item.organizer?.email,
+    }];
+  });
 }
 
 async function docExcerpt(accessToken: string, id: string): Promise<string | undefined> {
@@ -276,21 +402,29 @@ async function googleGet<T>(accessToken: string, url: string): Promise<T> {
   return body;
 }
 
-async function readToken(): Promise<(StoredToken & { email?: string }) | null> {
+interface StoredMeta {
+  email?: string;
+  hostedDomain?: string;
+  scopes?: string;
+}
+
+async function readToken(): Promise<(StoredToken & StoredMeta) | null> {
   const userId = await currentAccountId();
   if (!userId) return null;
   const connection = await getConnection<StoredToken>(userId, "google");
-  return connection
-    ? {
-        ...connection.secret,
-        email: typeof connection.meta.email === "string" ? connection.meta.email : undefined,
-      }
-    : null;
+  if (!connection) return null;
+  const meta = connection.meta;
+  return {
+    ...connection.secret,
+    email: typeof meta.email === "string" ? meta.email : undefined,
+    hostedDomain: typeof meta.hostedDomain === "string" ? meta.hostedDomain : undefined,
+    scopes: typeof meta.scopes === "string" ? meta.scopes : undefined,
+  };
 }
 
-async function writeToken(token: StoredToken & { email?: string }): Promise<void> {
+async function writeToken(token: StoredToken & StoredMeta): Promise<void> {
   const userId = await currentAccountId();
   if (!userId) throw new Error("Unauthorized");
-  const { email, ...secret } = token;
-  await saveConnection(userId, "google", secret, { email });
+  const { email, hostedDomain, scopes, ...secret } = token;
+  await saveConnection(userId, "google", secret, { email, hostedDomain, scopes });
 }

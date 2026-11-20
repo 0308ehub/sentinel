@@ -4,7 +4,7 @@ import type { ResultEstimate } from "@/lib/autopilot/power";
 import type { ChangeSummary } from "@/lib/autopilot/change-summary";
 import type { Theme } from "@/lib/autopilot/themes";
 
-export type EvidenceSource = "slack" | "ticket" | "analytics" | "interview";
+export type EvidenceSource = "slack" | "ticket" | "analytics" | "interview" | "google";
 
 export interface Evidence {
   id: string;

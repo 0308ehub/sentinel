@@ -4,6 +4,7 @@ import { addEvidence, knownEvidenceUrls, log, type NewEvidence } from "@/lib/aut
 import { evidenceFromGraph, type FiledEvidence } from "@/lib/autopilot/workspace-evidence";
 import { actingUserId } from "@/lib/connections/current";
 import { slackActiveForAccount } from "@/lib/connections/ownership";
+import { listGoogleWorkspaceEvidence } from "@/lib/google/client";
 import { listRecentIssues } from "@/lib/jira/client";
 import { listBotChannels, listRecentMessages, SlackApiError } from "@/lib/slack/client";
 import { isPersonMessage, slackMessageEvidence } from "@/lib/slack/events-core";
@@ -76,6 +77,16 @@ async function slackEvidence(): Promise<FiledEvidence[]> {
   }
 }
 
+async function googleEvidence(): Promise<FiledEvidence[]> {
+  try {
+    return await listGoogleWorkspaceEvidence();
+  } catch (error) {
+    if (error instanceof Error && error.message === "Connect Google Workspace first.") return [];
+    console.error("[autopilot] google evidence", error);
+    return [];
+  }
+}
+
 function asNew(item: FiledEvidence): NewEvidence {
   const parsed = Date.parse(item.occurredAt);
   return {
@@ -85,11 +96,16 @@ function asNew(item: FiledEvidence): NewEvidence {
   };
 }
 
-/** Evidence this account filed in Kismet, plus its connected Jira and Slack. Safe to repeat. */
+/** Evidence this account filed in Kismet, plus its connected Jira, Slack, and Google Workspace. Safe to repeat. */
 export async function workspaceEvidence(): Promise<string | null> {
   const userId = await actingUserId();
   if (!userId) return null;
-  const candidates = [...(await graphEvidence(userId)), ...(await jiraEvidence()), ...(await slackEvidence())];
+  const candidates = [
+    ...(await graphEvidence(userId)),
+    ...(await jiraEvidence()),
+    ...(await slackEvidence()),
+    ...(await googleEvidence()),
+  ];
   const known = await knownEvidenceUrls(candidates.map((item) => item.url));
   // Drop what's already filed before capping, so old messages in one channel can't crowd out new ones.
   const fresh = candidates
@@ -97,5 +113,5 @@ export async function workspaceEvidence(): Promise<string | null> {
     .sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt))
     .slice(0, MAX_NEW_EVIDENCE);
   const added = await addEvidence(fresh.map(asNew));
-  return added ? `Collected ${added} from the workspace, Slack, and Jira.` : null;
+  return added ? `Collected ${added} from the workspace, Slack, Jira, and Google.` : null;
 }

@@ -1,5 +1,5 @@
 export interface FiledEvidence {
-  source: "ticket" | "slack";
+  source: "ticket" | "slack" | "google";
   title: string;
   body: string;
   author: string;

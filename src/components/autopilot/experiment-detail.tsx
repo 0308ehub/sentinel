@@ -435,6 +435,7 @@ const SOURCE_MARK: Record<string, { src: string }> = {
   ticket: { src: "/connectors/jira.svg" },
   analytics: { src: "/connectors/amplitude.png" },
   interview: { src: "" },
+  google: { src: "/connectors/google-workspace.svg" },
 };
 
 function EvidenceStrip({ signal, rationale }: { signal: Signal | null; rationale: ChangeRationale | null }) {

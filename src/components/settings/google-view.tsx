@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { graphStore } from "@/lib/graph/graph-store";
-import type { GoogleDoc, GoogleMessage, GooglePreview, GoogleStatus } from "@/lib/google/types";
+import type { GoogleDoc, GoogleEvent, GoogleMessage, GooglePreview, GoogleStatus } from "@/lib/google/types";
 
 const REDIRECT = "your Kismet origin + /api/google/callback";
 
@@ -83,7 +83,7 @@ export function GoogleView() {
   }
 
   return (
-    <SettingsShell title="Google Workspace" description="Read Docs and Gmail, and save drafts">
+    <SettingsShell title="Google Workspace" description="Read Docs, Calendar, and Gmail">
       <Link
         href="/settings/connectors"
         className="mb-4 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
@@ -104,18 +104,19 @@ export function GoogleView() {
           <CardHeader>
             <CardTitle className="text-sm">Create a Google OAuth client</CardTitle>
             <CardDescription className="text-xs leading-relaxed">
-              Kismet asks Google for read access to Gmail and Docs, plus permission to save drafts.
-              It does not request permission to delete mail.
+              Kismet asks Google for read access to Gmail, Docs, Drive, and Calendar, plus permission to save drafts.
+              It does not request permission to delete mail or change the calendar.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-xs leading-relaxed text-muted-foreground">
             <p>
               1. Open Google Cloud Console, create a project, and enable the Gmail API, Google Docs API,
-              and Google Drive API.
+              Google Drive API, and Google Calendar API.
             </p>
             <p>
-              2. Configure the OAuth consent screen. While it is in testing, add your own Gmail address
-              as a test user.
+              2. Configure the OAuth consent screen for External, or Internal if this Cloud project belongs
+              to the same Workspace. While the app is in testing, add each person as a test user. A Workspace
+              admin may also need to allow the app.
             </p>
             <p>3. Create an OAuth client of type Web application. Set the authorized redirect URI to {REDIRECT}.</p>
             <p>
@@ -129,7 +130,7 @@ export function GoogleView() {
           <CardHeader>
             <CardTitle className="text-sm">Sign in with Google</CardTitle>
             <CardDescription className="text-xs leading-relaxed">
-              Google will show the account, then the permissions: read Gmail, read Docs and Drive, and create drafts.
+              Sign in with the Google account you use at work. Google will ask to read Gmail, Docs, Drive, and Calendar, and to create drafts.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -144,28 +145,40 @@ export function GoogleView() {
             <CardContent className="flex flex-wrap items-center gap-3 p-4">
               <Badge variant="success">Connected</Badge>
               <span className="text-sm">{status.email}</span>
+              {status.hostedDomain && <span className="text-xs text-muted-foreground">Workspace · {status.hostedDomain}</span>}
               <Button variant="outline" size="sm" className="ml-auto" onClick={() => void disconnect()}>
                 Disconnect
               </Button>
             </CardContent>
           </Card>
+          {status.calendar === false && (
+            <p className="text-xs text-muted-foreground">
+              Calendar is not on this connection yet.{" "}
+              <a href="/api/google/auth" className="text-brand hover:underline">Add Calendar</a>
+            </p>
+          )}
           {previewError && <p className="text-xs text-destructive">{previewError}</p>}
           {!preview && !previewError && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Reading inbox and Docs…
+              Reading Docs, Calendar, and Gmail…
             </div>
           )}
           {preview && (
             <>
-              <Section title="Inbox" empty="No inbox messages were returned.">
-                {preview.messages.map((message) => (
-                  <MessageRow key={message.id} message={message} />
-                ))}
-              </Section>
-              <Section title="Docs" empty="No Google Docs were returned.">
+              <Section title="Docs" empty="No Google Docs were returned." error={preview.errors?.docs}>
                 {preview.docs.map((doc) => (
                   <DocRow key={doc.id} doc={doc} />
+                ))}
+              </Section>
+              <Section title="Calendar" empty="Nothing on the primary calendar in the last two weeks or the next three." error={preview.errors?.calendar}>
+                {preview.events.map((event) => (
+                  <EventRow key={event.id} event={event} />
+                ))}
+              </Section>
+              <Section title="Inbox" empty="No recent inbox messages were returned." error={preview.errors?.mail}>
+                {preview.messages.map((message) => (
+                  <MessageRow key={message.id} message={message} />
                 ))}
               </Section>
               <Card>
@@ -209,10 +222,12 @@ export function GoogleView() {
 function Section({
   title,
   empty,
+  error,
   children,
 }: {
   title: string;
   empty: string;
+  error?: string;
   children: ReactNode;
 }) {
   const list = Array.isArray(children) ? children : [children];
@@ -223,7 +238,8 @@ function Section({
         <CardTitle className="text-sm">{title}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 p-4 pt-0">
-        {items.length === 0 ? <p className="text-xs text-muted-foreground">{empty}</p> : items}
+        {error && <p className="text-xs text-destructive">{error}</p>}
+        {items.length === 0 && !error ? <p className="text-xs text-muted-foreground">{empty}</p> : items}
       </CardContent>
     </Card>
   );
@@ -237,6 +253,35 @@ function MessageRow({ message }: { message: GoogleMessage; }) {
       {message.snippet && <p className="mt-1 text-xs text-muted-foreground">{message.snippet}</p>}
     </div>
   );
+}
+
+function EventRow({ event }: { event: GoogleEvent }) {
+  const label = eventTime(event);
+  return (
+    <div className="border-b border-border pb-3 last:border-0 last:pb-0">
+      {event.link ? (
+        <a href={event.link} target="_blank" rel="noreferrer" className="text-sm font-medium text-brand hover:underline">
+          {event.title}
+        </a>
+      ) : (
+        <p className="text-sm font-medium">{event.title}</p>
+      )}
+      <p className="text-[11px] text-muted-foreground">{label}{event.organizer ? ` · ${event.organizer}` : ""}</p>
+      {event.location && <p className="mt-1 text-xs text-muted-foreground">{event.location}</p>}
+      {event.snippet && <p className="mt-1 text-xs text-muted-foreground">{event.snippet}</p>}
+    </div>
+  );
+}
+
+function eventTime(event: GoogleEvent): string {
+  if (event.allDay) return event.start.slice(0, 10);
+  const start = new Date(event.start);
+  const end = new Date(event.end);
+  if (Number.isNaN(start.getTime())) return event.start;
+  const day = start.toLocaleString(undefined, { month: "short", day: "numeric" });
+  const from = start.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const to = Number.isNaN(end.getTime()) ? "" : end.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  return to ? `${day}, ${from}–${to}` : `${day}, ${from}`;
 }
 
 function DocRow({ doc }: { doc: GoogleDoc; }) {

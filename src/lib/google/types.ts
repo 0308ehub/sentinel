@@ -2,6 +2,10 @@ export interface GoogleStatus {
   configured: boolean;
   connected: boolean;
   email?: string;
+  hostedDomain?: string;
+  gmail?: boolean;
+  docs?: boolean;
+  calendar?: boolean;
   error?: string;
 }
 
@@ -21,8 +25,23 @@ export interface GoogleDoc {
   excerpt?: string;
 }
 
+export interface GoogleEvent {
+  id: string;
+  title: string;
+  start: string;
+  end: string;
+  allDay: boolean;
+  location?: string;
+  snippet?: string;
+  link?: string;
+  organizer?: string;
+}
+
 export interface GooglePreview {
   email?: string;
+  hostedDomain?: string;
   messages: GoogleMessage[];
   docs: GoogleDoc[];
+  events: GoogleEvent[];
+  errors?: { mail?: string; docs?: string; calendar?: string };
 }
