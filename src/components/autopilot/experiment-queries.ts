@@ -33,6 +33,8 @@ export type ExperimentSnapshot = {
   error?: string | null;
   controlHtml?: string | null;
   treatmentHtml?: string | null;
+  stage?: "setting_up" | "rendering_current" | "rendering_new" | "checking" | "ready";
+  elapsedMinutes?: number;
 };
 export type DailyVisitors = { day: string; control: number; treatment: number };
 

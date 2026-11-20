@@ -13,6 +13,7 @@ import {
 } from "@/components/autopilot/experiment-queries";
 import type { ChangeSummary } from "@/lib/autopilot/change-summary";
 import { addedTextFromPatch, normalizePreviewCondition, textDifference } from "@/lib/autopilot/preview-diff";
+import { snapshotStageLabel, type SnapshotStage } from "@/lib/autopilot/snapshot-stage-core";
 import type { Experiment } from "@/lib/autopilot/types";
 
 function previewHref(origin: string, page: string, flag: string, arm: "control" | "treatment", embed: boolean) {
@@ -164,11 +165,29 @@ function VisualPreview({ experiment, changes, siteUrl, when, addedText }: {
         </button>
       )}
       {snapshot?.status === "rendering" && (
-        <p className="mt-2 text-xs text-[#6b7280]">Rendering both versions with sample data… (usually a few minutes)</p>
+        <SnapshotProgress stage={snapshot.stage ?? "setting_up"} elapsedMinutes={snapshot.elapsedMinutes ?? 0} />
       )}
       {(snapshot?.status === "failed" || snapshotMessage || snapshotLoadMessage) && (
         <p className="mt-2 text-xs text-[#6b7280]">{snapshotMessage || snapshotLoadMessage || snapshot?.error || "The sample preview could not be rendered."}</p>
       )}
+    </div>
+  );
+}
+
+function SnapshotProgress({ stage, elapsedMinutes }: { stage: SnapshotStage; elapsedMinutes: number }) {
+  const stages: SnapshotStage[] = ["setting_up", "rendering_current", "rendering_new", "checking", "ready"];
+  const currentIndex = stages.indexOf(stage);
+  return (
+    <div className="mt-2 flex items-center gap-1 overflow-x-auto whitespace-nowrap text-xs text-[#6b7280]" role="status">
+      {stages.map((item, index) => (
+        <span key={item} className="contents">
+          {index > 0 && <span className="text-[#c4c8cf]">→</span>}
+          <span className={index < currentIndex ? "text-[#17663a]" : index === currentIndex ? "font-medium text-[#111827]" : "text-[#9aa0a8]"}>
+            {index < currentIndex ? "✓ " : ""}{snapshotStageLabel(item)}
+          </span>
+        </span>
+      ))}
+      <span className="ml-1 text-[#9aa0a8]">· {elapsedMinutes} min</span>
     </div>
   );
 }

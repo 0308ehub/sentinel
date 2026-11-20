@@ -7,18 +7,26 @@ import {
   startSnapshot,
 } from "@/lib/autopilot/snapshots";
 import { getExperiment } from "@/lib/autopilot/store";
+import { elapsedMinutes, snapshotStage } from "@/lib/autopilot/snapshot-stage-core";
 import { currentAccountId } from "@/lib/connections/current";
+import { managedSessionView } from "@/lib/coder/sessions";
 
 export const dynamic = "force-dynamic";
 
-function responseFor(snapshot: Awaited<ReturnType<typeof snapshotFor>>) {
+async function responseFor(snapshot: Awaited<ReturnType<typeof snapshotFor>>) {
   if (!snapshot) return { status: "none" as const };
+  const progress = snapshot.status === "rendering" && snapshot.sessionId
+    ? await managedSessionView(snapshot.sessionId)
+      .then((view) => ({ stage: snapshotStage(view.items), elapsedMinutes: elapsedMinutes(snapshot.createdAt) }))
+      .catch(() => ({ stage: "setting_up" as const, elapsedMinutes: elapsedMinutes(snapshot.createdAt) }))
+    : { stage: snapshotStage([], snapshot.status === "ready"), elapsedMinutes: elapsedMinutes(snapshot.createdAt) };
   return {
     status: snapshot.status,
     scenario: snapshot.scenario,
     error: snapshot.error,
     controlHtml: snapshot.controlHtml,
     treatmentHtml: snapshot.treatmentHtml,
+    ...progress,
   };
 }
 
@@ -32,7 +40,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     await followSnapshots();
     const source = await snapshotSource(experiment);
     if (!source) return Response.json({ status: "none" });
-    return Response.json(responseFor(await snapshotFor(id, source.sha)));
+    return Response.json(await responseFor(await snapshotFor(id, source.sha)));
   });
 }
 
@@ -45,7 +53,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     if (!experiment) return new Response("Experiment not found.", { status: 404 });
     if (!experiment.changeSummary) return new Response("The change summary is not ready yet.", { status: 409 });
     try {
-      return Response.json(responseFor(await startSnapshot(experiment, experiment.changeSummary)));
+      return Response.json(await responseFor(await startSnapshot(experiment, experiment.changeSummary)));
     } catch (error) {
       if (error instanceof SnapshotError) return new Response(error.message, { status: error.status });
       console.error("[autopilot] snapshot start", error);

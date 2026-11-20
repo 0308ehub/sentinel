@@ -9,6 +9,7 @@ import { accountDailyLimitCents, formatDollars } from "@/lib/autopilot/spend-cor
 import { agentBudgetLeft, recordAgentSession } from "@/lib/autopilot/spend";
 import { listExperiments, listSignals, log, setSignalStatus, snoozeSignal, updateExperiment } from "@/lib/autopilot/store";
 import { isLocalSource } from "@/lib/autopilot/source";
+import { ensureChangeSummary } from "@/lib/autopilot/change-summary-server";
 import { startSnapshot } from "@/lib/autopilot/snapshots";
 import { markerOnlyPatch, noChangeReason } from "@/lib/autopilot/no-change-core";
 import { recordNoChange } from "@/lib/autopilot/no-change";
@@ -155,14 +156,14 @@ export async function finishBuild(
     note: `Built by ${by}. Waiting for the preview build.`,
   });
   await log("build", `Opened PR #${pull.number} for “${experiment.title}”.`, experiment.id);
-  const summary = experiment.changeSummary;
-  const codeIsLive = false;
-  // Fixes get a sample render too, started now rather than when someone opens the page.
-  if (summary?.kind === "ui" && (Boolean(summary.when.trim()) || !codeIsLive)) {
-    await startSnapshot(
-      { ...experiment, status: "awaiting_approval", prUrl: pull.url, prNumber: pull.number, branch },
-      summary,
-    ).catch((error) => console.error("[autopilot] could not start sample preview", error));
+  const opened = { ...experiment, status: "awaiting_approval" as const, prUrl: pull.url, prNumber: pull.number, branch };
+  // Summary/render work is opportunistic and must never turn a successful PR into a failed build.
+  try {
+    const summary = await ensureChangeSummary(opened);
+    const codeIsLive = false;
+    if (summary?.kind === "ui" && (Boolean(summary.when.trim()) || !codeIsLive)) await startSnapshot(opened, summary);
+  } catch (error) {
+    console.error("[autopilot] could not prepare sample preview", error);
   }
   return `Opened a pull request for “${experiment.title}”.`;
 }
