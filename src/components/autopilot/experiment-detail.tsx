@@ -436,6 +436,7 @@ const SOURCE_MARK: Record<string, { src: string }> = {
   analytics: { src: "/connectors/amplitude.png" },
   interview: { src: "" },
   google: { src: "/connectors/google-workspace.svg" },
+  kismet: { src: "/kismet-app-mark.png" },
 };
 
 function EvidenceStrip({ signal, rationale }: { signal: Signal | null; rationale: ChangeRationale | null }) {

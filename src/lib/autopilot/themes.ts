@@ -25,7 +25,7 @@ export interface Theme {
 
 const person = (evidence: Pick<Evidence, "author">) => {
   const author = evidence.author.trim();
-  return author && author.toLowerCase() !== "kismet analytics" ? author : "";
+  return author && !author.toLowerCase().startsWith("kismet") ? author : "";
 };
 
 function representativeQuotes(items: Evidence[]): ThemeQuote[] {
@@ -66,7 +66,7 @@ export function buildThemes(signals: Signal[], now: Date): Theme[] {
   return signals
     .filter((signal) => signal.status === "open" || signal.status === "experimenting" || signal.status === "stale")
     .flatMap((signal) => {
-      const qualitative = signal.evidence.filter((item) => item.source !== "analytics");
+      const qualitative = signal.evidence.filter((item) => item.source !== "analytics" && item.source !== "kismet");
       if (!qualitative.length) return [];
       const people = new Set(qualitative.map(person).filter(Boolean)).size;
       const last7 = qualitative.filter((item) => {

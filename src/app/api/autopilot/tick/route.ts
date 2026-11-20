@@ -33,5 +33,5 @@ export async function GET(request: Request) {
 export async function POST() {
   const userId = await currentAccountId();
   if (!userId) return Response.json({ error: "Sign in required." }, { status: 401 });
-  return Response.json(await runTick(userId));
+  return Response.json(await runTick(userId, { manual: true }));
 }

@@ -23,6 +23,7 @@ import { sampleEvidenceCount } from "@/lib/autopilot/sample-data";
 import { simulateTraffic } from "@/lib/autopilot/simulate";
 import {
   claimLegacyRows,
+  evidenceCreatedSince,
   evidenceCounts,
   lastRunAt,
   latestErrorMessage,
@@ -42,6 +43,8 @@ import { syntheticEnabled, syntheticEvidence } from "@/lib/autopilot/synthetic";
 import type { AutopilotState } from "@/lib/autopilot/types";
 import { buildThemes } from "@/lib/autopilot/themes";
 import { triageSignals } from "@/lib/autopilot/triage";
+import { suggestIdeas } from "@/lib/autopilot/ideas";
+import { buildRunReport, type RunReport, type RunSnapshot } from "@/lib/autopilot/run-report-core";
 import { verifyFixes } from "@/lib/autopilot/verify-fixes";
 import { notifySlack, postAccountAlert } from "@/lib/autopilot/notify";
 import { refreshAgentSpend } from "@/lib/autopilot/spend";
@@ -53,6 +56,7 @@ export interface TickResult {
   ran: boolean;
   steps: string[];
   errors: string[];
+  report?: RunReport;
 }
 
 async function step(name: string, result: TickResult, fn: () => Promise<string | null>): Promise<void> {
@@ -67,15 +71,32 @@ async function step(name: string, result: TickResult, fn: () => Promise<string |
 }
 
 /** One pass of one account's loop. Every step is safe to repeat, so a missed or doubled tick does no harm. */
-export async function runTick(userId: string): Promise<TickResult> {
+export async function runTick(userId: string, options: { manual?: boolean } = {}): Promise<TickResult> {
   await claimLegacyRows(userId);
-  return withAutopilotUser(userId, () => runScopedTick());
+  return withAutopilotUser(userId, () => runScopedTick(options));
 }
 
-async function runScopedTick(): Promise<TickResult> {
+function snapshot(
+  signals: Awaited<ReturnType<typeof listSignals>>,
+  experiments: Awaited<ReturnType<typeof listExperiments>>,
+  evidenceBySource: Record<string, number>,
+): RunSnapshot {
+  return {
+    signals: signals.map(({ id, title, status, kind }) => ({ id, title, status, kind })),
+    experiments: experiments.map(({ id, title, status }) => ({ id, title, status })),
+    evidenceBySource,
+  };
+}
+
+async function runScopedTick(options: { manual?: boolean }): Promise<TickResult> {
   const result: TickResult = { ran: false, steps: [], errors: [] };
   const outcome = await withTickLock(async () => {
     result.ran = true;
+    const tickStartedAt = new Date();
+    const [startingSignals, startingExperiments] = await Promise.all([listSignals(), listExperiments()]);
+    const before = snapshot(startingSignals, startingExperiments, {});
+    const startingSignalIds = new Set(startingSignals.map((signal) => signal.id));
+    const ideaSignalIds = new Set<string>();
 
     const synthetic = syntheticEnabled();
 
@@ -98,6 +119,19 @@ async function runScopedTick(): Promise<TickResult> {
       return sorted ? `Sorted ${sorted} pieces of evidence into problems.` : null;
     });
     await step("triage", result, triageSignals);
+    if (options.manual) {
+      const signalsAfterTriage = await listSignals();
+      const alreadyCreated = signalsAfterTriage.some(
+        (signal) => signal.status === "open" && !startingSignalIds.has(signal.id),
+      );
+      if (!alreadyCreated) {
+        await step("ideas", result, async () => {
+          const ideas = await suggestIdeas();
+          for (const id of ideas.signalIds) ideaSignalIds.add(id);
+          return ideas.message;
+        });
+      }
+    }
 
     // Steps that touch code need a repository; an account that has not chosen one stops at noticing.
     if (!(await sourceLabel())) {
@@ -137,6 +171,20 @@ async function runScopedTick(): Promise<TickResult> {
       }
     } catch (error) {
       console.error("[autopilot] could not send failing-run alert", error);
+    }
+    if (options.manual) {
+      const [signals, experiments, evidenceBySource] = await Promise.all([
+        listSignals(),
+        listExperiments(),
+        evidenceCreatedSince(tickStartedAt),
+      ]);
+      result.report = buildRunReport(
+        before,
+        snapshot(signals, experiments, evidenceBySource),
+        result.steps,
+        result.errors,
+        ideaSignalIds,
+      );
     }
     return result;
   });

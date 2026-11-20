@@ -148,8 +148,8 @@ export interface NewEvidence {
   occurredAt?: string;
 }
 
-export async function addEvidence(items: NewEvidence[]): Promise<number> {
-  if (items.length === 0) return 0;
+export async function addEvidenceWithIds(items: NewEvidence[]): Promise<string[]> {
+  if (items.length === 0) return [];
   const sql = await db();
   const userId = scopeUser();
   const rows = items.map((item) => ({
@@ -164,7 +164,31 @@ export async function addEvidence(items: NewEvidence[]): Promise<number> {
     occurred_at: item.occurredAt ?? new Date().toISOString(),
   }));
   await sql`insert into kismet.evidence ${sql(rows)}`;
-  return rows.length;
+  return rows.map((row) => row.id);
+}
+
+export async function addEvidence(items: NewEvidence[]): Promise<number> {
+  return (await addEvidenceWithIds(items)).length;
+}
+
+export async function evidenceCreatedSince(since: Date): Promise<Record<string, number>> {
+  const sql = await db();
+  const rows = await sql`
+    select source, count(*)::int as count from kismet.evidence
+    where user_id = ${scopeUser()} and created_at >= ${since.toISOString()}
+    group by source
+  `;
+  return Object.fromEntries(rows.map((row) => [String(row.source), Number(row.count)]));
+}
+
+export async function kismetIdeasToday(): Promise<number> {
+  const sql = await db();
+  const [row] = await sql`
+    select count(*)::int as count from kismet.evidence
+    where user_id = ${scopeUser()} and source = 'kismet'
+      and created_at >= date_trunc('day', now() at time zone 'UTC') at time zone 'UTC'
+  `;
+  return Number(row?.count ?? 0);
 }
 
 export async function unassignedEvidence(limit: number): Promise<Evidence[]> {

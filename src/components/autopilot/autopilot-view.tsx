@@ -7,6 +7,7 @@ import { useAutopilot } from "@/components/autopilot/use-autopilot";
 import type { Builder } from "@/lib/autopilot/builders";
 import type { Experiment, Signal } from "@/lib/autopilot/types";
 import { MoveInCard } from "@/components/workspace/move-in-card";
+import type { RunReport } from "@/lib/autopilot/run-report-core";
 
 export function AutopilotView() {
   const query = useAutopilot();
@@ -15,15 +16,18 @@ export function AutopilotView() {
   const [running, setRunning] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [report, setReport] = useState<RunReport | null>(null);
 
   async function runNow() {
     setRunning(true);
     setMessage(null);
+    setReport(null);
     try {
       const res = await fetch("/api/autopilot/tick", { method: "POST" });
-      const result = (await res.json()) as { steps?: string[]; errors?: string[] };
+      const result = (await res.json()) as { steps?: string[]; errors?: string[]; report?: RunReport };
       const parts = [...(result.steps ?? []), ...(result.errors ?? [])];
-      setMessage(parts.length ? parts.join(" ") : "Nothing new to do.");
+      if (result.report) setReport(result.report);
+      else setMessage(parts.length ? parts.join(" ") : "Nothing new to do.");
       await load();
     } catch {
       setMessage("The run failed. Try again.");
@@ -178,6 +182,8 @@ export function AutopilotView() {
       running={running}
       busy={busy}
       message={message}
+      report={report}
+      onDismissReport={() => setReport(null)}
       onRun={() => void runNow()}
       onRemoveSample={() => void removeSample()}
       onTest={(signal, builder) => void testSignal(signal, builder)}

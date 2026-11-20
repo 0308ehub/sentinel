@@ -7,6 +7,7 @@ import { Check, ChevronDown, Circle, Loader2, MoreHorizontal, Play } from "lucid
 import { CreateExperimentDialog } from "@/components/autopilot/create-experiment-dialog";
 import { ExperimentDetail } from "@/components/autopilot/experiment-detail";
 import { SpendOverview } from "@/components/autopilot/spend-overview";
+import { RunReport } from "@/components/autopilot/run-report";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -24,6 +25,7 @@ import { setupSteps } from "@/lib/autopilot/setup-core";
 import { setOpenExperiment } from "@/lib/autopilot/open-experiment";
 import { startOfMonth, wonSince } from "@/lib/autopilot/won-core";
 import type { AutopilotState, Experiment, Learning, Signal } from "@/lib/autopilot/types";
+import type { RunReport as RunReportData } from "@/lib/autopilot/run-report-core";
 
 const ENDED = new Set<Experiment["status"]>(["rolled_out", "stopped", "rejected", "failed"]);
 const SUGGESTED_STATUS = new Set<Experiment["status"]>(["building", "awaiting_approval"]);
@@ -47,6 +49,8 @@ export function ExperimentBoard({
   running,
   busy,
   message,
+  report,
+  onDismissReport,
   onRun,
   onRemoveSample,
   onTest,
@@ -61,6 +65,8 @@ export function ExperimentBoard({
   running: boolean;
   busy: string | null;
   message: string | null;
+  report: RunReportData | null;
+  onDismissReport: () => void;
   onRun: () => void;
   onRemoveSample: () => void;
   onTest: (signal: Signal, builder: Builder) => void;
@@ -298,6 +304,14 @@ export function ExperimentBoard({
           </div>
         )}
         {message && <p className="mt-3 text-xs text-[#6b7280]">{message}</p>}
+        {report && (
+          <RunReport
+            report={report}
+            onOpenSignal={(id) => setSelected({ kind: "signal", id })}
+            onOpenExperiment={(id) => setSelected({ kind: "experiment", id })}
+            onDismiss={onDismissReport}
+          />
+        )}
         {tab === "overview" && <div className="mt-4 flex flex-wrap items-center gap-2">
           <input
             value={query}
