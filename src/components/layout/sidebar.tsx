@@ -39,7 +39,7 @@ import { startNewChat } from "@/lib/chat/session";
 import { BrandLogo } from "@/components/marketing/brand-logo";
 import { useAccount } from "@/lib/auth/use-account";
 import { ReportProblem } from "@/components/feedback/report-problem";
-import { OrganizationSwitcher } from "@clerk/nextjs";
+import { OrganizationSwitcher, useOrganization } from "@clerk/nextjs";
 import { usePresence } from "@/components/workspace/live-sync";
 
 type NavItem = { id: string; label: string; href: string; icon: typeof LayoutDashboard };
@@ -189,21 +189,7 @@ export function Sidebar() {
 
       <Separator />
       <div className="p-2">
-        {process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && sidebarCollapsed && (
-          <div className="mb-1 flex justify-center" title="Switch workspace">
-            {/* Collapsed: just the workspace's avatar, which still opens the switcher. */}
-            <OrganizationSwitcher
-              hidePersonal={false}
-              afterSelectOrganizationUrl={pathname}
-              afterSelectPersonalUrl={pathname}
-              appearance={{ elements: {
-                organizationSwitcherTrigger: "justify-center rounded-md border-0 bg-transparent p-1 shadow-none hover:bg-sidebar-accent",
-                organizationPreviewTextContainer: "hidden",
-                organizationSwitcherTriggerIcon: "hidden",
-              } }}
-            />
-          </div>
-        )}
+        {process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && sidebarCollapsed && <CollapsedWorkspace onOpen={toggleSidebar} />}
         {process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && !sidebarCollapsed && (
           <div className="mb-1">
             <OrganizationSwitcher
@@ -311,5 +297,25 @@ export function Sidebar() {
         </DropdownMenu>
       </div>
     </aside>
+  );
+}
+
+/** Collapsed sidebar: only the workspace's logo. Clicking it opens the sidebar, where the full switcher is. */
+function CollapsedWorkspace({ onOpen }: { onOpen: () => void }) {
+  const { organization } = useOrganization();
+  if (!organization) return null;
+  return (
+    <div className="mb-1 flex justify-center">
+      <button
+        type="button"
+        onClick={onOpen}
+        title={`${organization.name} · switch workspace`}
+        aria-label={`Workspace ${organization.name}. Open the sidebar to switch.`}
+        className="rounded-md p-1 hover:bg-sidebar-accent"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element -- Clerk serves the logo from its own CDN */}
+        <img src={organization.imageUrl} alt="" className="h-6 w-6 rounded-md" />
+      </button>
+    </div>
   );
 }
