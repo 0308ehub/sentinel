@@ -14,7 +14,7 @@ import {
 import { captionLines, type CaptionLine } from "@/lib/autopilot/caption";
 import type { ChangeSummary } from "@/lib/autopilot/change-summary";
 import { addedTextFromPatch, normalizePreviewCondition, textDifference } from "@/lib/autopilot/preview-diff";
-import { previewSources, type PreviewSource } from "@/lib/autopilot/preview-source-core";
+import { previewSources, previewVersions } from "@/lib/autopilot/preview-source-core";
 import { snapshotStageLabel, type SnapshotStage } from "@/lib/autopilot/snapshot-stage-core";
 import type { Experiment } from "@/lib/autopilot/types";
 
@@ -78,7 +78,7 @@ export function VersionCaption({ before, after }: { before: string; after: strin
   const [version, setVersion] = useState<"control" | "treatment">("treatment");
   return (
     <div>
-      <VersionToggle showing={version} onChange={setVersion} />
+      <VersionToggle showing={version} onChange={setVersion} options={previewVersions(false)} />
       <CaptionList version={version} before={before} after={after} />
     </div>
   );
@@ -120,26 +120,26 @@ function CaptionText({ line }: { line: CaptionLine }) {
   return <>{nodes}</>;
 }
 
-function VersionToggle({ showing, onChange, extra }: {
+function VersionToggle({ showing, onChange, options, extra }: {
   showing: "control" | "treatment";
   onChange: (version: "control" | "treatment") => void;
+  options: { value: "control" | "treatment"; label: string }[];
   extra?: ReactNode;
 }) {
-  const option = (value: "control" | "treatment", label: string) => (
-    <button
-      type="button"
-      aria-pressed={showing === value}
-      onClick={() => onChange(value)}
-      className={`rounded px-2.5 py-1 ${showing === value ? "bg-white font-medium text-[#111827] shadow-sm" : "text-[#6b7280] hover:text-[#374151]"}`}
-    >
-      {label}
-    </button>
-  );
   return (
     <div className="flex items-center justify-between text-xs">
       <div className="inline-flex rounded-md bg-[#f1f3f5] p-0.5" role="group" aria-label="Which version to show">
-        {option("control", "Current")}
-        {option("treatment", "New version")}
+        {options.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            aria-pressed={showing === option.value}
+            onClick={() => onChange(option.value)}
+            className={`rounded px-2.5 py-1 ${showing === option.value ? "bg-white font-medium text-[#111827] shadow-sm" : "text-[#6b7280] hover:text-[#374151]"}`}
+          >
+            {option.label}
+          </button>
+        ))}
       </div>
       {extra}
     </div>
@@ -277,54 +277,17 @@ function SnapshotChoice({ experiment, changes, liveOrigin, isLive, when, before,
   snapshot: SnapshotResponse | null;
 }) {
   const ready = snapshot?.status === "ready" && Boolean(snapshot.controlHtml && snapshot.treatmentHtml);
-  const [chosen, setChosen] = useState<PreviewSource | null>(null);
-  const sources = previewSources({
-    ready,
-    isLive,
-    hasLiveOrigin: Boolean(liveOrigin),
-    hasRoutePage: Boolean(experiment.page?.trim().startsWith("/")),
-    when,
-    kind: experiment.kind,
-    chosen,
-  });
-  const live = (showCaption: boolean) => (
-    <PreviewBody experiment={experiment} changes={changes} liveOrigin={liveOrigin} isLive={isLive} when={when} before={before} after={after} addedText={addedText} showCaption={showCaption} sampleReady={ready} accountMode={sources.accountMode} />
+  const sources = previewSources({ ready });
+  const links = (showCaption: boolean) => (
+    <PreviewBody experiment={experiment} changes={changes} liveOrigin={liveOrigin} before={before} after={after} showCaption={showCaption} />
   );
-  // Nothing rendered yet and no live account view: keep the preview-build links and caption.
-  if (sources.shown === "none") return live(true);
-  const scenario = snapshot?.scenario || "Sample data";
+  if (sources.shown !== "sample" || !snapshot?.controlHtml || !snapshot.treatmentHtml) return isLive ? null : links(true);
+  const scenario = snapshot.scenario || "Sample data";
   return (
     <div>
-      {sources.offerToggle ? (
-        <div className="mb-2 flex items-center gap-2 text-xs text-[#6b7280]">
-          <span className="shrink-0">Shown with</span>
-          <div className="inline-flex shrink-0 rounded-md bg-[#f1f3f5] p-0.5" role="group" aria-label="Which data to show">
-            <button
-              type="button"
-              aria-pressed={sources.shown === "account"}
-              onClick={() => setChosen("account")}
-              className={`whitespace-nowrap rounded px-2.5 py-1 ${sources.shown === "account" ? "bg-white font-medium text-[#111827] shadow-sm" : "hover:text-[#374151]"}`}
-            >
-              Your account
-            </button>
-            <button
-              type="button"
-              aria-pressed={sources.shown === "sample"}
-              onClick={() => setChosen("sample")}
-              className={`whitespace-nowrap rounded px-2.5 py-1 ${sources.shown === "sample" ? "bg-white font-medium text-[#111827] shadow-sm" : "hover:text-[#374151]"}`}
-            >
-              Sample data
-            </button>
-          </div>
-        </div>
-      ) : null}
-      {sources.shown === "sample" && ready ? (
-        <>
-          <PreviewSwitcher control={snapshot.controlHtml!} treatment={snapshot.treatmentHtml!} when={when} before={before} after={after} addedText={[]} sample />
-          <p className="mt-2 text-[11px] text-[#9aa0a8]">Sample data: {scenario} · rendered by Kismet&apos;s coding agent</p>
-          {!isLive && <div className="mt-3">{live(false)}</div>}
-        </>
-      ) : live(true)}
+      <PreviewSwitcher control={snapshot.controlHtml} treatment={snapshot.treatmentHtml} when={when} before={before} after={after} addedText={addedText} sample isLive={isLive} />
+      <p className="mt-2 text-[11px] text-[#9aa0a8]">Sample data: {scenario} · rendered by Kismet&apos;s coding agent</p>
+      {!isLive && <div className="mt-3">{links(false)}</div>}
     </div>
   );
 }
@@ -340,18 +303,13 @@ function LoadingBlock({ className, label }: { className: string; label: string }
   );
 }
 
-function PreviewBody({ experiment, changes, liveOrigin, isLive, when, before, after, addedText, showCaption, sampleReady, accountMode }: {
+function PreviewBody({ experiment, changes, liveOrigin, before, after, showCaption }: {
   experiment: Experiment;
   changes: Changes;
   liveOrigin: string | null;
-  isLive: boolean;
-  when: string;
   before: string;
   after: string;
-  addedText: string[];
   showCaption: boolean;
-  sampleReady: boolean;
-  accountMode: "compare" | "single";
 }) {
   if (!liveOrigin) return (
     <p className="rounded border border-[#e1e4e8] bg-[#f8f9fa] p-3 text-sm text-[#6b7280]">
@@ -365,12 +323,11 @@ function PreviewBody({ experiment, changes, liveOrigin, isLive, when, before, af
       Kismet doesn&apos;t know which page this changes, so there&apos;s no live preview. See the code change below.
     </p>
   );
-  const control = previewHref(liveOrigin, experiment.page, experiment.flag, "control", isLive);
-  const treatmentOrigin = isLive ? liveOrigin : changes.previewUrl;
+  const control = previewHref(liveOrigin, experiment.page, experiment.flag, "control", false);
   // Kismet's own preview builds have no sign-in (Clerk is configured for production only), so the link
   // would only show "Sign-in is not configured". Other sites' preview builds are fine to open.
-  const treatment = treatmentOrigin && !(!isLive && changes.ownRepo) ? previewHref(treatmentOrigin, experiment.page, experiment.flag, "treatment", isLive) : null;
-  if (!isLive) return (
+  const treatment = changes.previewUrl && !changes.ownRepo ? previewHref(changes.previewUrl, experiment.page, experiment.flag, "treatment", false) : null;
+  return (
     <div>
       <div className="flex flex-wrap items-center gap-3 rounded border border-[#e1e4e8] bg-[#f8f9fa] p-3 text-sm">
         {treatment && <a href={treatment} target="_blank" rel="noreferrer" className="text-brand hover:underline">Open new version (preview build) ↗</a>}
@@ -380,21 +337,13 @@ function PreviewBody({ experiment, changes, liveOrigin, isLive, when, before, af
       {showCaption && <div className="mt-3"><VersionCaption before={before} after={after} /></div>}
     </div>
   );
-  if (!treatment) return showCaption ? <VersionCaption before={before} after={after} /> : null;
-  if (accountMode === "single") {
-    const page = new URL(experiment.page, `${liveOrigin}/`);
-    const fullPage = page.toString();
-    page.searchParams.set("kismet_embed", "1");
-    return <LiveFixPreview src={page.toString()} fullPage={fullPage} addedText={addedText} sampleReady={sampleReady} />;
-  }
-  return <PreviewSwitcher control={control} treatment={treatment} when={when} before={before} after={after} addedText={addedText} />;
 }
 
 const FRAME_WIDTH = 1280;
 const FRAME_HEIGHT = 760;
 
 /**
- * One large frame with a Current / New version switch. Both pages stay loaded so flipping is
+ * One large frame with a version switch. Both pages stay loaded so flipping is
  * instant, which makes the difference easy to spot; side by side they shrank to unreadable.
  */
 type FrameText = { element: HTMLElement; text: string };
@@ -445,66 +394,7 @@ function highlightTreatment(document: Document, blocks: FrameText[], texts: stri
   document.head.appendChild(style);
 }
 
-function LiveFixPreview({ src, fullPage, addedText, sampleReady }: {
-  src: string;
-  fullPage: string;
-  addedText: string[];
-  sampleReady: boolean;
-}) {
-  const frame = useRef<HTMLIFrameElement>(null);
-  const { box, scale } = useFrameScale();
-  const [highlighted, setHighlighted] = useState(false);
-  const inspectFrame = () => {
-    window.setTimeout(() => {
-      try {
-        const document = frame.current?.contentDocument;
-        if (!document?.body) return;
-        // Live text carries real values ("Won this month: 3"), so match blocks that contain an added string.
-        const needles = addedText.map((text) => text.trim()).filter((text) => text.length >= 3);
-        const matches = frameTextBlocks(document).filter((block) => needles.some((needle) => block.text.includes(needle)));
-        if (matches.length) highlightTreatment(document, matches, matches.map((block) => block.text));
-        setHighlighted(matches.length > 0);
-      } catch {
-        // Cross-origin frames cannot be inspected. The live preview still works without highlights.
-      }
-    }, 1500);
-  };
-  return (
-    <div>
-      <p className="mb-2 text-xs text-[#6b7280]">
-        {sampleReady
-          ? "Live on your account now. The old version no longer runs, so Current is on Sample data."
-          : "Live on your account now. The old version no longer runs, so only the new version can be shown."}
-      </p>
-      <div className="mb-2 flex justify-end text-xs">
-        <a href={fullPage} target="_blank" rel="noreferrer" className="text-brand hover:underline">Open full page ↗</a>
-      </div>
-      {highlighted && (
-        <p className="mb-2 rounded border border-[#f59e0b] bg-[#fffbeb] px-3 py-2 text-xs text-[#92400e]">
-          Highlighted: what&apos;s new
-        </p>
-      )}
-      <div ref={box} className="relative overflow-hidden rounded border border-[#e1e4e8] bg-white" style={{ aspectRatio: `${FRAME_WIDTH} / ${FRAME_HEIGHT}` }}>
-        <iframe
-          ref={frame}
-          title="New version"
-          src={src}
-          onLoad={inspectFrame}
-          loading="lazy"
-          className="absolute left-0 top-0 border-0"
-          style={{
-            width: FRAME_WIDTH,
-            height: FRAME_HEIGHT,
-            transform: `scale(${scale})`,
-            transformOrigin: "top left",
-          }}
-        />
-      </div>
-    </div>
-  );
-}
-
-function PreviewSwitcher({ control, treatment, when, before, after, addedText, sample = false }: {
+function PreviewSwitcher({ control, treatment, when, before, after, addedText, sample = false, isLive = false }: {
   control: string;
   treatment: string;
   when: string;
@@ -512,8 +402,11 @@ function PreviewSwitcher({ control, treatment, when, before, after, addedText, s
   after: string;
   addedText: string[];
   sample?: boolean;
+  isLive?: boolean;
 }) {
-  const [showing, setShowing] = useState<"control" | "treatment">("treatment");
+  const versions = previewVersions(isLive);
+  const treatmentLabel = versions.find((version) => version.value === "treatment")?.label ?? "New version";
+  const [showing, setShowing] = useState(versions[0].value);
   const { box, scale } = useFrameScale();
   const controlFrame = useRef<HTMLIFrameElement>(null);
   const treatmentFrame = useRef<HTMLIFrameElement>(null);
@@ -559,12 +452,13 @@ function PreviewSwitcher({ control, treatment, when, before, after, addedText, s
         <VersionToggle
           showing={showing}
           onChange={setShowing}
+          options={versions}
           extra={fullPage && !pagesMatch ? <a href={fullPage} target="_blank" rel="noreferrer" className="text-brand hover:underline">Open full page ↗</a> : null}
         />
       </div>
       {hasNewText && (
         <p className="mb-2 rounded border border-[#f59e0b] bg-[#fffbeb] px-3 py-2 text-xs text-[#92400e]">
-          {showing === "treatment" ? "Highlighted in the new version: what’s new" : "Switch to New version to see what’s highlighted"}
+          {showing === "treatment" ? `Highlighted in ${treatmentLabel}: what’s new` : `Switch to ${treatmentLabel} to see what’s highlighted`}
         </p>
       )}
       {pagesMatch && (
@@ -589,7 +483,7 @@ function PreviewSwitcher({ control, treatment, when, before, after, addedText, s
         {([["control", control], ["treatment", treatment]] as const).map(([value, url]) => (
           <iframe
             key={value}
-            title={value === "control" ? "Current version" : "New version"}
+            title={versions.find((version) => version.value === value)?.label ?? value}
             {...(sample ? { srcDoc: url, sandbox: "allow-same-origin" } : { src: url })}
             ref={value === "control" ? controlFrame : treatmentFrame}
             onLoad={() => {

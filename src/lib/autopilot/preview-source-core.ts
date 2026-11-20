@@ -1,41 +1,19 @@
-export type PreviewSource = "account" | "sample";
+export type PreviewVersion = "control" | "treatment";
 
-export function previewSources({
-  ready,
-  isLive,
-  hasLiveOrigin,
-  hasRoutePage,
-  when,
-  kind,
-  chosen,
-}: {
-  ready: boolean;
-  isLive: boolean;
-  hasLiveOrigin: boolean;
-  hasRoutePage: boolean;
-  when: string;
-  kind: "test" | "change" | "fix";
-  chosen: PreviewSource | null;
-}) {
-  const accountAvailable = isLive && hasLiveOrigin && hasRoutePage;
-  const sampleAvailable = ready;
-  const offerToggle = accountAvailable && sampleAvailable;
-  const accountMode: "compare" | "single" = kind === "fix" && isLive ? "single" : "compare";
+export function previewSources({ ready }: { ready: boolean }) {
+  return { shown: ready ? "sample" as const : "none" as const };
+}
 
-  if (chosen === "account" && accountAvailable) {
-    return { accountAvailable, offerToggle, shown: "account" as const, accountMode };
+/** Sample frames only. Once a change is live, the shipped version is Current and the one it replaced is Old. */
+export function previewVersions(isLive: boolean): { value: PreviewVersion; label: string }[] {
+  if (isLive) {
+    return [
+      { value: "treatment", label: "Current" },
+      { value: "control", label: "Old" },
+    ];
   }
-  if (chosen === "sample" && sampleAvailable) {
-    return { accountAvailable, offerToggle, shown: "sample" as const, accountMode };
-  }
-  if (accountAvailable && !when.trim()) {
-    return { accountAvailable, offerToggle, shown: "account" as const, accountMode };
-  }
-  if (sampleAvailable) {
-    return { accountAvailable, offerToggle, shown: "sample" as const, accountMode };
-  }
-  if (accountAvailable) {
-    return { accountAvailable, offerToggle, shown: "account" as const, accountMode };
-  }
-  return { accountAvailable, offerToggle, shown: "none" as const, accountMode };
+  return [
+    { value: "control", label: "Current" },
+    { value: "treatment", label: "New version" },
+  ];
 }
