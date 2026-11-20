@@ -10,6 +10,7 @@ export async function GET(request: Request) {
   const destination = new URL("/settings/connectors/google", url.origin);
   const oauthError = url.searchParams.get("error");
   if (oauthError) {
+    console.error("[google] sign-in returned", oauthError, url.searchParams.get("error_description") ?? "");
     destination.searchParams.set("error", oauthError);
     return NextResponse.redirect(destination);
   }
@@ -24,6 +25,7 @@ export async function GET(request: Request) {
     await exchangeGoogleCode(code, url.origin);
     destination.searchParams.set("connected", "1");
   } catch (error) {
+    console.error("[google] token exchange failed", error);
     destination.searchParams.set("error", error instanceof Error ? error.message : "connect_failed");
   }
   const response = NextResponse.redirect(destination);

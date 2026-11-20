@@ -60,7 +60,7 @@ export const CONNECTED_APPS: ConnectedApp[] = [
   {
     id: "google-workspace",
     name: "Google Workspace",
-    description: "Reads Docs, Calendar, and Gmail into Kismet",
+    description: "Reads Calendar and the Docs you choose into Kismet",
     category: "Productivity",
     logo: "/connectors/google-workspace.svg",
     status: "available",

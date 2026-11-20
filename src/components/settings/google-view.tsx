@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { graphStore } from "@/lib/graph/graph-store";
+import { pickGoogleDocs } from "@/lib/google/picker";
 import type { GoogleDoc, GoogleEvent, GoogleMessage, GooglePreview, GoogleStatus } from "@/lib/google/types";
 
 export function GoogleView() {
@@ -22,6 +23,8 @@ export function GoogleView() {
   const [draftBody, setDraftBody] = useState("");
   const [draftState, setDraftState] = useState<string | null>(null);
   const [savingDraft, setSavingDraft] = useState(false);
+  const [picking, setPicking] = useState(false);
+  const [pickError, setPickError] = useState<string | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -45,7 +48,7 @@ export function GoogleView() {
     const res = await fetch("/api/google/preview", { cache: "no-store" });
     const body = (await res.json()) as GooglePreview & { error?: string; };
     if (!res.ok) {
-      setPreviewError(body.error ?? "Could not read Gmail or Docs.");
+      setPreviewError(body.error ?? "Could not read Google.");
       return;
     }
     setPreview(body);
@@ -72,6 +75,19 @@ export function GoogleView() {
     setDraftState("Saved in Gmail drafts. It was not sent.");
   }
 
+  async function chooseDocs() {
+    setPicking(true);
+    setPickError(null);
+    try {
+      const picked = await pickGoogleDocs();
+      if (picked.length > 0) await load();
+    } catch (error) {
+      setPickError(error instanceof Error ? error.message : "Could not open the Google Picker.");
+    } finally {
+      setPicking(false);
+    }
+  }
+
   async function disconnect() {
     await fetch("/api/google/disconnect", { method: "POST" });
     graphStore.getState().detachSource("google-workspace");
@@ -81,7 +97,7 @@ export function GoogleView() {
   }
 
   return (
-    <SettingsShell title="Google Workspace" description="Read Docs, Calendar, and Gmail">
+    <SettingsShell title="Google Workspace" description="Read Calendar and the Docs you choose">
       <Link
         href="/settings/connectors"
         className="mb-4 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
@@ -102,14 +118,14 @@ export function GoogleView() {
           <CardHeader>
             <CardTitle className="text-sm">Create a Google OAuth client</CardTitle>
             <CardDescription className="text-xs leading-relaxed">
-              Kismet asks Google for read access to Gmail, Docs, Drive, and Calendar, plus permission to save drafts.
-              It does not request permission to delete mail or change the calendar.
+              Kismet asks Google to read Calendar events and the Docs a person picks. It cannot see the rest of
+              Drive or change the calendar.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-xs leading-relaxed text-muted-foreground">
             <p>
-              1. Open Google Cloud Console, create a project, and enable the Gmail API, Google Docs API,
-              Google Drive API, and Google Calendar API.
+              1. Open Google Cloud Console, create a project, and enable the Google Docs API, Google Drive API,
+              Google Picker API, and Google Calendar API.
             </p>
             <p>
               2. Configure the OAuth consent screen for External, or Internal if this Cloud project belongs
@@ -120,8 +136,9 @@ export function GoogleView() {
               3. Create a Web application OAuth client. Under Authorized redirect URIs, add the address of this site plus /api/google/callback. That address is only for Google to return to. Opening it yourself does not connect an account.
             </p>
             <p>
-              4. Put the client ID and secret in .env as GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET,
-              then restart the dev server and come back here.
+              4. Put the client ID and secret in .env as GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET. Create an
+              API key limited to the Google Picker API and add it as GOOGLE_PICKER_API_KEY. Then restart the
+              dev server and come back here.
             </p>
           </CardContent>
         </Card>
@@ -130,7 +147,8 @@ export function GoogleView() {
           <CardHeader>
             <CardTitle className="text-sm">Sign in with Google</CardTitle>
             <CardDescription className="text-xs leading-relaxed">
-              Connect Google opens Google's account list. Pick an account there, or choose Use another account and type the Berkeley email.
+              Connect Google opens Google&apos;s account list. Pick the account to use, or choose Use another account.
+              After that you choose which Docs Kismet can read.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -161,12 +179,21 @@ export function GoogleView() {
           {!preview && !previewError && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Reading Docs, Calendar, and Gmail…
+              Reading Google…
             </div>
           )}
           {preview && (
             <>
-              <Section title="Docs" empty="No Google Docs were returned." error={preview.errors?.docs}>
+              <Section
+                title="Docs"
+                empty="No docs yet. Choose the docs Kismet should read."
+                error={preview.errors?.docs ?? pickError ?? undefined}
+                action={status.picker ? (
+                  <Button type="button" variant="outline" size="sm" disabled={picking} onClick={() => void chooseDocs()}>
+                    {picking ? "Opening…" : "Choose docs"}
+                  </Button>
+                ) : undefined}
+              >
                 {preview.docs.map((doc) => (
                   <DocRow key={doc.id} doc={doc} />
                 ))}
@@ -176,41 +203,45 @@ export function GoogleView() {
                   <EventRow key={event.id} event={event} />
                 ))}
               </Section>
-              <Section title="Inbox" empty="No recent inbox messages were returned." error={preview.errors?.mail}>
-                {preview.messages.map((message) => (
-                  <MessageRow key={message.id} message={message} />
-                ))}
-              </Section>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">Save a draft</CardTitle>
-                  <CardDescription className="text-xs">This writes a Gmail draft and leaves it unsent.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-2 p-4 pt-0">
-                  <Input
-                    value={draftTo}
-                    onChange={(event) => setDraftTo(event.target.value)}
-                    placeholder="Recipient"
-                    className="h-9"
-                  />
-                  <Input
-                    value={draftSubject}
-                    onChange={(event) => setDraftSubject(event.target.value)}
-                    placeholder="Subject"
-                    className="h-9"
-                  />
-                  <Textarea
-                    value={draftBody}
-                    onChange={(event) => setDraftBody(event.target.value)}
-                    placeholder="Message"
-                    rows={4}
-                  />
-                  <Button type="button" size="sm" disabled={savingDraft} onClick={() => void saveDraft()}>
-                    {savingDraft ? "Saving…" : "Save draft"}
-                  </Button>
-                  {draftState && <p className="text-xs text-muted-foreground">{draftState}</p>}
-                </CardContent>
-              </Card>
+              {status.gmail && (
+                <>
+                  <Section title="Inbox" empty="No recent inbox messages were returned." error={preview.errors?.mail}>
+                    {preview.messages.map((message) => (
+                      <MessageRow key={message.id} message={message} />
+                    ))}
+                  </Section>
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm">Save a draft</CardTitle>
+                      <CardDescription className="text-xs">This writes a Gmail draft and leaves it unsent.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-2 p-4 pt-0">
+                      <Input
+                        value={draftTo}
+                        onChange={(event) => setDraftTo(event.target.value)}
+                        placeholder="Recipient"
+                        className="h-9"
+                      />
+                      <Input
+                        value={draftSubject}
+                        onChange={(event) => setDraftSubject(event.target.value)}
+                        placeholder="Subject"
+                        className="h-9"
+                      />
+                      <Textarea
+                        value={draftBody}
+                        onChange={(event) => setDraftBody(event.target.value)}
+                        placeholder="Message"
+                        rows={4}
+                      />
+                      <Button type="button" size="sm" disabled={savingDraft} onClick={() => void saveDraft()}>
+                        {savingDraft ? "Saving…" : "Save draft"}
+                      </Button>
+                      {draftState && <p className="text-xs text-muted-foreground">{draftState}</p>}
+                    </CardContent>
+                  </Card>
+                </>
+              )}
             </>
           )}
         </div>
@@ -223,19 +254,22 @@ function Section({
   title,
   empty,
   error,
+  action,
   children,
 }: {
   title: string;
   empty: string;
   error?: string;
+  action?: ReactNode;
   children: ReactNode;
 }) {
   const list = Array.isArray(children) ? children : [children];
   const items = list.filter(Boolean);
   return (
     <Card>
-      <CardHeader className="pb-2">
+      <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0 pb-2">
         <CardTitle className="text-sm">{title}</CardTitle>
+        {action}
       </CardHeader>
       <CardContent className="space-y-3 p-4 pt-0">
         {error && <p className="text-xs text-destructive">{error}</p>}
@@ -301,9 +335,19 @@ function DocRow({ doc }: { doc: GoogleDoc; }) {
 
 function errorMessage(code: string): string {
   if (code === "missing_client") return "Add the Google client ID and secret to .env, then restart the server.";
-  if (code === "access_denied") return "Google sign-in was cancelled.";
-  if (code === "open_connect") return "That address is only for Google to return to. Click Connect Google, then choose your Berkeley email.";
-  if (code === "state") return "The Google sign-in expired. Click Connect Google and choose your Berkeley email.";
+  if (code === "access_denied") {
+    return "Google did not grant access. Sign-in was cancelled, or this account is not allowed while the Google app is still in testing.";
+  }
+  if (code === "admin_policy_enforced") {
+    return "Your school or company's Google admin blocks this app. Ask them to allow Kismet, or connect a personal Google account.";
+  }
+  if (code === "org_internal") return "This OAuth client only allows accounts inside its own Google organization.";
+  if (code === "invalid_grant") return "Google rejected the sign-in code. It may have expired or been used already. Click Connect Google again.";
+  if (code === "invalid_client" || code === "unauthorized_client") {
+    return "Google rejected Kismet's client ID or secret. Check GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET on this deployment.";
+  }
+  if (code === "open_connect") return "That address is only for Google to return to. Click Connect Google, then choose your account.";
+  if (code === "state") return "The Google sign-in expired. Click Connect Google and choose your account again.";
   if (code === "redirect_uri_mismatch") return "Google blocked the connection because this site's return address is not allowed on the OAuth client yet.";
   return code;
 }

@@ -2,10 +2,16 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   CALENDAR_READONLY,
+  DRIVE_FILE,
+  DRIVE_READONLY,
+  GMAIL_SCOPES,
   GOOGLE_SCOPES,
   docEvidence,
   eventEvidence,
+  googleAppId,
   googleRedirectUri,
+  googleScopes,
+  grantsDocs,
   grantsScope,
   mailEvidence,
 } from "../src/lib/google/read-core.ts";
@@ -21,12 +27,29 @@ test("a localhost redirect setting is not sent from the live app", () => {
   );
 });
 
-test("the Google connection can read Docs, Calendar, and Gmail", () => {
-  assert.ok(GOOGLE_SCOPES.includes(CALENDAR_READONLY));
-  assert.ok(GOOGLE_SCOPES.includes("https://www.googleapis.com/auth/gmail.readonly"));
-  assert.ok(GOOGLE_SCOPES.includes("https://www.googleapis.com/auth/documents.readonly"));
+test("the public connection asks only for scopes that need no Google security audit", () => {
+  assert.deepEqual(googleScopes(false), ["openid", "email", "profile", DRIVE_FILE, CALENDAR_READONLY]);
+  for (const restricted of [...GMAIL_SCOPES, DRIVE_READONLY]) {
+    assert.equal(googleScopes(false).includes(restricted), false);
+  }
   assert.equal(grantsScope(GOOGLE_SCOPES.join(" "), CALENDAR_READONLY), true);
   assert.equal(grantsScope(undefined, CALENDAR_READONLY), false);
+});
+
+test("Gmail is added only when it is switched on", () => {
+  assert.ok(googleScopes(true).includes("https://www.googleapis.com/auth/gmail.readonly"));
+  assert.ok(googleScopes(true).includes(CALENDAR_READONLY));
+});
+
+test("picked docs and older full-Drive connections both count as Docs", () => {
+  assert.equal(grantsDocs(DRIVE_FILE), true);
+  assert.equal(grantsDocs(`openid ${DRIVE_READONLY}`), true);
+  assert.equal(grantsDocs(CALENDAR_READONLY), false);
+});
+
+test("the Picker app ID is the Cloud project number from the client ID", () => {
+  assert.equal(googleAppId("444278353912-abc.apps.googleusercontent.com"), "444278353912");
+  assert.equal(googleAppId("not-a-client"), "");
 });
 
 test("an inbox message becomes evidence pointing at that message", () => {

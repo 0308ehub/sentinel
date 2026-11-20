@@ -3,20 +3,31 @@ export const GMAIL_COMPOSE = "https://www.googleapis.com/auth/gmail.compose";
 export const DOCS_READONLY = "https://www.googleapis.com/auth/documents.readonly";
 export const DRIVE_READONLY = "https://www.googleapis.com/auth/drive.readonly";
 export const CALENDAR_READONLY = "https://www.googleapis.com/auth/calendar.events.readonly";
+/** Only the files a person opens with the Google Picker. Google needs no security audit for this one. */
+export const DRIVE_FILE = "https://www.googleapis.com/auth/drive.file";
 
-export const GOOGLE_SCOPES = [
-  "openid",
-  "email",
-  "profile",
-  GMAIL_READONLY,
-  GMAIL_COMPOSE,
-  DOCS_READONLY,
-  DRIVE_READONLY,
-  CALENDAR_READONLY,
-];
+/** Gmail scopes are restricted: any account can use them only after Google's security assessment. */
+export const GMAIL_SCOPES = [GMAIL_READONLY, GMAIL_COMPOSE];
+
+export const GOOGLE_SCOPES = ["openid", "email", "profile", DRIVE_FILE, CALENDAR_READONLY];
+
+export function googleScopes(gmail: boolean): string[] {
+  return gmail ? [...GOOGLE_SCOPES, ...GMAIL_SCOPES] : GOOGLE_SCOPES;
+}
 
 export function grantsScope(scopes: string | undefined, scope: string): boolean {
   return (scopes ?? "").split(/\s+/).filter(Boolean).includes(scope);
+}
+
+/** Older connections asked for Docs and all of Drive. New ones get the docs a person picks. */
+export function grantsDocs(scopes: string | undefined): boolean {
+  return grantsScope(scopes, DRIVE_FILE) || grantsScope(scopes, DOCS_READONLY) || grantsScope(scopes, DRIVE_READONLY);
+}
+
+/** The Cloud project number is the part of a web client ID before the first dash. */
+export function googleAppId(clientId: string): string {
+  const match = /^(\d+)-/.exec(clientId.trim());
+  return match ? match[1] : "";
 }
 
 /** The callback Google will accept is the one for the site the person is using. */

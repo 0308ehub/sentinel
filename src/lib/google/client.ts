@@ -5,16 +5,24 @@ import { deleteConnection, getConnection, saveConnection } from "@/lib/connectio
 import type { FiledEvidence } from "@/lib/autopilot/workspace-evidence";
 import {
   CALENDAR_READONLY,
-  DOCS_READONLY,
   GMAIL_READONLY,
-  GOOGLE_SCOPES,
+  googleAppId,
   googleRedirectUri,
+  googleScopes as scopesFor,
   docEvidence,
   eventEvidence,
+  grantsDocs,
   grantsScope,
   mailEvidence,
 } from "@/lib/google/read-core";
-import type { GoogleDoc, GoogleEvent, GoogleMessage, GooglePreview, GoogleStatus } from "@/lib/google/types";
+import type {
+  GoogleDoc,
+  GoogleEvent,
+  GoogleMessage,
+  GooglePickerSession,
+  GooglePreview,
+  GoogleStatus,
+} from "@/lib/google/types";
 
 interface GoogleConfig {
   clientId: string;
@@ -42,8 +50,13 @@ interface AccountProfile {
   hd?: string;
 }
 
+/** Off until Google has verified Kismet for Gmail. Test users on the OAuth client can use it before that. */
+function gmailEnabled(): boolean {
+  return process.env.GOOGLE_GMAIL_ENABLED?.trim() === "true";
+}
+
 export function googleScopes(): string[] {
-  return GOOGLE_SCOPES;
+  return scopesFor(gmailEnabled());
 }
 
 export function readGoogleConfig(origin?: string): GoogleConfig | null {
@@ -61,7 +74,7 @@ export function googleAuthUrl(state: string, origin: string): string | null {
   url.searchParams.set("client_id", config.clientId);
   url.searchParams.set("redirect_uri", config.redirectUri);
   url.searchParams.set("response_type", "code");
-  url.searchParams.set("scope", GOOGLE_SCOPES.join(" "));
+  url.searchParams.set("scope", googleScopes().join(" "));
   url.searchParams.set("access_type", "offline");
   url.searchParams.set("prompt", "select_account consent");
   url.searchParams.set("include_granted_scopes", "true");
@@ -88,11 +101,22 @@ export async function getGoogleStatus(origin?: string): Promise<GoogleStatus> {
     connected: true,
     email: stored.email,
     hostedDomain: stored.hostedDomain,
-    gmail: legacy || grantsScope(stored.scopes, GMAIL_READONLY),
-    docs: legacy || grantsScope(stored.scopes, DOCS_READONLY),
+    gmail: gmailEnabled() && (legacy || grantsScope(stored.scopes, GMAIL_READONLY)),
+    gmailAvailable: gmailEnabled(),
+    docs: legacy || grantsDocs(stored.scopes),
     calendar: grantsScope(stored.scopes, CALENDAR_READONLY),
+    picker: Boolean(process.env.GOOGLE_PICKER_API_KEY?.trim()),
     redirectUri,
   };
+}
+
+/** What the browser needs to open the Google Picker with the person's own access token. */
+export async function googlePickerSession(): Promise<GooglePickerSession> {
+  const config = readGoogleConfig();
+  const apiKey = process.env.GOOGLE_PICKER_API_KEY?.trim();
+  if (!config) throw new Error("Google OAuth is not configured.");
+  if (!apiKey) throw new Error("Add GOOGLE_PICKER_API_KEY so people can choose docs.");
+  return { accessToken: await accessTokenOrThrow(), apiKey, appId: googleAppId(config.clientId) };
 }
 
 export async function exchangeGoogleCode(code: string, origin: string): Promise<void> {
@@ -103,6 +127,7 @@ export async function exchangeGoogleCode(code: string, origin: string): Promise<
     grant_type: "authorization_code",
     redirect_uri: config.redirectUri,
   });
+  if (token.error) throw new Error(token.error);
   if (!token.refresh_token && !(await readToken())?.refreshToken) {
     throw new Error(
       "Google did not return a refresh token. Remove Kismet's access in your Google Account and connect again.",
@@ -120,7 +145,7 @@ export async function exchangeGoogleCode(code: string, origin: string): Promise<
     expiresAt: Date.now() + (token.expires_in ?? 3600) * 1000,
     email: profile.email,
     hostedDomain: profile.hd,
-    scopes: token.scope || GOOGLE_SCOPES.join(" "),
+    scopes: token.scope || googleScopes().join(" "),
   });
 }
 
@@ -142,6 +167,7 @@ export async function createGmailDraft(input: {
   if (!subject) throw new Error("Add a subject.");
   if (!body) throw new Error("Add the draft body.");
   if (subject.length > 200 || body.length > 8000) throw new Error("That draft is too long.");
+  if (!gmailEnabled()) throw new Error("Gmail is not available on this site yet.");
   const accessToken = await accessTokenOrThrow();
   const raw = Buffer.from(
     [`To: ${to}`, `Subject: ${subject}`, "Content-Type: text/plain; charset=\"UTF-8\"", "", body].join("\r\n"),
@@ -160,7 +186,7 @@ export async function loadGooglePreview(): Promise<GooglePreview> {
   const accessToken = await accessTokenOrThrow();
   const stored = await readToken();
   const [messages, docs, events] = await Promise.all([
-    readSource(listInbox(accessToken)),
+    readSource(readsGmail(stored?.scopes) ? listInbox(accessToken) : Promise.resolve([])),
     readSource(listDocs(accessToken)),
     readSource(listEvents(accessToken)),
   ]);
@@ -180,7 +206,7 @@ export async function listGoogleWorkspaceEvidence(): Promise<FiledEvidence[]> {
   if (!stored?.refreshToken) return [];
   const accessToken = await accessTokenOrThrow();
   const [messages, docs, events] = await Promise.all([
-    listInbox(accessToken).catch(() => [] as GoogleMessage[]),
+    readsGmail(stored.scopes) ? listInbox(accessToken).catch(() => [] as GoogleMessage[]) : [],
     listDocs(accessToken).catch(() => [] as GoogleDoc[]),
     listEvents(accessToken).catch(() => [] as GoogleEvent[]),
   ]);
@@ -198,6 +224,10 @@ export async function listGoogleWorkspaceEvidence(): Promise<FiledEvidence[]> {
     if (item) items.push(item);
   }
   return items;
+}
+
+function readsGmail(scopes: string | undefined): boolean {
+  return gmailEnabled() && (!scopes || grantsScope(scopes, GMAIL_READONLY));
 }
 
 async function readSource<T>(work: Promise<T[]>): Promise<{ value: T[]; error?: string }> {

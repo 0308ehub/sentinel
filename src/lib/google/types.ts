@@ -4,10 +4,20 @@ export interface GoogleStatus {
   email?: string;
   hostedDomain?: string;
   gmail?: boolean;
+  /** Gmail is switched on for this deployment. */
+  gmailAvailable?: boolean;
   docs?: boolean;
   calendar?: boolean;
+  /** The Google Picker key is set, so people can choose docs. */
+  picker?: boolean;
   redirectUri?: string;
   error?: string;
+}
+
+export interface GooglePickerSession {
+  accessToken: string;
+  apiKey: string;
+  appId: string;
 }
 
 export interface GoogleMessage {
