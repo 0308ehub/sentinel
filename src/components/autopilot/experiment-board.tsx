@@ -325,7 +325,7 @@ export function ExperimentBoard({
             <select
               value={filter}
               onChange={(event) => setFilter(event.target.value as StatusFilter)}
-              className="h-9 appearance-none rounded border border-[#e1e4e8] bg-white pl-3 pr-8 text-sm"
+              className="h-9 w-44 appearance-none rounded border border-[#e1e4e8] bg-white pl-3 pr-8 text-sm"
             >
               <option value="active">Active</option>
               <option value="suggested">Suggested</option>

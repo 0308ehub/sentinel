@@ -4,6 +4,7 @@ import {
   addedTextFromPatch,
   normalizePreviewCondition,
   textDifference,
+  unchangedSelectWidth,
 } from "../src/lib/autopilot/preview-diff.ts";
 
 test("normalizePreviewCondition makes model conditions fit the preview sentence", () => {
@@ -49,6 +50,14 @@ test("textDifference compares normalized text as multisets", () => {
     textDifference([" Shared   copy ", "Repeated", "Repeated", "Old copy"], ["Shared copy", "Repeated", "New copy"]),
     { onlyInTreatment: ["New copy"], onlyInControl: ["Repeated", "Old copy"] },
   );
+});
+
+test("an unchanged select keeps the old width when the snapshots disagree", () => {
+  assert.equal(unchangedSelectWidth(176, 128, true), 176);
+  assert.equal(unchangedSelectWidth(128, 176, true), 128);
+  assert.equal(unchangedSelectWidth(176, 177, true), null);
+  assert.equal(unchangedSelectWidth(176, 128, false), null);
+  assert.equal(unchangedSelectWidth(0, 128, true), null);
 });
 
 test("addedTextFromPatch finds a short label inside an inline JSX expression", () => {

@@ -13,7 +13,7 @@ import {
 } from "@/components/autopilot/experiment-queries";
 import { captionLines, type CaptionLine } from "@/lib/autopilot/caption";
 import type { ChangeSummary } from "@/lib/autopilot/change-summary";
-import { addedTextFromPatch, normalizePreviewCondition, textDifference } from "@/lib/autopilot/preview-diff";
+import { addedTextFromPatch, normalizePreviewCondition, textDifference, unchangedSelectWidth } from "@/lib/autopilot/preview-diff";
 import { previewSources, previewVersions } from "@/lib/autopilot/preview-source-core";
 import { snapshotStageLabel, type SnapshotStage } from "@/lib/autopilot/snapshot-stage-core";
 import type { Experiment } from "@/lib/autopilot/types";
@@ -379,6 +379,24 @@ function frameTextBlocks(document: Document): FrameText[] {
   });
 }
 
+function selectLabel(select: HTMLSelectElement): string {
+  return (select.options[select.selectedIndex]?.text ?? "").trim();
+}
+
+function holdUnchangedSelects(controlDocument: Document, treatmentDocument: Document) {
+  const current = [...controlDocument.querySelectorAll("select")];
+  const next = [...treatmentDocument.querySelectorAll("select")];
+  const count = Math.min(current.length, next.length);
+  for (let index = 0; index < count; index += 1) {
+    const before = current[index];
+    const after = next[index];
+    const width = unchangedSelectWidth(before.offsetWidth, after.offsetWidth, selectLabel(before) === selectLabel(after) && selectLabel(before) !== "");
+    if (width == null) continue;
+    after.style.boxSizing = "border-box";
+    after.style.width = `${width}px`;
+  }
+}
+
 function highlightTreatment(document: Document, blocks: FrameText[], texts: string[]) {
   const remaining = new Map<string, number>();
   for (const text of texts) remaining.set(text, (remaining.get(text) ?? 0) + 1);
@@ -426,6 +444,7 @@ function PreviewSwitcher({ control, treatment, when, before, after, addedText, s
           treatmentBlocks.map(({ text }) => text),
         );
         if (result.onlyInTreatment.length) highlightTreatment(treatmentDocument, treatmentBlocks, result.onlyInTreatment);
+        holdUnchangedSelects(controlDocument, treatmentDocument);
         setComparison(result);
       } catch {
         // Cross-origin frames cannot be inspected. The preview still works without comparison notes.

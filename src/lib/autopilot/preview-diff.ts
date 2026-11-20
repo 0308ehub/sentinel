@@ -96,3 +96,10 @@ export function textDifference(controlTexts: string[], treatmentTexts: string[])
 
   return { onlyInTreatment: unmatchedTreatment, onlyInControl };
 }
+
+/** Width to apply so an unchanged select does not resize between the two snapshots. */
+export function unchangedSelectWidth(controlWidth: number, treatmentWidth: number, sameLabel: boolean): number | null {
+  if (!sameLabel || !(controlWidth > 0) || !(treatmentWidth > 0)) return null;
+  if (Math.abs(controlWidth - treatmentWidth) < 2) return null;
+  return controlWidth;
+}
