@@ -130,7 +130,7 @@ export function GoogleView() {
           <CardHeader>
             <CardTitle className="text-sm">Sign in with Google</CardTitle>
             <CardDescription className="text-xs leading-relaxed">
-              Sign in with the Google account you use at work. Google will ask to read Gmail, Docs, Drive, and Calendar, and to create drafts.
+              Choose the Gmail account to connect. Google will ask to read Gmail, Docs, Drive, and Calendar, and to create drafts.
             </CardDescription>
           </CardHeader>
           <CardContent>
