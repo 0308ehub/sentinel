@@ -1,10 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import Image from "next/image";
 import { Search } from "lucide-react";
 import { CONNECTOR_CATEGORIES, CONNECTORS } from "@/lib/connectors/catalog";
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 export function ConnectorsGallery() {
@@ -112,8 +115,91 @@ export function ConnectorsGallery() {
               ))}
             </div>
           )}
+
+          <div className="mt-8">
+            <RequestIntegration />
+          </div>
         </div>
       </div>
     </div>
+  );
+}
+
+const REQUEST_SUGGESTIONS = ["Postgres / database", "Granola", "Google Calendar", "Sentry", "Dropbox", "Linear", "Pylon"];
+
+function RequestIntegration() {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [status, setStatus] = useState("");
+  const [sending, setSending] = useState(false);
+
+  function changeOpen(next: boolean) {
+    setOpen(next);
+    if (!next) setStatus("");
+  }
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSending(true);
+    setStatus("");
+    try {
+      const response = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: `Integration request: ${name.trim()}`, page: "/integrations" }),
+      });
+      if (!response.ok) {
+        setStatus((await response.text()) || "Could not send request.");
+        return;
+      }
+      setName("");
+      setStatus("Thanks — this goes straight to the Kismet team.");
+    } catch {
+      setStatus("Could not send request.");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={changeOpen}>
+      <DialogTrigger asChild>
+        <Button type="button" variant="outline">Request an integration</Button>
+      </DialogTrigger>
+      <DialogContent>
+        <form onSubmit={(event) => void submit(event)} className="grid gap-4">
+          <div>
+            <h2 className="text-sm font-semibold">Request an integration</h2>
+            <p className="mt-1 text-xs text-muted-foreground">Tell us which tool or data source Kismet should connect to.</p>
+          </div>
+          <Input
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Tool name"
+            aria-label="Tool name"
+            maxLength={200}
+            autoFocus
+          />
+          <div className="flex flex-wrap gap-1.5">
+            {REQUEST_SUGGESTIONS.map((suggestion) => (
+              <button
+                key={suggestion}
+                type="button"
+                onClick={() => setName(suggestion)}
+                className="rounded-full border border-[#e6e6e3] px-2.5 py-1 text-xs text-[#4a4a4a] hover:text-[#111]"
+              >
+                {suggestion}
+              </button>
+            ))}
+          </div>
+          {status && <p className="text-xs text-muted-foreground" role="status">{status}</p>}
+          <div className="flex justify-end">
+            <Button type="submit" disabled={sending || name.trim().length === 0}>
+              {sending ? "Sending…" : "Send request"}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
