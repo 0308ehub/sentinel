@@ -189,6 +189,21 @@ export function Sidebar() {
 
       <Separator />
       <div className="p-2">
+        {process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && sidebarCollapsed && (
+          <div className="mb-1 flex justify-center" title="Switch workspace">
+            {/* Collapsed: just the workspace's avatar, which still opens the switcher. */}
+            <OrganizationSwitcher
+              hidePersonal={false}
+              afterSelectOrganizationUrl={pathname}
+              afterSelectPersonalUrl={pathname}
+              appearance={{ elements: {
+                organizationSwitcherTrigger: "justify-center rounded-md border-0 bg-transparent p-1 shadow-none hover:bg-sidebar-accent",
+                organizationPreviewTextContainer: "hidden",
+                organizationSwitcherTriggerIcon: "hidden",
+              } }}
+            />
+          </div>
+        )}
         {process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && !sidebarCollapsed && (
           <div className="mb-1">
             <OrganizationSwitcher
