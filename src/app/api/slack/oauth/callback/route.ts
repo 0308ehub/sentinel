@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { currentUserId } from "@/lib/connections/current";
+import { currentAccountId } from "@/lib/connections/current";
 import { saveConnection } from "@/lib/connections/store";
 import { canConnectSlackTeam } from "@/lib/connections/ownership";
 import { validOAuthReturnPath } from "@/lib/slack/oauth-return";
@@ -31,7 +31,7 @@ export async function GET(request: Request) {
     return response;
   };
 
-  const userId = await currentUserId();
+  const userId = await currentAccountId();
   if (!userId) return Response.json({ error: "Sign in required." }, { status: 401 });
   const oauthError = url.searchParams.get("error");
   if (oauthError) return finish(oauthError);

@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react";
 import { ExperimentBoard } from "@/components/autopilot/experiment-board";
 import type { Builder } from "@/lib/autopilot/builders";
 import type { AutopilotState, Experiment, Signal } from "@/lib/autopilot/types";
+import { MoveInCard } from "@/components/workspace/move-in-card";
 
 /** Refresh quickly while Kismet is building something, and steadily otherwise. Hidden tabs pause. */
 const ACTIVE_REFRESH_MS = 4000;
@@ -189,7 +190,9 @@ export function AutopilotView() {
   }
 
   return (
-    <ExperimentBoard
+    <div className="flex h-full min-h-0 flex-col">
+      {process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && <MoveInCard />}
+      <div className="min-h-0 flex-1"><ExperimentBoard
       state={state}
       running={running}
       busy={busy}
@@ -203,6 +206,7 @@ export function AutopilotView() {
       onSchedule={scheduleRollout}
       onCreate={createExperiment}
       onSaveAdjustments={saveAdjustments}
-    />
+      /></div>
+    </div>
   );
 }

@@ -1,8 +1,8 @@
 import { createGmailDraft } from "@/lib/google/client";
-import { currentUserId } from "@/lib/connections/current";
+import { currentAccountId } from "@/lib/connections/current";
 
 export async function POST(request: Request) {
-  if (!await currentUserId()) {
+  if (!await currentAccountId()) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
   const body = (await request.json().catch(() => null)) as {

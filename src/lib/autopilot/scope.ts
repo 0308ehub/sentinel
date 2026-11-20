@@ -18,9 +18,21 @@ export function withAutopilotUser<T>(userId: string, fn: () => Promise<T>): Prom
 }
 
 /** Visitors on this deployment belong to the named owner. Other accounts keep their own loop. */
-export function siteAutopilotUser(): string | null {
+export async function resolveMovedAccount(accountId: string | null): Promise<string | null> {
+  if (!accountId) return null;
+  try {
+    const { db } = await import("@/lib/autopilot/db");
+    const sql = await db();
+    const rows = await sql<{ to_id: string }[]>`select to_id from kismet.account_moves where from_id = ${accountId} limit 1`;
+    return rows[0]?.to_id ?? accountId;
+  } catch {
+    return accountId;
+  }
+}
+
+export async function siteAutopilotUser(): Promise<string | null> {
   const named = process.env.KISMET_AUTOPILOT_USER_ID?.trim();
-  if (named) return named;
+  if (named) return resolveMovedAccount(named);
   if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.NODE_ENV !== "production") return "local";
   return null;
 }

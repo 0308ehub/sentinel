@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
-import { currentUserId } from "@/lib/connections/current";
+import { currentAccountId } from "@/lib/connections/current";
 import { validOAuthReturnPath } from "@/lib/slack/oauth-return";
 
 const SCOPES = [
@@ -13,7 +13,7 @@ const SCOPES = [
 ].join(",");
 
 export async function GET(request: Request) {
-  if (!(await currentUserId())) return Response.json({ error: "Sign in required." }, { status: 401 });
+  if (!(await currentAccountId())) return Response.json({ error: "Sign in required." }, { status: 401 });
 
   const requestUrl = new URL(request.url);
   const returnPath = requestUrl.searchParams.get("return");

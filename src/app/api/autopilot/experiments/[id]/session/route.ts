@@ -1,13 +1,13 @@
 import { withAutopilotUser } from "@/lib/autopilot/scope";
 import { getExperiment } from "@/lib/autopilot/store";
 import { managedSessionView } from "@/lib/coder/sessions";
-import { currentUserId } from "@/lib/connections/current";
+import { currentAccountId } from "@/lib/connections/current";
 
 export const dynamic = "force-dynamic";
 
 /** The live transcript of the coding agent building this experiment. */
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const userId = await currentUserId();
+  const userId = await currentAccountId();
   if (!userId) return Response.json({ error: "Sign in required." }, { status: 401 });
   const { id } = await params;
   try {

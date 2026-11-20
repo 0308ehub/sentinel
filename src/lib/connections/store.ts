@@ -3,6 +3,7 @@ import "server-only";
 import type postgres from "postgres";
 import { db } from "@/lib/autopilot/db";
 import { decrypt, encrypt } from "@/lib/connections/crypto";
+import { attributed, currentPersonName } from "@/lib/auth/person";
 
 export type Provider = "slack" | "jira" | "databricks" | "github" | "google" | "figma" | "postgres" | "cursor";
 
@@ -33,6 +34,8 @@ export async function saveConnection(
     on conflict (user_id, provider) do update
     set secret = excluded.secret, meta = excluded.meta, updated_at = now()
   `;
+  const message = attributed(`Changed ${provider} connection`, await currentPersonName());
+  await sql`insert into kismet.activity (user_id, kind, message) values (${userId}, 'connection', ${message})`;
 }
 
 export async function listConnectionUsers(provider: Provider): Promise<string[]> {
@@ -52,4 +55,6 @@ export async function listUsersForSlackTeam(teamId: string): Promise<string[]> {
 export async function deleteConnection(userId: string, provider: Provider): Promise<void> {
   const sql = await db();
   await sql`delete from kismet.connections where user_id = ${userId} and provider = ${provider}`;
+  const message = attributed(`Disconnected ${provider}`, await currentPersonName());
+  await sql`insert into kismet.activity (user_id, kind, message) values (${userId}, 'connection', ${message})`;
 }

@@ -1,8 +1,8 @@
 import { googleAuthUrl, readGoogleConfig } from "@/lib/google/client";
-import { currentUserId } from "@/lib/connections/current";
+import { currentAccountId } from "@/lib/connections/current";
 
 export async function GET(request: Request) {
-  if (!await currentUserId()) {
+  if (!await currentAccountId()) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
   const origin = new URL(request.url).origin;

@@ -3,7 +3,7 @@ import "server-only";
 import type postgres from "postgres";
 import { askForJson, readJson } from "@/lib/ai/respond";
 import { db } from "@/lib/autopilot/db";
-import { currentUserId } from "@/lib/connections/current";
+import { currentAccountId } from "@/lib/connections/current";
 import { slackActiveForAccount } from "@/lib/connections/ownership";
 import { assignJiraIssue, createFeatureIssue, findJiraAccount, JiraApiError } from "@/lib/jira/client";
 import {
@@ -79,7 +79,7 @@ function update<T>(userId: string, fn: (store: Store) => Promise<T>): Promise<T>
 }
 
 async function mentionUserId(): Promise<string> {
-  const userId = await currentUserId();
+  const userId = await currentAccountId();
   if (!userId) throw new SlackApiError("not_connected", "Connect Slack in Settings → Connectors → Slack.", 503);
   return userId;
 }

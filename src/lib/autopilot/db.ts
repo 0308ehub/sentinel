@@ -35,8 +35,16 @@ function client(): Sql {
 }
 
 // Everything lives in its own schema so the shared Neon database's other tables are never touched.
+// Unless explicitly private (for example coder_sessions), user_id stores a Kismet account id:
+// an active Clerk organization id, or a person id when using Kismet personally.
 const SCHEMA = `
 create schema if not exists kismet;
+
+create table if not exists kismet.account_moves (
+  from_id text primary key,
+  to_id text not null,
+  moved_at timestamptz not null default now()
+);
 
 create table if not exists kismet.ai_spend (
   bucket text not null,

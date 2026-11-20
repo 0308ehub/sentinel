@@ -70,7 +70,7 @@ export async function POST(request: Request) {
   if (!allowedRate(request, key)) return Response.json({ error: "slow_down" }, { status: 429, headers });
   let userId: string | null;
   try {
-    userId = key === null ? siteAutopilotUser() : await userForSiteKey(key);
+    userId = key === null ? await siteAutopilotUser() : await userForSiteKey(key);
   } catch (error) {
     console.error("[autopilot] events site", error);
     return new Response(null, { status: 204, headers });

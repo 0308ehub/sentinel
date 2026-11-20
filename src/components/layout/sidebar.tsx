@@ -39,6 +39,7 @@ import { startNewChat } from "@/lib/chat/session";
 import { BrandLogo } from "@/components/marketing/brand-logo";
 import { useAccount } from "@/lib/auth/use-account";
 import { ReportProblem } from "@/components/feedback/report-problem";
+import { OrganizationSwitcher } from "@clerk/nextjs";
 
 type NavItem = { id: string; label: string; href: string; icon: typeof LayoutDashboard };
 
@@ -186,6 +187,14 @@ export function Sidebar() {
 
       <Separator />
       <div className="p-2">
+        {process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && !sidebarCollapsed && (
+          <OrganizationSwitcher
+            hidePersonal={false}
+            afterSelectOrganizationUrl={pathname}
+            afterSelectPersonalUrl={pathname}
+            appearance={{ elements: { rootBox: "w-full mb-1", organizationSwitcherTrigger: "w-full justify-start rounded-md border-0 bg-transparent px-2 py-1.5 text-xs shadow-none hover:bg-sidebar-accent" } }}
+          />
+        )}
         <ReportProblem>
           <button
             type="button"

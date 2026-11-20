@@ -1,9 +1,9 @@
-import { currentUserId } from "@/lib/connections/current";
+import { currentAccountId } from "@/lib/connections/current";
 import { normalizeShare } from "@/lib/prd/document";
 import { shareVisible, signShare, verifyShare } from "@/lib/prd/share-token";
 
 export async function POST(request: Request) {
-  const userId = await currentUserId();
+  const userId = await currentAccountId();
   if (!userId) return Response.json({ error: "Sign in required." }, { status: 401 });
 
   let body: unknown;

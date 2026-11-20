@@ -1,4 +1,4 @@
-import { currentUserId } from "@/lib/connections/current";
+import { currentAccountId } from "@/lib/connections/current";
 import { connectErrorMessage } from "@/lib/connections/errors";
 import { saveConnection } from "@/lib/connections/store";
 import { getJiraStatus, normalizeJiraConfig, type JiraSecret } from "@/lib/jira/client";
@@ -6,7 +6,7 @@ import { getJiraStatus, normalizeJiraConfig, type JiraSecret } from "@/lib/jira/
 const text = (value: unknown) => (typeof value === "string" ? value.trim() : "");
 
 export async function POST(request: Request) {
-  const userId = await currentUserId();
+  const userId = await currentAccountId();
   if (!userId) return Response.json({ error: "Sign in required." }, { status: 401 });
 
   try {

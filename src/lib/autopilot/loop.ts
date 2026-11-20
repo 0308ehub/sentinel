@@ -3,7 +3,7 @@ import "server-only";
 import { autopilotConfigured } from "@/lib/autopilot/db";
 import { autopilotDryRun, chosenAutopilotRepoReason, NO_REPO_MESSAGE } from "@/lib/autopilot/repo";
 import { withAutopilotUser } from "@/lib/autopilot/scope";
-import { currentUserId } from "@/lib/connections/current";
+import { currentAccountId } from "@/lib/connections/current";
 import { isLocalSource, sourceLabel } from "@/lib/autopilot/source";
 import { buildNext, followPulls } from "@/lib/autopilot/build";
 import { agentBuildAvailable, followAgentBuilds } from "@/lib/autopilot/agent-build";
@@ -174,7 +174,7 @@ export async function autopilotState(): Promise<AutopilotState> {
     summary: { evidenceThisWeek: 0, realThisWeek: 0, readySignals: 0, running: 0, needsYou: 0 },
   };
   if (!empty.configured) return empty;
-  const userId = await currentUserId();
+  const userId = await currentAccountId();
   if (!userId) return empty;
   try {
     await claimLegacyRows(userId);

@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { runTick } from "@/lib/autopilot/loop";
 import { tickUsers } from "@/lib/autopilot/scope";
-import { currentUserId } from "@/lib/connections/current";
+import { currentAccountId } from "@/lib/connections/current";
 import { listConnectionUsers } from "@/lib/connections/store";
 
 function bearerMatches(header: string | null, secret: string): boolean {
@@ -23,7 +23,7 @@ export async function GET(request: Request) {
     console.error("[autopilot] connected users", error);
     return [];
   });
-  const users = tickUsers(connected, await currentUserId());
+  const users = tickUsers(connected, await currentAccountId());
   const runs = [];
   for (const userId of users) runs.push(await runTick(userId));
   return Response.json({ ran: runs.some((run) => run.ran), runs });
@@ -31,7 +31,7 @@ export async function GET(request: Request) {
 
 // The Run now button runs only the signed-in account.
 export async function POST() {
-  const userId = await currentUserId();
+  const userId = await currentAccountId();
   if (!userId) return Response.json({ error: "Sign in required." }, { status: 401 });
   return Response.json(await runTick(userId));
 }

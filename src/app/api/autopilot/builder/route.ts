@@ -1,14 +1,14 @@
 import { accountBuilder, cursorKey, setAccountBuilder } from "@/lib/autopilot/builder-store";
 import { BUILDERS, CLAUDE_WORKFLOW_FILE, CLAUDE_WORKFLOW_PATH, CLAUDE_WORKFLOW_YAML } from "@/lib/autopilot/builders";
 import { chosenAutopilotRepo } from "@/lib/autopilot/repo";
-import { currentUserId } from "@/lib/connections/current";
+import { currentAccountId } from "@/lib/connections/current";
 import { workflowState, type WorkflowState } from "@/lib/github/client";
 
 export const dynamic = "force-dynamic";
 
 /** Which coding agent writes this account's experiments, and whether that agent is set up. */
 export async function GET() {
-  const userId = await currentUserId();
+  const userId = await currentAccountId();
   if (!userId) return Response.json({ error: "Sign in required." }, { status: 401 });
   try {
     const [builder, key, repo] = await Promise.all([accountBuilder(), cursorKey(userId), chosenAutopilotRepo()]);
@@ -31,7 +31,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const userId = await currentUserId();
+  const userId = await currentAccountId();
   if (!userId) return Response.json({ error: "Sign in required." }, { status: 401 });
   const body = (await request.json().catch(() => null)) as { builder?: unknown } | null;
   const builder = BUILDERS.find((item) => item === body?.builder);

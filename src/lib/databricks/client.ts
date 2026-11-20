@@ -1,6 +1,6 @@
 import "server-only";
 
-import { currentUserId } from "@/lib/connections/current";
+import { currentAccountId } from "@/lib/connections/current";
 import { getConnection } from "@/lib/connections/store";
 import type {
   DatabricksCatalog,
@@ -94,7 +94,7 @@ export function normalizeDatabricksConfig(secret: DatabricksSecret): DatabricksC
 }
 
 async function readConfig(): Promise<DatabricksConfig | null> {
-  const userId = await currentUserId();
+  const userId = await currentAccountId();
   if (userId) {
     try {
       const stored = await getConnection<DatabricksSecret>(userId, "databricks");

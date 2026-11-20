@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
-import { currentUserId } from "@/lib/connections/current";
+import { currentAccountId } from "@/lib/connections/current";
 import { getConnection, saveConnection } from "@/lib/connections/store";
 import { githubAppConfigured } from "@/lib/github/app";
 import { githubAppInstallUrl, githubPopupHtml, githubStateMatches, normalizeGitHubInstallations } from "@/lib/github/app-core";
@@ -45,7 +45,7 @@ export async function GET(request: Request) {
     return finish({ error: code }, defaultPath);
   };
 
-  const userId = await currentUserId();
+  const userId = await currentAccountId();
   if (!userId) return Response.json({ error: "Sign in required." }, { status: 401 });
   // Adding or removing repos on an installation this account already has can come back without a code.
   // Nothing is saved in that case (repos are read live), so it only needs to be an installation we know.

@@ -3,7 +3,7 @@ import "server-only";
 import { headers } from "next/headers";
 import postgres from "postgres";
 import { autopilotConfigured, db } from "@/lib/autopilot/db";
-import { currentUserId } from "@/lib/connections/current";
+import { currentAccountId } from "@/lib/connections/current";
 import { tryAutopilotUser } from "@/lib/autopilot/scope";
 import {
   adjustCents,
@@ -125,7 +125,7 @@ async function subject(): Promise<string> {
   const scoped = tryAutopilotUser();
   if (scoped) return `user:${scoped}`.slice(0, 120);
   try {
-    const id = await currentUserId();
+    const id = await currentAccountId();
     if (id) return `user:${id}`.slice(0, 120);
   } catch {
     // A background call with no request still has to be counted.

@@ -14,13 +14,13 @@ export async function slackTeamOwner(teamId: string): Promise<string | null> {
     select user_id, created_at from kismet.connections
     where provider = 'slack' and meta ->> 'teamId' = ${teamId}
   `;
-  return slackOwner(rows.map((row) => ({ userId: row.user_id, createdAt: row.created_at })), siteAutopilotUser());
+  return slackOwner(rows.map((row) => ({ userId: row.user_id, createdAt: row.created_at })), await siteAutopilotUser());
 }
 
 /** The one account allowed to consume events and interactions for a Slack workspace. */
 /** Whether this account may connect the Slack workspace: it is free, already theirs, or they own the deployment. */
 export async function canConnectSlackTeam(userId: string, teamId: string): Promise<boolean> {
-  if (userId === siteAutopilotUser()) return true;
+  if (userId === await siteAutopilotUser()) return true;
   const owner = await slackTeamOwner(teamId);
   return !owner || owner === userId;
 }
@@ -44,7 +44,7 @@ function defaultRepo(): string {
 
 export async function repoOwner(repo: string): Promise<string | null> {
   const sql = await db();
-  const deploymentUserId = siteAutopilotUser();
+  const deploymentUserId = await siteAutopilotUser();
   const [rows, deploymentRows] = await Promise.all([
     sql<{ user_id: string; repo: string; created_at: Date | null; updated_at: Date | null }[]>`
       select user_id, repo, created_at, updated_at from kismet.autopilot_repo
