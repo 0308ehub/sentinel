@@ -15,7 +15,6 @@ import {
   GitBranch,
   BarChart3,
   Scale,
-  MessageSquare,
   Search,
   Plus,
   Boxes,
@@ -26,7 +25,6 @@ import type { NodeType } from "@/types/graph";
 import { ReportProblem } from "@/components/feedback/report-problem";
 
 const NAV_ITEMS = [
-  { label: "Chat", href: "/ai", icon: MessageSquare },
   { label: "Dashboard", href: "/experiments", icon: LayoutDashboard },
   { label: "Timeline", href: "/timeline", icon: Clock },
   { label: "Graph", href: "/graph", icon: GitBranch },
@@ -81,10 +79,10 @@ export function CommandPalette() {
   return (
     <>
       <Dialog open={commandPaletteOpen} onOpenChange={setCommandPaletteOpen}>
-        <DialogContent className="overflow-hidden p-0 shadow-lg max-w-lg">
+        <DialogContent className="top-[18%] translate-y-0 overflow-hidden p-0 shadow-lg max-w-lg">
           <Command shouldFilter={false}>
             <CommandInput
-              placeholder="Search products, features, metrics, decisions..."
+              placeholder="Search"
               value={query}
               onValueChange={setQuery}
             />

@@ -1,14 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Check, ChevronDown, Circle, Loader2, MoreHorizontal, Play } from "lucide-react";
-import { BuilderMenu, useAccountBuilder } from "@/components/autopilot/builder-menu";
+import { CreateExperimentDialog } from "@/components/autopilot/create-experiment-dialog";
 import { ExperimentDetail } from "@/components/autopilot/experiment-detail";
-import { ExperimentSessions } from "@/components/autopilot/experiment-sessions";
 import { SpendOverview } from "@/components/autopilot/spend-overview";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,6 +21,7 @@ import type { RolloutPhase } from "@/lib/autopilot/rollout-plan";
 import { useVariant } from "@/lib/autopilot/variant";
 import { formatRelativeTime } from "@/lib/utils";
 import { setupSteps } from "@/lib/autopilot/setup-core";
+import { setOpenExperiment } from "@/lib/autopilot/open-experiment";
 import { startOfMonth, wonSince } from "@/lib/autopilot/won-core";
 import type { AutopilotState, Experiment, Learning, Signal } from "@/lib/autopilot/types";
 
@@ -71,12 +71,13 @@ export function ExperimentBoard({
   onCreate: (input: { title: string; change: string; page: string; builder: Builder }) => Promise<void>;
   onSaveAdjustments: (target: Signal | Experiment, adjustments: string) => Promise<void>;
 }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<"overview" | "learnings" | "themes" | "activity" | "spend">("overview");
   const [filter, setFilter] = useState<StatusFilter>("active");
   const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState<Selection | null>(null);
-  const initialExperiments = useRef(state.experiments);
   const goals = state.goals;
   const [renderedAt] = useState(() => Date.now());
   const variant = useVariant("ap-add-first-experiment-guidance-to-the-exp-v1");
@@ -92,12 +93,24 @@ export function ExperimentBoard({
     return () => cancelAnimationFrame(frame);
   }, []);
 
+  const experimentParam = searchParams.get("experiment");
   useEffect(() => {
-    const id = new URLSearchParams(window.location.search).get("experiment");
-    if (!id || !initialExperiments.current.some((experiment) => experiment.id === id)) return;
-    const frame = requestAnimationFrame(() => setSelected({ kind: "experiment", id }));
+    setOpenExperiment(experimentParam);
+    if (!experimentParam || !state.experiments.some((experiment) => experiment.id === experimentParam)) return;
+    const frame = requestAnimationFrame(() => {
+      setSelected((current) => current?.kind === "experiment" && current.id === experimentParam ? current : { kind: "experiment", id: experimentParam });
+    });
     return () => cancelAnimationFrame(frame);
-  }, []);
+  }, [experimentParam, state.experiments]);
+
+  function select(next: Selection | null) {
+    setSelected(next);
+    const params = new URLSearchParams(searchParams.toString());
+    if (next?.kind === "experiment") params.set("experiment", next.id);
+    else params.delete("experiment");
+    const queryString = params.toString();
+    router.replace(queryString ? `/experiments?${queryString}` : "/experiments", { scroll: false });
+  }
 
   const taken = useMemo(
     () => new Set(state.experiments.filter((experiment) => ACTIVE_EXPERIMENT.has(experiment.status)).map((experiment) => experiment.signalId)),
@@ -166,17 +179,8 @@ export function ExperimentBoard({
   const suggested = selection?.kind === "signal" || (openExperiment != null && SUGGESTED_STATUS.has(openExperiment.status));
 
   return (
-    <div className="flex h-full min-h-0 bg-white">
-      <ExperimentSessions
-        experiments={state.experiments}
-        selectedId={selection?.kind === "experiment" ? selection.id : null}
-        running={running}
-        onOpen={(id) => setSelected({ kind: "experiment", id })}
-        onCreate={() => setCreating(true)}
-        onStop={(experiment) => onAct(experiment, "cancel")}
-        onRun={onRun}
-      />
-      <div className="min-w-0 flex-1 overflow-hidden">
+    <div className="h-full min-h-0 overflow-hidden bg-white">
+      <div className="h-full min-w-0 overflow-hidden">
         {open ? (
           <ExperimentDetail
             experiment={openExperiment}
@@ -185,7 +189,7 @@ export function ExperimentBoard({
             suggested={suggested}
             lastFailed={openExperiment ? null : lastFailedAttempt(state.experiments, openSignal?.id ?? null)}
             busy={busy}
-            onBack={() => setSelected(null)}
+            onBack={() => select(null)}
             onApprove={() => openExperiment && onAct(openExperiment, "approve")}
             onReject={() => openExperiment && onAct(openExperiment, "reject")}
             onCancel={() => openExperiment && onAct(openExperiment, "cancel")}
@@ -322,15 +326,15 @@ export function ExperimentBoard({
       </div>
       <div className="mt-3 px-6 pb-8">
         {tab === "learnings" ? (
-          <LearningsTable learnings={state.learnings} onOpen={(id) => setSelected({ kind: "experiment", id })} />
+          <LearningsTable learnings={state.learnings} onOpen={(id) => select({ kind: "experiment", id })} />
         ) : tab === "themes" ? (
-          <ThemesTable themes={state.themes} onOpen={(id) => setSelected({ kind: "signal", id })} />
+          <ThemesTable themes={state.themes} onOpen={(id) => select({ kind: "signal", id })} />
         ) : tab === "activity" ? (
           <ActivityTable
             activity={state.activity}
             experiments={state.experiments}
             signals={state.signals}
-            onOpen={setSelected}
+            onOpen={select}
           />
         ) : tab === "spend" ? (
           <SpendOverview />
@@ -363,7 +367,7 @@ export function ExperimentBoard({
               rows.map((row) => {
                 const id = row.kind === "experiment" ? row.experiment.id : row.signal.id;
                 const feature = featureNotation(row.feature);
-                const open = () => setSelected(row.kind === "experiment" ? { kind: "experiment", id } : { kind: "signal", id });
+                const open = () => select(row.kind === "experiment" ? { kind: "experiment", id } : { kind: "signal", id });
                 const places = environmentsFor(row);
                 return (
                   <tr
@@ -407,76 +411,6 @@ export function ExperimentBoard({
       </div>
       <CreateExperimentDialog open={creating} busy={busy === "create"} onOpenChange={setCreating} onCreate={onCreate} />
     </div>
-  );
-}
-
-function CreateExperimentDialog({
-  open,
-  busy,
-  onOpenChange,
-  onCreate,
-}: {
-  open: boolean;
-  busy: boolean;
-  onOpenChange: (open: boolean) => void;
-  onCreate: (input: { title: string; change: string; page: string; builder: Builder }) => Promise<void>;
-}) {
-  const accountBuilder = useAccountBuilder();
-  const [title, setTitle] = useState("");
-  const [change, setChange] = useState("");
-  const [page, setPage] = useState("");
-  const [picked, setPicked] = useState<Builder | null>(null);
-  const [error, setError] = useState("");
-  const builder = picked ?? accountBuilder;
-
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    setError("");
-    try {
-      await onCreate({ title: title.trim(), change: change.trim(), page: page.trim(), builder });
-      setTitle("");
-      setChange("");
-      setPage("");
-      setPicked(null);
-      onOpenChange(false);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not create the experiment.");
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg gap-0 p-0">
-        <form onSubmit={(event) => void submit(event)}>
-          <div className="border-b border-[#eef0f3] px-5 py-4">
-            <h2 className="text-base font-medium text-[#111]">Create experiment</h2>
-          </div>
-          <div className="space-y-4 px-5 py-4">
-            <label className="block text-sm">
-              <span className="text-[#374151]">Name</span>
-              <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Homepage banner" className="mt-1 h-9 w-full rounded-md border border-[#e1e4e8] px-3 text-sm outline-none focus:border-[#111]" />
-            </label>
-            <label className="block text-sm">
-              <span className="text-[#374151]">What should change</span>
-              <textarea value={change} onChange={(event) => setChange(event.target.value)} required rows={4} placeholder="Showing items you may like on the homepage banner will increase purchases" className="mt-1 w-full resize-none rounded-md border border-[#e1e4e8] px-3 py-2 text-sm outline-none focus:border-[#111]" />
-            </label>
-            <BuilderMenu value={builder} onChange={setPicked} />
-            <label className="block text-sm">
-              <span className="text-[#6b7280]">Page, if you know it</span>
-              <input value={page} onChange={(event) => setPage(event.target.value)} placeholder="/home" className="mt-1 h-9 w-full rounded-md border border-[#e1e4e8] px-3 text-sm outline-none focus:border-[#111]" />
-            </label>
-            {error && <p className="text-sm text-destructive">{error}</p>}
-          </div>
-          <div className="flex justify-end gap-2 border-t border-[#eef0f3] px-5 py-3">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
-            <Button type="submit" className="bg-[#111] text-white hover:bg-[#2a2a2a]" disabled={busy || change.trim().length < 8}>
-              {busy && <Loader2 className="animate-spin" />}
-              Create experiment
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
   );
 }
 

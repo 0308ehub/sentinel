@@ -28,15 +28,6 @@ export function NavigationSettingsView() {
             <div key={group}>
               <p className="px-1 pb-1 text-[11px] font-medium text-muted-foreground">{group}</p>
               <div className="divide-y divide-border">
-                {group === "Workspace" && (
-                  <div className="flex items-center justify-between gap-4 py-3">
-                    <div>
-                      <p className="text-sm font-medium">Chat</p>
-                      <p className="text-xs text-muted-foreground">Always visible</p>
-                    </div>
-                    <Switch checked disabled aria-label="Chat" />
-                  </div>
-                )}
                 {HIDEABLE_NAV.filter((item) => item.group === group).map((item) => (
                   <div key={item.id} className="flex items-center justify-between gap-4 py-3">
                     <p className="text-sm font-medium">{item.label}</p>
