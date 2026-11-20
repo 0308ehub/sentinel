@@ -28,6 +28,33 @@
   --success: #1a7f37;
   --warning: #f9ab00;
   --brand: #0a4f8c;
+  --graph-line: #d1d5db;
+  --graph-dot: #e8eaed;
+  --canvas: #e6e7eb;
+  --canvas-dot: #c4c6cc;
+  --timeline-won: #ffffff;
+  --timeline-won-fg: #111827;
+  --timeline-flat: #eceef2;
+  --timeline-flat-fg: #4b5563;
+  --timeline-lost: #f8d0cb;
+  --timeline-lost-fg: #9f2d2d;
+  --timeline-run: #d6e4ff;
+  --timeline-run-fg: #1d4e89;
+  --timeline-plan: #eef2ff;
+  --timeline-plan-fg: #3730a3;
+  --timeline-plan-border: #a5b4fc;
+  --tag-0-bg: #d9f2e3;
+  --tag-0-fg: #17663a;
+  --tag-1-bg: #d6e6ff;
+  --tag-1-fg: #1d4e89;
+  --tag-2-bg: #efe4ff;
+  --tag-2-fg: #6941c6;
+  --tag-3-bg: #ffe8c7;
+  --tag-3-fg: #b54708;
+  --tag-4-bg: #fde2e1;
+  --tag-4-fg: #9f2d2d;
+  --tag-5-bg: #d9f4f2;
+  --tag-5-fg: #0f766e;
   --radius: 6px;
   color-scheme: light;
 }
@@ -103,6 +130,33 @@
   --success: #3d9a50;
   --warning: #e8a317;
   --brand: #8eafd0;
+  --graph-line: #4b5160;
+  --graph-dot: #2a2c31;
+  --canvas: #141518;
+  --canvas-dot: #2c2e33;
+  --timeline-won: #243028;
+  --timeline-won-fg: #d7f5e1;
+  --timeline-flat: #2a2c31;
+  --timeline-flat-fg: #c5c9d1;
+  --timeline-lost: #3a2220;
+  --timeline-lost-fg: #f6c7c2;
+  --timeline-run: #1c3358;
+  --timeline-run-fg: #d4e4ff;
+  --timeline-plan: #24243f;
+  --timeline-plan-fg: #d9d6ff;
+  --timeline-plan-border: #6d68b8;
+  --tag-0-bg: #1a3a2a;
+  --tag-0-fg: #b7ebc9;
+  --tag-1-bg: #1c3358;
+  --tag-1-fg: #d4e4ff;
+  --tag-2-bg: #32244a;
+  --tag-2-fg: #e4d4ff;
+  --tag-3-bg: #3d2c14;
+  --tag-3-fg: #ffd7a8;
+  --tag-4-bg: #3a2220;
+  --tag-4-fg: #f6c7c2;
+  --tag-5-bg: #143836;
+  --tag-5-fg: #b7efe8;
   color-scheme: dark;
 }
 
@@ -479,9 +533,227 @@ body {
 
 .react-flow__controls-button {
   border-bottom: 1px solid var(--border);
-  background: white;
+  background: var(--card);
+  fill: var(--foreground);
+  color: var(--foreground);
 }
 
 .react-flow__controls-button:hover {
   background: var(--muted);
+}
+
+.react-flow__controls-button svg {
+  fill: currentColor;
+}
+
+.dark .react-flow__controls,
+.dark .react-flow__minimap {
+  background: var(--card) !important;
+  border-color: var(--border) !important;
+}
+
+.dark .react-flow__controls-button {
+  background: var(--card) !important;
+  color: var(--foreground) !important;
+  fill: var(--foreground) !important;
+  border-bottom-color: var(--border) !important;
+}
+
+.dark .react-flow__controls-button:hover {
+  background: var(--accent) !important;
+}
+
+/* Hardcoded light surfaces in the app follow the theme. Marketing and auth stay inside .force-light. */
+.dark .bg-white,
+.dark .bg-\[\#fff\],
+.dark .bg-\[\#ffffff\] {
+  background-color: var(--background);
+}
+.dark .bg-\[\#f8f9fa\],
+.dark .bg-\[\#f8fafc\],
+.dark .bg-\[\#f7f7f8\],
+.dark .bg-\[\#f6f7f9\],
+.dark .bg-\[\#f5f6f8\],
+.dark .bg-\[\#f4f5f7\],
+.dark .bg-\[\#f3f4f6\],
+.dark .bg-\[\#f3f3f4\],
+.dark .bg-\[\#f2f2f4\],
+.dark .bg-\[\#eef0f3\],
+.dark .bg-\[\#e9e9eb\],
+.dark .bg-\[\#eceef1\],
+.dark .bg-\[\#eceef2\],
+.dark .bg-\[\#e8eaed\],
+.dark .bg-\[\#e2e5e9\] {
+  background-color: var(--muted);
+}
+.dark .hover\:bg-white:hover,
+.dark .hover\:bg-\[\#fff\]:hover,
+.dark .hover\:bg-\[\#ffffff\]:hover,
+.dark .hover\:bg-\[\#f8fafc\]:hover,
+.dark .hover\:bg-\[\#f7f7f8\]:hover,
+.dark .hover\:bg-\[\#f3f3f4\]:hover,
+.dark .hover\:bg-\[\#f3f4f6\]:hover,
+.dark .hover\:bg-\[\#eef0f3\]:hover,
+.dark .focus\:bg-\[\#f8fafc\]:focus {
+  background-color: var(--accent);
+}
+.dark .text-\[\#111\],
+.dark .text-\[\#111111\],
+.dark .text-\[\#111827\],
+.dark .text-\[\#1c1c1c\],
+.dark .text-\[\#2c2c2c\],
+.dark .text-\[\#374151\],
+.dark .text-\[\#3c4250\],
+.dark .text-\[\#4b5563\],
+.dark .text-black,
+.dark .hover\:text-\[\#111\]:hover,
+.dark .hover\:text-\[\#111827\]:hover,
+.dark .hover\:text-\[\#1c1c1c\]:hover,
+.dark .hover\:text-\[\#374151\]:hover {
+  color: var(--foreground);
+}
+.dark .text-\[\#6b7280\],
+.dark .text-\[\#6a717c\],
+.dark .text-\[\#8b919a\],
+.dark .text-\[\#9aa0a8\],
+.dark .text-\[\#b0b6c0\],
+.dark .text-\[\#b4bac2\],
+.dark .text-\[\#596579\],
+.dark .text-\[\#59616d\] {
+  color: var(--muted-foreground);
+}
+.dark .border-\[\#e6e8ec\],
+.dark .border-\[\#e1e4e8\],
+.dark .border-\[\#e7e7e7\],
+.dark .border-\[\#eee\],
+.dark .border-\[\#eef0f3\],
+.dark .border-\[\#eceef2\],
+.dark .border-\[\#f3f4f6\],
+.dark .border-\[\#f7f8fa\],
+.dark .border-\[\#d5d8de\],
+.dark .border-\[\#d8dce3\],
+.dark .border-\[\#d9dde3\],
+.dark .border-\[\#c5c8ce\],
+.dark .border-\[\#e5e7eb\],
+.dark .border-red-200,
+.dark .border-green-200,
+.dark .border-amber-200 {
+  border-color: var(--border);
+}
+.dark .bg-red-50,
+.dark .bg-green-50,
+.dark .bg-amber-50,
+.dark .bg-yellow-50,
+.dark .bg-blue-50 {
+  background-color: var(--muted);
+}
+.dark .text-red-600,
+.dark .text-red-700 {
+  color: #f0a8a2;
+}
+.dark .text-green-600,
+.dark .text-green-700 {
+  color: #79d39a;
+}
+.dark .bg-\[\#111\],
+.dark .bg-\[\#111111\],
+.dark .bg-\[\#111827\],
+.dark .bg-\[\#2a2a2a\],
+.dark .hover\:bg-\[\#2a2a2a\]:hover,
+.dark .hover\:bg-\[\#111\]:hover {
+  background-color: var(--foreground);
+  color: var(--background);
+}
+.dark .bg-\[\#eef4ff\],
+.dark .bg-\[\#eef2ff\] {
+  background-color: var(--timeline-plan);
+}
+.dark .bg-\[\#d6e4ff\] {
+  background-color: var(--timeline-run);
+}
+.dark .bg-\[\#f8d0cb\] {
+  background-color: var(--timeline-lost);
+}
+.dark .bg-\[\#eaf7ee\] {
+  background-color: #143024;
+}
+.dark .bg-\[\#fcebea\] {
+  background-color: #3a1e1c;
+}
+.dark .bg-\[\#f3edfb\] {
+  background-color: #2a2238;
+}
+.dark .bg-\[\#d9dce1\],
+.dark .bg-\[\#c5c8ce\] {
+  background-color: #3a3d44;
+}
+.dark .text-\[\#147a3f\],
+.dark .text-\[\#17803d\],
+.dark .text-\[\#1f8a4c\],
+.dark .text-\[\#1f9d55\] {
+  color: #79d39a;
+}
+.dark .text-\[\#b42318\] {
+  color: #f0a8a2;
+}
+.dark .text-\[\#6f42a6\] {
+  color: #d2b4f0;
+}
+.dark .border-\[\#b7dfc5\] {
+  border-color: #245c3a;
+}
+.dark .border-\[\#f2c1bd\] {
+  border-color: #6a3330;
+}
+.dark .border-\[\#d8c6ef\] {
+  border-color: #4a3a66;
+}
+.dark input,
+.dark textarea,
+.dark select {
+  background-color: var(--muted);
+  color: var(--foreground);
+}
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: var(--muted-foreground);
+}
+
+.dark .force-light .bg-white,
+.dark .force-light .bg-\[\#fff\],
+.dark .force-light .bg-\[\#ffffff\] {
+  background-color: #fff;
+}
+.dark .force-light .bg-\[\#f8f9fa\],
+.dark .force-light .bg-\[\#f8fafc\],
+.dark .force-light .bg-\[\#f4f5f7\],
+.dark .force-light .bg-\[\#f3f4f6\],
+.dark .force-light .bg-\[\#f5f6f8\] {
+  background-color: revert-layer;
+}
+.dark .force-light .text-\[\#111\],
+.dark .force-light .text-\[\#111111\],
+.dark .force-light .text-\[\#111827\],
+.dark .force-light .text-black {
+  color: #111;
+}
+.dark .force-light .text-\[\#6b7280\],
+.dark .force-light .text-\[\#6a717c\] {
+  color: #6a717c;
+}
+.dark .force-light .bg-\[\#111\],
+.dark .force-light .bg-\[\#111111\],
+.dark .force-light .hover\:bg-\[\#2a2a2a\]:hover {
+  background-color: #111;
+  color: #fff;
+}
+.dark .force-light input,
+.dark .force-light textarea,
+.dark .force-light select {
+  background-color: #fff;
+  color: #111;
+}
+.dark .force-light input::placeholder,
+.dark .force-light textarea::placeholder {
+  color: #6a717c;
 }

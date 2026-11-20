@@ -227,8 +227,8 @@ function MapGraphView() {
     target: edge.target,
     label: edge.label,
     labelStyle: { fontSize: 9, fill: "#6b7280" },
-    style: { stroke: "#d1d5db", strokeWidth: 1.25 },
-    markerEnd: { type: MarkerType.ArrowClosed, width: 11, height: 11, color: "#d1d5db" },
+    style: { stroke: "var(--graph-line)", strokeWidth: 1.25 },
+    markerEnd: { type: MarkerType.ArrowClosed, width: 11, height: 11, color: "var(--graph-line)" },
   })), [query.data?.nodes, query.data?.edges]);
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -275,7 +275,7 @@ function MapGraphView() {
           maxZoom={2}
           proOptions={{ hideAttribution: true }}
         >
-          <Background gap={20} size={1} color="#e8eaed" />
+          <Background gap={20} size={1} color="var(--graph-dot)" />
           <Controls showInteractive={false} />
         </ReactFlow>
       )}
@@ -328,7 +328,7 @@ function WorkspaceGraphView() {
     () =>
       graphEdges.map((e) => {
         const hop = hopColor(e.sourceId, e.targetId, agents);
-        const stroke = hop ?? "#dadce0";
+        const stroke = hop ?? "var(--graph-line)";
         return {
           id: e.id,
           source: e.sourceId,
@@ -374,7 +374,7 @@ function WorkspaceGraphView() {
           maxZoom={2}
           proOptions={{ hideAttribution: true }}
         >
-          <Background gap={20} size={1} color="#e8eaed" />
+          <Background gap={20} size={1} color="var(--graph-dot)" />
           <Controls showInteractive={false} />
           <MiniMap
             nodeColor={(n) => getNodeColor((n.data as { type: NodeType }).type)}

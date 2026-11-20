@@ -16,12 +16,12 @@ const ZOOMS = [
 ] as const;
 
 const TAGS = [
-  { bg: "#d9f2e3", fg: "#17663a" },
-  { bg: "#d6e6ff", fg: "#1d4e89" },
-  { bg: "#efe4ff", fg: "#6941c6" },
-  { bg: "#ffe8c7", fg: "#b54708" },
-  { bg: "#fde2e1", fg: "#9f2d2d" },
-  { bg: "#d9f4f2", fg: "#0f766e" },
+  { bg: "var(--tag-0-bg)", fg: "var(--tag-0-fg)" },
+  { bg: "var(--tag-1-bg)", fg: "var(--tag-1-fg)" },
+  { bg: "var(--tag-2-bg)", fg: "var(--tag-2-fg)" },
+  { bg: "var(--tag-3-bg)", fg: "var(--tag-3-fg)" },
+  { bg: "var(--tag-4-bg)", fg: "var(--tag-4-fg)" },
+  { bg: "var(--tag-5-bg)", fg: "var(--tag-5-fg)" },
 ];
 
 export function TimelineView() {
@@ -427,21 +427,21 @@ function monthMarks(start: Date, totalDays: number): { key: string; name: string
 
 function barTone(experiment: Experiment): { background: string; color: string; border: string; dashed: boolean; mark: "check" | "warn" | null } {
   if (experiment.status === "rolled_out" || experiment.readout?.verdict === "won") {
-    return { background: "#ffffff", color: "#111827", border: "#e5e7eb", dashed: false, mark: "check" };
+    return { background: "var(--timeline-won)", color: "var(--timeline-won-fg)", border: "var(--border)", dashed: false, mark: "check" };
   }
   if (experiment.readout?.verdict === "flat") {
-    return { background: "#eceef2", color: "#4b5563", border: "transparent", dashed: false, mark: null };
+    return { background: "var(--timeline-flat)", color: "var(--timeline-flat-fg)", border: "transparent", dashed: false, mark: null };
   }
   if (experiment.status === "stopped" || experiment.status === "failed" || experiment.readout?.verdict === "lost") {
-    return { background: "#f8d0cb", color: "#9f2d2d", border: "transparent", dashed: false, mark: "warn" };
+    return { background: "var(--timeline-lost)", color: "var(--timeline-lost-fg)", border: "transparent", dashed: false, mark: "warn" };
   }
   if (experiment.status === "running" || experiment.status === "awaiting_rollout" || experiment.status === "rolling_out") {
-    return { background: "#d6e4ff", color: "#1d4e89", border: "transparent", dashed: false, mark: "check" };
+    return { background: "var(--timeline-run)", color: "var(--timeline-run-fg)", border: "transparent", dashed: false, mark: "check" };
   }
   if (experiment.status === "queued") {
-    return { background: "#eceef2", color: "#4b5563", border: "transparent", dashed: false, mark: null };
+    return { background: "var(--timeline-flat)", color: "var(--timeline-flat-fg)", border: "transparent", dashed: false, mark: null };
   }
-  return { background: "#eef2ff", color: "#3730a3", border: "#a5b4fc", dashed: true, mark: null };
+  return { background: "var(--timeline-plan)", color: "var(--timeline-plan-fg)", border: "var(--timeline-plan-border)", dashed: true, mark: null };
 }
 
 function tagFor(experiment: Experiment): { letters: string; bg: string; fg: string } {

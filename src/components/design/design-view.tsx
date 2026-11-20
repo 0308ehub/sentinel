@@ -586,8 +586,8 @@ export function DesignView() {
         className="relative min-h-0 min-w-0 flex-1 cursor-grab overflow-hidden touch-none"
         onPointerDown={onCanvasPointerDown}
         style={{
-          backgroundColor: "#e6e7eb",
-          backgroundImage: "radial-gradient(#c4c6cc 1px, transparent 1px)",
+          backgroundColor: "var(--canvas)",
+          backgroundImage: "radial-gradient(var(--canvas-dot) 1px, transparent 1px)",
           backgroundSize: `${16 * zoom}px ${16 * zoom}px`,
           backgroundPosition: `${pan.x}px ${pan.y}px`,
         }}
@@ -630,14 +630,14 @@ export function DesignView() {
             className="absolute left-0 top-0"
             style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: "0 0" }}
           >
+            <p className="absolute -top-6 left-0 max-w-full truncate text-xs text-muted-foreground">
+              {viewingOriginal ? "Original" : active.name}
+              <span className="ml-2">{active.sourceLabel}</span>
+            </p>
             <div
-              className="relative bg-white shadow-[0_12px_40px_rgba(0,0,0,0.08)]"
+              className="force-light relative bg-white text-[#111] shadow-[0_12px_40px_rgba(0,0,0,0.08)]"
               style={{ width: active.width, height: active.height }}
             >
-              <p className="absolute -top-6 left-0 max-w-full truncate text-xs text-muted-foreground">
-                {viewingOriginal ? "Original" : active.name}
-                <span className="ml-2">{active.sourceLabel}</span>
-              </p>
               {active.pieces.map((piece) => (
                 <PieceBox
                   key={piece.id}
@@ -926,7 +926,7 @@ function Thumb({ screen, label, active, onClick }: { screen: Screen; label: stri
   return (
     <button type="button" onClick={onClick} className="w-[104px] shrink-0 text-left">
       <span className={cn("relative block h-[72px] overflow-hidden rounded-md border bg-[#f4f5f7]", active ? "border-primary" : "border-border")}>
-        <span className="absolute left-0 top-0 bg-white" style={{ width: screen.width, height: screen.height, transform: `scale(${scale})`, transformOrigin: "top left" }}>
+        <span className="force-light absolute left-0 top-0 bg-white text-[#111]" style={{ width: screen.width, height: screen.height, transform: `scale(${scale})`, transformOrigin: "top left" }}>
           {screen.pieces.map((piece) => (
             <span key={piece.id} className={cn("absolute", pieceClass(piece.kind))} style={{ left: piece.x, top: piece.y, width: piece.w, height: piece.h }} />
           ))}
