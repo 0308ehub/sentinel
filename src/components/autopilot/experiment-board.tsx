@@ -22,6 +22,7 @@ import type { RolloutPhase } from "@/lib/autopilot/rollout-plan";
 import { useVariant } from "@/lib/autopilot/variant";
 import { formatRelativeTime } from "@/lib/utils";
 import { setupSteps } from "@/lib/autopilot/setup-core";
+import { startOfMonth, wonSince } from "@/lib/autopilot/won-core";
 import type { AutopilotState, Experiment, Learning, Signal, SuggestionRating } from "@/lib/autopilot/types";
 
 const ENDED = new Set<Experiment["status"]>(["rolled_out", "stopped", "rejected", "failed"]);
@@ -35,7 +36,7 @@ const ACTIVE_EXPERIMENT = new Set<Experiment["status"]>([
   "rolling_out",
 ]);
 
-type StatusFilter = "active" | "suggested" | "running" | "ended" | "all";
+type StatusFilter = "active" | "suggested" | "running" | "ended" | "won" | "all";
 
 type Selection =
   | { kind: "experiment"; id: string }
@@ -82,6 +83,14 @@ export function ExperimentBoard({
   const setup = setupSteps(state.setup);
   const setupComplete = setup.every((step) => step.done);
   const missedRun = state.health.lastRunAt != null && renderedAt - Date.parse(state.health.lastRunAt) > 150 * 60_000;
+  const monthStart = startOfMonth(renderedAt);
+  const wonThisMonth = state.experiments.filter((experiment) => wonSince(experiment, monthStart)).length;
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("filter") !== "won") return;
+    const frame = requestAnimationFrame(() => setFilter("won"));
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get("experiment");
@@ -129,12 +138,13 @@ export function ExperimentBoard({
         if (filter === "suggested") return row.suggested;
         if (filter === "running") return row.kind === "experiment" && row.live;
         if (filter === "ended") return row.kind === "experiment" && ENDED.has(row.experiment.status);
+        if (filter === "won") return row.kind === "experiment" && wonSince(row.experiment, monthStart);
         if (filter === "active") return row.kind === "signal" || !ENDED.has(row.experiment.status);
         return true;
       })
       .filter((row) => !needle || `${row.name} ${row.key} ${row.description}`.toLowerCase().includes(needle))
       .sort((a, b) => Date.parse(b.modified) - Date.parse(a.modified));
-  }, [filter, query, state.experiments, suggestions]);
+  }, [filter, monthStart, query, state.experiments, suggestions]);
 
   const createdFromSignal =
     selected?.kind === "signal"
@@ -195,7 +205,19 @@ export function ExperimentBoard({
       <div className="px-6 pt-5">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-[22px] font-medium text-[#1c1c1c]">Experiments</h1>
+            <div className="flex items-baseline gap-3">
+              <h1 className="text-[22px] font-medium text-[#1c1c1c]">Experiments</h1>
+              <Link
+                href="/experiments?filter=won"
+                onClick={() => {
+                  setTab("overview");
+                  setFilter("won");
+                }}
+                className="text-xs text-[#6b7280] hover:text-brand hover:underline"
+              >
+                Won this month: {wonThisMonth}
+              </Link>
+            </div>
             <p className="mt-1 text-xs text-[#6b7280]">
               {state.repo ? `Ships to ${state.repo}. ` : "No repository yet. "}
               {state.lastRunAt ? (
@@ -290,6 +312,7 @@ export function ExperimentBoard({
               <option value="suggested">Suggested</option>
               <option value="running">Running</option>
               <option value="ended">Ended</option>
+              <option value="won">Won this month</option>
               <option value="all">All</option>
             </select>
             <ChevronDown className="pointer-events-none absolute right-2 top-2.5 h-4 w-4 text-[#6b7280]" />
