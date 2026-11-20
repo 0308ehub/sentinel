@@ -24,6 +24,7 @@ export type ExperimentChanges = {
     deletions?: number;
     changedFiles?: number;
     files?: ChangeFile[];
+    author?: { login: string; avatarUrl: string; bot: boolean } | null;
   };
 };
 export type ExperimentSummary = { summary?: ChangeSummary; pending?: boolean; siteUrl?: string | null };

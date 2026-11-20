@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import {
@@ -11,6 +11,7 @@ import {
   type ExperimentChanges as Changes,
   type ExperimentSnapshot as SnapshotResponse,
 } from "@/components/autopilot/experiment-queries";
+import { captionLines, type CaptionLine } from "@/lib/autopilot/caption";
 import type { ChangeSummary } from "@/lib/autopilot/change-summary";
 import { addedTextFromPatch, normalizePreviewCondition, textDifference } from "@/lib/autopilot/preview-diff";
 import { snapshotStageLabel, type SnapshotStage } from "@/lib/autopilot/snapshot-stage-core";
@@ -31,13 +32,14 @@ export function WhatChanges({ experiment }: { experiment: Experiment }) {
   const reason = summaryQuery.error ?? changesQuery.error;
   const error = reason instanceof Error ? reason.message || (changesQuery.error ? "Could not load the preview." : "Could not load the change summary.") : reason ? "Could not load what changes." : "";
 
+  if (summary?.summary?.kind === "behavior") return null;
+
   return (
-    <section className="border-b border-[#e6e8ec] px-4 py-4 text-[#374151]">
-      <h2 className="text-sm font-medium text-[#111827]">What changes</h2>
-      {error ? <p className="mt-3 text-sm text-[#b42318]">{error}</p> : !summary || !changes ? (
-        <LoadingBlock className="mt-3 min-h-40" label="Loading what changes…" />
+    <section className="text-[#374151]">
+      {error ? <p className="text-sm text-[#b42318]">{error}</p> : !summary || !changes ? (
+        <LoadingBlock className="min-h-40" label="Loading what changes…" />
       ) : summary.pending || !summary.summary ? (
-        <p className="mt-3 text-sm text-[#6b7280]">The change is still being built.</p>
+        <p className="text-sm text-[#6b7280]">The change is still being built.</p>
       ) : (
         <div className="animate-in fade-in duration-150"><SummaryContent experiment={experiment} summary={summary.summary} changes={changes} siteUrl={summary.siteUrl ?? changes.siteUrl ?? null} /></div>
       )}
@@ -56,34 +58,101 @@ function SummaryContent({ experiment, summary, changes, siteUrl }: {
     const files = changes.source === "pull" ? changes.pull?.files : changes.files;
     return addedTextFromPatch((files ?? []).flatMap((file) => file.patch ? [file.patch] : []));
   }, [changes]);
+  if (summary.kind !== "ui") return null;
   return (
-    <div className="mt-3">
-      <div className="grid gap-3 md:grid-cols-2">
-        <SummaryCard label="Before" text={summary.before} />
-        <SummaryCard label="After" text={summary.after} />
+    <VisualPreview
+      experiment={experiment}
+      changes={changes}
+      siteUrl={siteUrl}
+      when={summary.when}
+      where={place}
+      before={summary.before}
+      after={summary.after}
+      addedText={addedText}
+    />
+  );
+}
+
+export function VersionCaption({ before, after }: { before: string; after: string }) {
+  const [version, setVersion] = useState<"control" | "treatment">("treatment");
+  return (
+    <div>
+      <VersionToggle showing={version} onChange={setVersion} />
+      <CaptionList version={version} before={before} after={after} />
+    </div>
+  );
+}
+
+function CaptionList({ version, before, after }: { version: "control" | "treatment"; before: string; after: string }) {
+  const lines = captionLines(version === "control" ? before : after);
+  if (!lines.length) return null;
+  return (
+    <ul className="mt-2 space-y-1 text-xs leading-5 text-[#4b5563]">
+      {lines.map((line) => (
+        <li key={line.text} className="flex gap-2">
+          <span className="text-[#c4c8cf]" aria-hidden="true">•</span>
+          <span><CaptionText line={line} /></span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function CaptionText({ line }: { line: CaptionLine }) {
+  const marks = [...line.marks].sort((a, b) => b.length - a.length);
+  const nodes: ReactNode[] = [];
+  let rest = line.text;
+  while (rest) {
+    let hit: { index: number; mark: string } | null = null;
+    for (const mark of marks) {
+      const index = rest.toLowerCase().indexOf(mark.toLowerCase());
+      if (index >= 0 && (hit === null || index < hit.index)) hit = { index, mark: rest.slice(index, index + mark.length) };
+    }
+    if (!hit) {
+      nodes.push(rest);
+      break;
+    }
+    if (hit.index > 0) nodes.push(rest.slice(0, hit.index));
+    nodes.push(<strong key={nodes.length} className="font-semibold text-[#111827]">{hit.mark}</strong>);
+    rest = rest.slice(hit.index + hit.mark.length);
+  }
+  return <>{nodes}</>;
+}
+
+function VersionToggle({ showing, onChange, extra }: {
+  showing: "control" | "treatment";
+  onChange: (version: "control" | "treatment") => void;
+  extra?: ReactNode;
+}) {
+  const option = (value: "control" | "treatment", label: string) => (
+    <button
+      type="button"
+      aria-pressed={showing === value}
+      onClick={() => onChange(value)}
+      className={`rounded px-2.5 py-1 ${showing === value ? "bg-white font-medium text-[#111827] shadow-sm" : "text-[#6b7280] hover:text-[#374151]"}`}
+    >
+      {label}
+    </button>
+  );
+  return (
+    <div className="flex items-center justify-between text-xs">
+      <div className="inline-flex rounded-md bg-[#f1f3f5] p-0.5" role="group" aria-label="Which version to show">
+        {option("control", "Current")}
+        {option("treatment", "New version")}
       </div>
-      {place && <p className="mt-2 text-xs text-[#6b7280]">{place}</p>}
-      {summary.kind === "ui" && (
-        <VisualPreview experiment={experiment} changes={changes} siteUrl={siteUrl} when={summary.when} addedText={addedText} />
-      )}
+      {extra}
     </div>
   );
 }
 
-function SummaryCard({ label, text }: { label: string; text: string }) {
-  return (
-    <div className="rounded border border-[#e1e4e8] bg-[#f8f9fa] p-3">
-      <p className="text-[10px] font-medium uppercase tracking-wide text-[#6b7280]">{label}</p>
-      <p className="mt-1 text-sm leading-5 text-[#111827]">{text}</p>
-    </div>
-  );
-}
-
-function VisualPreview({ experiment, changes, siteUrl, when, addedText }: {
+function VisualPreview({ experiment, changes, siteUrl, when, where, before, after, addedText }: {
   experiment: Experiment;
   changes: Changes;
   siteUrl: string | null;
   when: string;
+  where: string;
+  before: string;
+  after: string;
   addedText: string[];
 }) {
   const queryClient = useQueryClient();
@@ -141,12 +210,15 @@ function VisualPreview({ experiment, changes, siteUrl, when, addedText }: {
   return (
     <div className="mt-4">
       {when && <p className="mb-2 text-xs text-[#6b7280]">The new version only appears {normalizePreviewCondition(when)}.</p>}
+      {where && <p className="mb-2 text-xs text-[#6b7280]">{where}</p>}
       <SnapshotChoice
         experiment={experiment}
         changes={changes}
         liveOrigin={liveOrigin}
         isLive={isLive}
         when={when}
+        before={before}
+        after={after}
         addedText={addedText}
         snapshot={snapshot}
       />
@@ -192,22 +264,24 @@ function SnapshotProgress({ stage, elapsedMinutes }: { stage: SnapshotStage; ela
   );
 }
 
-function SnapshotChoice({ experiment, changes, liveOrigin, isLive, when, addedText, snapshot }: {
+function SnapshotChoice({ experiment, changes, liveOrigin, isLive, when, before, after, addedText, snapshot }: {
   experiment: Experiment;
   changes: Changes;
   liveOrigin: string | null;
   isLive: boolean;
   when: string;
+  before: string;
+  after: string;
   addedText: string[];
   snapshot: SnapshotResponse | null;
 }) {
   const ready = snapshot?.status === "ready" && Boolean(snapshot.controlHtml && snapshot.treatmentHtml);
   const [shownAs, setShownAs] = useState<"sample" | "account">(() => ready && (Boolean(when.trim()) || !isLive) ? "sample" : "account");
   const chosen = useRef(false);
-  const live = (
-    <PreviewBody experiment={experiment} changes={changes} liveOrigin={liveOrigin} isLive={isLive} when={when} addedText={addedText} />
+  const live = (showCaption: boolean) => (
+    <PreviewBody experiment={experiment} changes={changes} liveOrigin={liveOrigin} isLive={isLive} when={when} before={before} after={after} addedText={addedText} showCaption={showCaption} />
   );
-  if (!ready) return live;
+  if (!ready) return live(true);
   // A change that only shows in some states (an empty list, a first visit) usually looks identical on
   // the person's own account, so the sample is the only useful comparison there.
   const offerAccount = isLive && !when.trim();
@@ -240,11 +314,11 @@ function SnapshotChoice({ experiment, changes, liveOrigin, isLive, when, addedTe
       ) : null}
       {showSample ? (
         <>
-          <PreviewSwitcher control={snapshot.controlHtml!} treatment={snapshot.treatmentHtml!} when={when} addedText={[]} sample />
-          <p className="mt-2 text-xs text-[#6b7280]">Sample data: {scenario} · rendered by Kismet&apos;s coding agent</p>
-          {!isLive && <div className="mt-3">{live}</div>}
+          <PreviewSwitcher control={snapshot.controlHtml!} treatment={snapshot.treatmentHtml!} when={when} before={before} after={after} addedText={[]} sample />
+          <p className="mt-2 text-[11px] text-[#9aa0a8]">Sample data: {scenario} · rendered by Kismet&apos;s coding agent</p>
+          {!isLive && <div className="mt-3">{live(false)}</div>}
         </>
-      ) : live}
+      ) : live(true)}
     </div>
   );
 }
@@ -260,13 +334,16 @@ function LoadingBlock({ className, label }: { className: string; label: string }
   );
 }
 
-function PreviewBody({ experiment, changes, liveOrigin, isLive, when, addedText }: {
+function PreviewBody({ experiment, changes, liveOrigin, isLive, when, before, after, addedText, showCaption }: {
   experiment: Experiment;
   changes: Changes;
   liveOrigin: string | null;
   isLive: boolean;
   when: string;
+  before: string;
+  after: string;
   addedText: string[];
+  showCaption: boolean;
 }) {
   if (!liveOrigin) return (
     <p className="rounded border border-[#e1e4e8] bg-[#f8f9fa] p-3 text-sm text-[#6b7280]">
@@ -286,14 +363,17 @@ function PreviewBody({ experiment, changes, liveOrigin, isLive, when, addedText 
   // would only show "Sign-in is not configured". Other sites' preview builds are fine to open.
   const treatment = treatmentOrigin && !changes.ownRepo ? previewHref(treatmentOrigin, experiment.page, experiment.flag, "treatment", isLive) : null;
   if (!isLive) return (
-    <div className="flex flex-wrap items-center gap-3 rounded border border-[#e1e4e8] bg-[#f8f9fa] p-3 text-sm">
-      {treatment && <a href={treatment} target="_blank" rel="noreferrer" className="text-brand hover:underline">Open new version (preview build) ↗</a>}
-      <a href={control} target="_blank" rel="noreferrer" className="text-brand hover:underline">Open current version ↗</a>
-      <span className="w-full text-xs text-[#6b7280]">{treatment ? "Preview builds can ask you to sign in." : changes.ownRepo ? "Kismet's preview builds can't sign in, so use the sample render above." : "The preview build is not available yet."}</span>
+    <div>
+      <div className="flex flex-wrap items-center gap-3 rounded border border-[#e1e4e8] bg-[#f8f9fa] p-3 text-sm">
+        {treatment && <a href={treatment} target="_blank" rel="noreferrer" className="text-brand hover:underline">Open new version (preview build) ↗</a>}
+        <a href={control} target="_blank" rel="noreferrer" className="text-brand hover:underline">Open current version ↗</a>
+        <span className="w-full text-xs text-[#6b7280]">{treatment ? "Preview builds can ask you to sign in." : changes.ownRepo ? "Kismet's preview builds can't sign in, so use the sample render above." : "The preview build is not available yet."}</span>
+      </div>
+      {showCaption && <div className="mt-3"><VersionCaption before={before} after={after} /></div>}
     </div>
   );
-  if (!treatment) return null;
-  return <PreviewSwitcher control={control} treatment={treatment} when={when} addedText={addedText} />;
+  if (!treatment) return showCaption ? <VersionCaption before={before} after={after} /> : null;
+  return <PreviewSwitcher control={control} treatment={treatment} when={when} before={before} after={after} addedText={addedText} />;
 }
 
 const FRAME_WIDTH = 1280;
@@ -336,10 +416,12 @@ function highlightTreatment(document: Document, blocks: FrameText[], texts: stri
   document.head.appendChild(style);
 }
 
-function PreviewSwitcher({ control, treatment, when, addedText, sample = false }: {
+function PreviewSwitcher({ control, treatment, when, before, after, addedText, sample = false }: {
   control: string;
   treatment: string;
   when: string;
+  before: string;
+  after: string;
   addedText: string[];
   sample?: boolean;
 }) {
@@ -387,16 +469,6 @@ function PreviewSwitcher({ control, treatment, when, addedText, sample = false }
     url.searchParams.delete("kismet_embed");
     return url.toString();
   }, [sample, src]);
-  const option = (value: "control" | "treatment", label: string) => (
-    <button
-      type="button"
-      aria-pressed={showing === value}
-      onClick={() => setShowing(value)}
-      className={`rounded px-2.5 py-1 ${showing === value ? "bg-white font-medium text-[#111827] shadow-sm" : "text-[#6b7280] hover:text-[#374151]"}`}
-    >
-      {label}
-    </button>
-  );
   const hasNewText = Boolean(comparison?.onlyInTreatment.length);
   // A sample render is the comparison itself; a layout-only change has identical text but still looks
   // different, so never hide the sample frames.
@@ -405,12 +477,12 @@ function PreviewSwitcher({ control, treatment, when, addedText, sample = false }
     && comparison.onlyInControl.length === 0;
   return (
     <div>
-      <div className={pagesMatch ? "hidden" : "mb-2 flex items-center justify-between text-xs"}>
-        <div className="inline-flex rounded-md bg-[#f1f3f5] p-0.5" role="group" aria-label="Which version to show">
-          {option("control", "Current")}
-          {option("treatment", "New version")}
-        </div>
-        {fullPage && <a href={fullPage} target="_blank" rel="noreferrer" className="text-brand hover:underline">Open full page ↗</a>}
+      <div className="mb-2">
+        <VersionToggle
+          showing={showing}
+          onChange={setShowing}
+          extra={fullPage && !pagesMatch ? <a href={fullPage} target="_blank" rel="noreferrer" className="text-brand hover:underline">Open full page ↗</a> : null}
+        />
       </div>
       {hasNewText && (
         <p className="mb-2 rounded border border-[#f59e0b] bg-[#fffbeb] px-3 py-2 text-xs text-[#92400e]">
@@ -459,6 +531,7 @@ function PreviewSwitcher({ control, treatment, when, addedText, sample = false }
           />
         ))}
       </div>
+      <CaptionList version={showing} before={before} after={after} />
     </div>
   );
 }

@@ -49,6 +49,12 @@ export interface GitHubPullChangeFile {
   patch?: string;
 }
 
+export interface GitHubPullAuthor {
+  login: string;
+  avatarUrl: string;
+  bot: boolean;
+}
+
 export interface GitHubPullChanges {
   title: string;
   state: "open" | "closed" | "merged";
@@ -58,6 +64,7 @@ export interface GitHubPullChanges {
   deletions: number;
   changedFiles: number;
   files: GitHubPullChangeFile[];
+  author: GitHubPullAuthor | null;
 }
 
 export async function pullChanges(fullName: string, number: number, candidateToken?: string): Promise<GitHubPullChanges> {
@@ -72,6 +79,7 @@ export async function pullChanges(fullName: string, number: number, candidateTok
     additions?: number;
     deletions?: number;
     changed_files?: number;
+    user?: { login?: string; avatar_url?: string; type?: string };
   }>(`/repos/${parsed.owner}/${parsed.repo}/pulls/${number}`, undefined, candidateToken);
   const files: GitHubPullChangeFile[] = [];
   for (let page = 1; page <= 3; page += 1) {
@@ -92,6 +100,13 @@ export async function pullChanges(fullName: string, number: number, candidateTok
     deletions: pull.deletions ?? files.reduce((sum, file) => sum + file.deletions, 0),
     changedFiles: pull.changed_files ?? files.length,
     files,
+    author: pull.user?.login
+      ? {
+          login: pull.user.login,
+          avatarUrl: pull.user.avatar_url ?? "",
+          bot: pull.user.type === "Bot" || pull.user.login.endsWith("[bot]"),
+        }
+      : null,
   };
 }
 

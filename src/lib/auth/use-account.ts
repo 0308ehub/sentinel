@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { useClerk, useUser } from "@clerk/nextjs";
 
 export interface Account {
+  id: string;
   name: string;
   email: string;
   imageUrl: string;
@@ -19,6 +20,7 @@ function useClerkAccount(): Account | null {
     if (!isLoaded || !user) return null;
 
     return {
+      id: user.id,
       name: user.fullName ?? "",
       email: user.primaryEmailAddress?.emailAddress ?? "",
       imageUrl: user.imageUrl,

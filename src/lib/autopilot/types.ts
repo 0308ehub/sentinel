@@ -217,6 +217,7 @@ export interface SuggestionRating {
   id: string;
   targetKind: SuggestionTargetKind;
   targetId: string;
+  voterId: string;
   rating: SuggestionRatingValue;
   reason: string | null;
   title: string;

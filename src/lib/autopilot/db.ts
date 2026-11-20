@@ -258,14 +258,34 @@ create index if not exists feedback_user_created_idx on kismet.feedback (user_id
 create table if not exists kismet.suggestion_ratings (
   id text primary key,
   user_id text not null,
+  voter_id text,
   target_kind text not null,
   target_id text not null,
   rating text not null,
   reason text,
   title text,
-  created_at timestamptz default now(),
-  unique (user_id, target_kind, target_id)
+  created_at timestamptz default now()
 );
+alter table kismet.suggestion_ratings add column if not exists voter_id text;
+update kismet.suggestion_ratings set voter_id = user_id where voter_id is null;
+do $$
+declare row record;
+begin
+  for row in
+    select con.conname
+    from pg_constraint con
+    join pg_class rel on rel.oid = con.conrelid
+    join pg_namespace nsp on nsp.oid = rel.relnamespace
+    where nsp.nspname = 'kismet'
+      and rel.relname = 'suggestion_ratings'
+      and con.contype = 'u'
+      and pg_get_constraintdef(con.oid) not like '%voter_id%'
+  loop
+    execute format('alter table kismet.suggestion_ratings drop constraint %I', row.conname);
+  end loop;
+end $$;
+create unique index if not exists suggestion_ratings_voter_idx
+  on kismet.suggestion_ratings (user_id, voter_id, target_kind, target_id);
 create index if not exists suggestion_ratings_user_created_idx on kismet.suggestion_ratings (user_id, created_at desc);
 
 -- Flag names used to be unique across the whole product. Each account can now reuse one.

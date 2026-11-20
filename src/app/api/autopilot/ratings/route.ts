@@ -1,7 +1,7 @@
 import { withAutopilotUser } from "@/lib/autopilot/scope";
-import { getExperiment, listSignals, log, rateSuggestion, setSignalStatus } from "@/lib/autopilot/store";
+import { getExperiment, listSignals, rateSuggestion, ratingCounts } from "@/lib/autopilot/store";
 import type { SuggestionRatingValue, SuggestionTargetKind } from "@/lib/autopilot/types";
-import { currentAccountId } from "@/lib/connections/current";
+import { currentAccountId, currentUserId } from "@/lib/connections/current";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +23,9 @@ export async function POST(request: Request) {
   const reason = body.reason?.trim() ?? "";
   if (reason.length > 200) return Response.json({ error: "Reason must be 200 characters or fewer." }, { status: 400 });
 
+  const voterId = await currentUserId();
+  if (!voterId) return Response.json({ error: "Sign in required." }, { status: 401 });
+
   return withAutopilotUser(userId, async () => {
     const targetKind = body.targetKind!;
     const targetId = body.targetId!;
@@ -30,11 +33,8 @@ export async function POST(request: Request) {
       ? (await listSignals()).find((signal) => signal.id === targetId) ?? null
       : await getExperiment(targetId);
     if (!target) return Response.json({ error: "Suggestion not found." }, { status: 404 });
-    const rating = await rateSuggestion({ targetKind, targetId, rating: body.rating!, reason, title: target.title });
-    if (targetKind === "signal" && body.rating === "not_useful") {
-      await setSignalStatus(targetId, "dismissed");
-      await log("rating", `You marked “${target.title}” not useful.`, targetId);
-    }
-    return Response.json({ rating });
+    const rating = await rateSuggestion({ targetKind, targetId, voterId, rating: body.rating!, reason, title: target.title });
+    const counts = await ratingCounts(targetKind, targetId);
+    return Response.json({ rating, good: counts.good, notUseful: counts.notUseful });
   });
 }

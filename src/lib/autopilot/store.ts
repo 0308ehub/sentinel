@@ -279,6 +279,7 @@ function toRating(row: Row): SuggestionRating {
     id: String(row.id),
     targetKind: row.target_kind as SuggestionTargetKind,
     targetId: String(row.target_id),
+    voterId: String(row.voter_id ?? row.user_id),
     rating: row.rating as SuggestionRatingValue,
     reason: (row.reason as string | null) ?? null,
     title: String(row.title),
@@ -289,24 +290,53 @@ function toRating(row: Row): SuggestionRating {
 export async function rateSuggestion(input: {
   targetKind: SuggestionTargetKind;
   targetId: string;
+  voterId: string;
   rating: SuggestionRatingValue;
   reason?: string | null;
   title: string;
-}): Promise<SuggestionRating> {
+}): Promise<SuggestionRating | null> {
   const sql = await db();
+  const existing = await sql`
+    select * from kismet.suggestion_ratings
+    where user_id = ${scopeUser()} and voter_id = ${input.voterId}
+      and target_kind = ${input.targetKind} and target_id = ${input.targetId}
+    limit 1
+  `;
+  if (existing[0] && existing[0].rating === input.rating) {
+    await sql`delete from kismet.suggestion_ratings where id = ${existing[0].id}`;
+    return null;
+  }
   const rows = await sql`
-    insert into kismet.suggestion_ratings (id, user_id, target_kind, target_id, rating, reason, title)
-    values (${newId("rating")}, ${scopeUser()}, ${input.targetKind}, ${input.targetId}, ${input.rating}, ${input.reason?.slice(0, 200) || null}, ${input.title.slice(0, 200)})
-    on conflict (user_id, target_kind, target_id) do update
+    insert into kismet.suggestion_ratings (id, user_id, voter_id, target_kind, target_id, rating, reason, title)
+    values (${newId("rating")}, ${scopeUser()}, ${input.voterId}, ${input.targetKind}, ${input.targetId}, ${input.rating}, ${input.reason?.slice(0, 200) || null}, ${input.title.slice(0, 200)})
+    on conflict (user_id, voter_id, target_kind, target_id) do update
       set rating = excluded.rating, reason = excluded.reason, title = excluded.title, created_at = now()
     returning *
   `;
   return toRating(rows[0]);
 }
 
-export async function listRatings(limit = 30): Promise<SuggestionRating[]> {
+export async function ratingCounts(targetKind: SuggestionTargetKind, targetId: string): Promise<{ good: number; notUseful: number }> {
   const sql = await db();
-  const safeLimit = Math.max(1, Math.min(100, Math.floor(limit)));
+  const rows = await sql`
+    select rating, count(*)::int as n
+    from kismet.suggestion_ratings
+    where user_id = ${scopeUser()} and target_kind = ${targetKind} and target_id = ${targetId}
+    group by rating
+  `;
+  let good = 0;
+  let notUseful = 0;
+  for (const row of rows) {
+    const count = Number(row.n) || 0;
+    if (row.rating === "good") good = count;
+    if (row.rating === "not_useful") notUseful = count;
+  }
+  return { good, notUseful };
+}
+
+export async function listRatings(limit = 200): Promise<SuggestionRating[]> {
+  const sql = await db();
+  const safeLimit = Math.max(1, Math.min(200, Math.floor(limit)));
   const rows = await sql`
     select * from kismet.suggestion_ratings
     where user_id = ${scopeUser()}

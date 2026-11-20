@@ -23,7 +23,7 @@ import { useVariant } from "@/lib/autopilot/variant";
 import { formatRelativeTime } from "@/lib/utils";
 import { setupSteps } from "@/lib/autopilot/setup-core";
 import { startOfMonth, wonSince } from "@/lib/autopilot/won-core";
-import type { AutopilotState, Experiment, Learning, Signal, SuggestionRating } from "@/lib/autopilot/types";
+import type { AutopilotState, Experiment, Learning, Signal } from "@/lib/autopilot/types";
 
 const ENDED = new Set<Experiment["status"]>(["rolled_out", "stopped", "rejected", "failed"]);
 const SUGGESTED_STATUS = new Set<Experiment["status"]>(["building", "awaiting_approval"]);
@@ -196,7 +196,8 @@ export function ExperimentBoard({
             onDismissCleanup={() => openExperiment && onAct(openExperiment, "dismiss-cleanup")}
             onStart={(builder) => openSignal && onTest(openSignal, builder)}
             onDismissSignal={() => openSignal && onDismiss(openSignal)}
-            rating={selection ? ratingForSelection(state.ratings, selection) : null}
+            ratings={selection ? state.ratings.filter((rating) => rating.targetKind === selection.kind && rating.targetId === selection.id) : []}
+            activity={state.activity}
             onRated={onRated}
             onSaveAdjustments={(adjustments) => onSaveAdjustments(openExperiment ?? openSignal!, adjustments)}
           />
@@ -543,10 +544,6 @@ function lastFailedAttempt(experiments: Experiment[], signalId: string | null): 
   if (!signalId) return null;
   const failed = experiments.filter((experiment) => experiment.signalId === signalId && experiment.status === "failed");
   return failed.sort((a, b) => Date.parse(b.endedAt ?? b.createdAt) - Date.parse(a.endedAt ?? a.createdAt))[0] ?? null;
-}
-
-function ratingForSelection(ratings: SuggestionRating[], selection: Selection): SuggestionRating | null {
-  return ratings.find((rating) => rating.targetKind === selection.kind && rating.targetId === selection.id) ?? null;
 }
 
 function ThemesTable({ themes, onOpen }: { themes: AutopilotState["themes"]; onOpen: (signalId: string) => void }) {

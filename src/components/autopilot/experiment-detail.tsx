@@ -1,23 +1,26 @@
 "use client";
 
-import { useState } from "react";
-import { ExternalLink, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ExternalLink, Loader2, ThumbsDown, ThumbsUp, UserRound } from "lucide-react";
 import { BuildLive } from "@/components/autopilot/build-live";
 import { CodeChange } from "@/components/autopilot/code-change";
-import { WhatChanges } from "@/components/autopilot/what-changes";
-import { useVisitorSeries, type ExperimentActivity } from "@/components/autopilot/experiment-queries";
+import { VersionCaption, WhatChanges } from "@/components/autopilot/what-changes";
+import { useExperimentSummary, useVisitorSeries, type ExperimentActivity } from "@/components/autopilot/experiment-queries";
 import { BuilderMenu, useAccountBuilder } from "@/components/autopilot/builder-menu";
 import { RolloutScheduleDialog } from "@/components/autopilot/rollout-schedule";
 import { Button } from "@/components/ui/button";
-import { BUILDER_NAME, type Builder } from "@/lib/autopilot/builders";
+import { useAccount } from "@/lib/auth/use-account";
+import { type Builder } from "@/lib/autopilot/builders";
 import { canLaunch, launchChecks } from "@/lib/autopilot/launch";
+import { voteTally } from "@/lib/autopilot/preferences";
 import type { RolloutPhase } from "@/lib/autopilot/rollout-plan";
 import { maxExperimentDays } from "@/lib/autopilot/thresholds";
 import { ageLabel } from "@/lib/autopilot/work-sessions";
-import type { ArmResult, Experiment, Learning, Readout, Signal, SuggestionRating } from "@/lib/autopilot/types";
+import type { Activity, ArmResult, ChangeRationale, Experiment, Learning, Readout, Signal, SuggestionRating } from "@/lib/autopilot/types";
+import { initialsFor } from "@/lib/onboarding";
 import { usePresence } from "@/components/workspace/live-sync";
 import { PresenceAvatar } from "@/components/workspace/presence-avatar";
-import { formatLocation, presenceHere } from "@/lib/workspace/live-sync-core";
+import { formatLocation, presenceHere, type PresenceEntry } from "@/lib/workspace/live-sync-core";
 
 const DECISION_VISITORS = 200;
 interface DailyVisitors {
@@ -44,7 +47,8 @@ export function ExperimentDetail({
   onDismissCleanup,
   onStart,
   onDismissSignal,
-  rating,
+  ratings,
+  activity,
   onRated,
   onSaveAdjustments,
 }: {
@@ -66,7 +70,8 @@ export function ExperimentDetail({
   onDismissCleanup: () => void;
   onStart: (builder: Builder) => void;
   onDismissSignal: () => void;
-  rating: SuggestionRating | null;
+  ratings: SuggestionRating[];
+  activity: Activity[];
   onRated: () => void;
   onSaveAdjustments: (adjustments: string) => Promise<void>;
 }) {
@@ -103,9 +108,7 @@ export function ExperimentDetail({
   const accountBuilder = useAccountBuilder();
   const [pickedWriter, setPickedWriter] = useState<Builder | null>(null);
   const writer = pickedWriter ?? accountBuilder;
-  const writtenBy = experiment?.builder ?? experiment?.buildWith ?? null;
   const facts = [
-    ...(writtenBy ? [{ label: "Written by", value: BUILDER_NAME[writtenBy] }] : []),
     ...(experiment?.kind === "fix" ? [{
       label: experiment.status === "rejected" && experiment.rejectedBy === "kismet" ? "Decision" : "Ships",
       value: experiment.status === "rejected" && experiment.rejectedBy === "kismet"
@@ -134,8 +137,6 @@ export function ExperimentDetail({
       onDismissCleanup={onDismissCleanup}
       onStart={() => onStart(writer)}
       onDismissSignal={onDismissSignal}
-      rating={rating}
-      onRated={onRated}
     />
   );
   return (
@@ -155,17 +156,20 @@ export function ExperimentDetail({
               <span>{here[0].name}{here.length === 1 ? " is here too" : ` and ${here.length - 1} ${here.length === 2 ? "other are" : "others are"} here too`}</span>
             </div>
           )}
-          <p className="mt-2 text-xs text-[#6b7280]">
-            {experiment?.kind === "fix" ? "Fix" : experiment?.kind === "change" ? "Change" : experiment ? "A/B Test" : "Suggestion"}
-            {experiment?.mode === "stochastic" ? " · varies each request" : ""} · <span className={status === "Running" || status === "Rolling out" ? "text-[#1f9d55]" : "text-[#374151]"}>{status}</span>
-          </p>
-          {suggested && (
-            <p className="mt-2 inline-flex rounded border border-[#c7d7fe] bg-[#eef4ff] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-brand">
-              Suggested
-            </p>
-          )}
           {experiment && showBuildProgress(experiment) && <BuildProgress experiment={experiment} />}
         </div>
+        <ReviewBar
+          experiment={experiment}
+          signal={signal}
+          status={status}
+          writer={writer}
+          ratings={ratings}
+          activity={activity}
+          presence={presence}
+          onRated={onRated}
+        />
+        <EvidenceStrip signal={signal} rationale={experiment?.rationale ?? null} />
+        {experiment && <ChangeLead experiment={experiment} />}
         {experiment?.status === "building" && experiment.coderSessionId && <BuildLive experimentId={experiment.id} />}
         {!experiment && signal && <BuilderMenu value={writer} onChange={setPickedWriter} />}
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
@@ -227,6 +231,243 @@ export function ExperimentDetail({
         />
       )}
     </div>
+  );
+}
+
+function ChangeLead({ experiment }: { experiment: Experiment }) {
+  const summaryQuery = useExperimentSummary(experiment);
+  const summary = summaryQuery.data?.summary ?? null;
+  if (summary?.kind === "behavior" && hasCodeChange(experiment)) {
+    return (
+      <section className="border-y border-[#e6e8ec] py-3">
+        <h2 className="text-sm font-medium text-[#111827]">Code change</h2>
+        <div className="mt-3"><CodeChange key={experiment.id} experiment={experiment} /></div>
+        <div className="mt-3"><VersionCaption before={summary.before} after={summary.after} /></div>
+      </section>
+    );
+  }
+  return <WhatChanges key={`summary-${experiment.id}`} experiment={experiment} />;
+}
+
+function CodeSection({ experiment }: { experiment: Experiment }) {
+  const summaryQuery = useExperimentSummary(experiment);
+  if (summaryQuery.data?.summary?.kind === "behavior") return null;
+  return <CodeChange key={experiment.id} experiment={experiment} />;
+}
+
+const AGENT_MARK: Record<Builder, string> = {
+  kismet: "/kismet-mark.png",
+  cursor: "/logos/cursor.svg",
+  "claude-code": "/logos/claude.svg",
+};
+
+const AGENT_LABEL: Record<Builder, string> = {
+  kismet: "Kismet",
+  cursor: "Cursor",
+  "claude-code": "Claude Code",
+};
+
+type Credit = { kind: "agent"; builder: Builder } | { kind: "person"; name: string; imageUrl: string };
+
+function ReviewBar({
+  experiment,
+  signal,
+  status,
+  writer,
+  ratings,
+  activity,
+  presence,
+  onRated,
+}: {
+  experiment: Experiment | null;
+  signal: Signal | null;
+  status: string;
+  writer: Builder;
+  ratings: SuggestionRating[];
+  activity: Activity[];
+  presence: PresenceEntry[];
+  onRated: () => void;
+}) {
+  const account = useAccount();
+  const kind = experiment?.kind === "fix" ? "Fix" : experiment?.kind === "change" ? "Change" : experiment ? "A/B Test" : "Suggestion";
+  const live = status === "Running" || status === "Rolling out";
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-4 border-y border-[#d5d8de] py-3">
+      <p className="text-sm font-medium text-[#111827]">
+        {kind}
+        {experiment?.mode === "stochastic" ? <span className="font-normal text-[#6b7280]"> · varies each request</span> : null}
+        <span className={live ? "font-normal text-[#1f9d55]" : "font-normal text-[#6b7280]"}> · {status}</span>
+      </p>
+      <div className="flex items-center gap-3">
+        <div className="space-y-1">
+          <CreditLine label="Written by" credit={{ kind: "agent", builder: experiment?.builder ?? experiment?.buildWith ?? writer }} />
+          <CreditLine label="Suggested by" credit={suggesterCredit(signal, activity, presence, account?.name ?? "", account?.imageUrl ?? "")} />
+        </div>
+        <Votes ratings={ratings} experiment={experiment} signal={signal} onRated={onRated} />
+      </div>
+    </div>
+  );
+}
+
+function suggesterCredit(signal: Signal | null, activity: Activity[], presence: PresenceEntry[], accountName: string, accountImage: string): Credit {
+  const started = signal
+    ? activity.find((item) => item.ref === signal.id && item.kind === "person" && item.message.includes("— by "))
+    : undefined;
+  const name = started?.message.split("— by ").pop()?.trim() ?? "";
+  if (name && name !== "someone") {
+    const watching = presence.find((person) => person.name === name);
+    return { kind: "person", name, imageUrl: watching?.imageUrl || (accountName === name ? accountImage : "") };
+  }
+  return { kind: "agent", builder: "kismet" };
+}
+
+function CreditLine({ label, credit }: { label: string; credit: Credit }) {
+  return (
+    <p className="flex items-center justify-end gap-1.5 text-xs text-[#374151]">
+      <span className="text-[#9aa0a8]">{label}</span>
+      {credit.kind === "agent" ? (
+        <img src={AGENT_MARK[credit.builder]} alt="" className="h-3.5 w-3.5 object-contain" />
+      ) : (
+        <span className="inline-flex h-4 w-4 items-center justify-center overflow-hidden rounded-full bg-[#eef1f4] text-[8px] font-medium text-[#374151]">
+          {credit.imageUrl ? <img src={credit.imageUrl} alt="" className="h-full w-full object-cover" /> : initialsFor(credit.name)}
+        </span>
+      )}
+      <span className="font-medium text-[#111827]">{credit.kind === "agent" ? AGENT_LABEL[credit.builder] : credit.name}</span>
+    </p>
+  );
+}
+
+function Votes({ ratings, experiment, signal, onRated }: {
+  ratings: SuggestionRating[];
+  experiment: Experiment | null;
+  signal: Signal | null;
+  onRated: () => void;
+}) {
+  const account = useAccount();
+  const voterId = account?.id || "local";
+  const targetId = experiment?.id ?? signal?.id ?? "";
+  const targetKind = experiment ? "experiment" : "signal";
+  const fromProps = voteTally(ratings, voterId);
+  const [pending, setPending] = useState<ReturnType<typeof voteTally> | null>(null);
+  const [saving, setSaving] = useState(false);
+  const signature = ratings.map((rating) => `${rating.voterId}:${rating.rating}`).join("|");
+  useEffect(() => { setPending(null); }, [signature]);
+  const view = pending ?? fromProps;
+  if (!targetId) return null;
+
+  async function vote(value: "good" | "not_useful") {
+    setPending(nextTally(view, value));
+    setSaving(true);
+    try {
+      const response = await fetch("/api/autopilot/ratings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetKind, targetId, rating: value }),
+      });
+      if (!response.ok) {
+        setPending(null);
+        return;
+      }
+      const body = (await response.json()) as { rating: SuggestionRating | null; good: number; notUseful: number };
+      setPending({ good: body.good, notUseful: body.notUseful, mine: body.rating?.rating ?? null });
+      onRated();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-1 border-l border-[#e6e8ec] pl-3">
+      <VoteButton label="Like" pressed={view.mine === "good"} count={view.good} disabled={saving} onClick={() => void vote("good")}>
+        <ThumbsUp className="h-3.5 w-3.5" />
+      </VoteButton>
+      <VoteButton label="Dislike" pressed={view.mine === "not_useful"} count={view.notUseful} disabled={saving} onClick={() => void vote("not_useful")}>
+        <ThumbsDown className="h-3.5 w-3.5" />
+      </VoteButton>
+    </div>
+  );
+}
+
+function nextTally(current: { good: number; notUseful: number; mine: "good" | "not_useful" | null }, value: "good" | "not_useful") {
+  if (current.mine === value) {
+    return {
+      good: Math.max(0, current.good - (value === "good" ? 1 : 0)),
+      notUseful: Math.max(0, current.notUseful - (value === "not_useful" ? 1 : 0)),
+      mine: null as "good" | "not_useful" | null,
+    };
+  }
+  let good = current.good;
+  let notUseful = current.notUseful;
+  if (current.mine === "good") good -= 1;
+  if (current.mine === "not_useful") notUseful -= 1;
+  if (value === "good") good += 1;
+  else notUseful += 1;
+  return { good: Math.max(0, good), notUseful: Math.max(0, notUseful), mine: value };
+}
+
+function VoteButton({ label, pressed, count, disabled, onClick, children }: {
+  label: string;
+  pressed: boolean;
+  count: number;
+  disabled: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={pressed}
+      aria-label={label}
+      disabled={disabled}
+      onClick={onClick}
+      className={`inline-flex items-center gap-1 rounded px-1.5 py-1 text-xs ${pressed ? "bg-[#eef4ff] text-brand" : "text-[#6b7280] hover:bg-[#f4f5f7] hover:text-[#111827]"}`}
+    >
+      {children}
+      <span>{count}</span>
+    </button>
+  );
+}
+
+const SOURCE_MARK: Record<string, { src: string }> = {
+  slack: { src: "/connectors/slack-color.svg" },
+  ticket: { src: "/connectors/jira.svg" },
+  analytics: { src: "/connectors/amplitude.png" },
+  interview: { src: "" },
+};
+
+function EvidenceStrip({ signal, rationale }: { signal: Signal | null; rationale: ChangeRationale | null }) {
+  const grouped = new Map<string, string[]>();
+  const add = (source: string, text: string) => {
+    const clipped = text.replace(/\s+/g, " ").trim();
+    if (!clipped) return;
+    const short = clipped.length > 88 ? `${clipped.slice(0, 85)}…` : clipped;
+    const list = grouped.get(source) ?? [];
+    if (list.length >= 2 || list.some((item) => item.toLowerCase() === short.toLowerCase())) return;
+    list.push(short);
+    grouped.set(source, list);
+  };
+  for (const item of signal?.evidence ?? []) add(item.source, item.title || item.body);
+  for (const item of rationale?.evidence ?? []) add(item.source, item.quote);
+  const groups = [...grouped.entries()];
+  if (!groups.length) return null;
+  return (
+    <section>
+      <h2 className="text-[11px] font-medium uppercase tracking-wide text-[#9aa0a8]">Evidence</h2>
+      <div className="mt-1.5 flex flex-wrap gap-x-6 gap-y-1.5">
+        {groups.map(([source, items]) => (
+          <div key={source} className="flex min-w-0 items-start gap-1.5">
+            {SOURCE_MARK[source]?.src ? (
+              <img src={SOURCE_MARK[source].src} alt="" className="mt-0.5 h-3.5 w-3.5 shrink-0 object-contain" />
+            ) : (
+              <UserRound className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#6b7280]" />
+            )}
+            <ul className="min-w-0 text-[11px] leading-4 text-[#374151]">
+              {items.map((text) => <li key={text} className="max-w-xs truncate">• {text}</li>)}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -344,10 +585,9 @@ function MainPanel(props: {
   );
   return (
     <div className="space-y-4">
-      {experiment && hasChange && <WhatChanges key={`summary-${experiment.id}`} experiment={experiment} />}
       {hasResults && experiment?.kind !== "fix" && (experiment?.kind === "change" ? <ChangeFollowUp experiment={experiment} /> : <ResultsCanvas experiment={experiment} {...results} />)}
       {!hasResults && suggested && <NotPublishedYet />}
-      {experiment && hasChange && <CodeChange key={experiment.id} experiment={experiment} />}
+      {experiment && hasChange && <CodeSection experiment={experiment} />}
       {experiment && !hasResults && !suggested && (
         <p className="border-t border-[#e6e8ec] pt-3 text-xs text-[#6b7280]">Results appear here once the experiment is live and counting visitors.</p>
       )}
@@ -372,16 +612,10 @@ function Autonomous({
   const [expanded, setExpanded] = useState(false);
   return (
     <div className="space-y-3 border-t border-[#e6e8ec] pt-3 text-xs">
-      <p className="font-medium text-[#374151]">Why</p>
+      <p className="font-medium text-[#374151]">Notes</p>
       <div className={expanded ? "space-y-3" : "space-y-3 overflow-hidden [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:4]"}>
-      {signal && (
-        <div className="text-[#374151]">
-          <p>
-            {`Suggested from ${signal.evidence.length} ${signal.evidence.length === 1 ? "piece" : "pieces"} of evidence${signal.area ? ` in ${signal.area}` : ""}. ${signal.problem}`}
-          </p>
-          {signal.staleEvidence > 0 && <p className="mt-1">{signal.staleEvidence} older items not counted</p>}
-        </div>
-      )}
+      {signal?.problem && <p className="text-[#374151]">{signal.problem}</p>}
+      {signal && signal.staleEvidence > 0 && <p className="text-[#374151]">{signal.staleEvidence} older items not counted</p>}
       {experiment?.hypothesis && <p>{experiment.hypothesis}</p>}
       {(experiment?.kind === "change" || experiment?.kind === "fix") && experiment.rationale && <ChangeRationaleBlock experiment={experiment} signal={signal} />}
       {experiment?.metric && <p className="text-[#374151]">{experiment.metric}</p>}
@@ -440,12 +674,6 @@ function ChangeRationaleBlock({ experiment, signal }: { experiment: Experiment; 
     <div className="space-y-2 rounded border border-[#dbe7ff] bg-[#f8fbff] p-3 text-[#374151]">
       <p className="font-medium text-[#111827]">{experiment.kind === "fix" ? "Why Kismet thinks this is a bug" : "Why Kismet thinks this helps"}</p>
       <p className="leading-5">{rationale.reasoning}</p>
-      <ul className="space-y-1">
-        {rationale.evidence.map((item, index) => {
-          const author = signal?.evidence.find((evidence) => evidence.source === item.source && `${evidence.title} ${evidence.body}`.toLowerCase().includes(item.quote.toLowerCase().slice(0, 40)))?.author;
-          return <li key={`${item.source}-${index}`}>“{item.quote}” <span className="text-[#6b7280]">— {item.source}{author ? ` · ${author}` : ""}</span></li>;
-        })}
-      </ul>
       <p><span className="font-medium">Confidence: {rationale.confidence === "high" ? "High" : "Medium"}</span> — {rationale.confidenceReason}</p>
       <p><span className="font-medium">What could go wrong:</span> {rationale.risks}</p>
       {rationale.question && (
@@ -475,8 +703,6 @@ function Decisions({
   onDismissCleanup,
   onStart,
   onDismissSignal,
-  rating,
-  onRated,
 }: {
   experiment: Experiment | null;
   signal: Signal | null;
@@ -492,8 +718,6 @@ function Decisions({
   onDismissCleanup: () => void;
   onStart: () => void;
   onDismissSignal: () => void;
-  rating: SuggestionRating | null;
-  onRated: () => void;
 }) {
   const id = experiment?.id ?? signal?.id ?? "";
   return (
@@ -553,62 +777,6 @@ function Decisions({
             </Button>
           </>
         )}
-        {(!experiment || experiment.status === "building" || experiment.status === "awaiting_approval") && signal && (
-          <RatingControls key={experiment?.id ?? signal.id} experiment={experiment} signal={signal} initialRating={rating} onRated={onRated} />
-        )}
-    </div>
-  );
-}
-
-function RatingControls({
-  experiment,
-  signal,
-  initialRating,
-  onRated,
-}: {
-  experiment: Experiment | null;
-  signal: Signal;
-  initialRating: SuggestionRating | null;
-  onRated: () => void;
-}) {
-  const [rating, setRating] = useState(initialRating);
-  const [askingReason, setAskingReason] = useState(false);
-  const [reason, setReason] = useState(initialRating?.rating === "not_useful" ? initialRating.reason ?? "" : "");
-  const [saving, setSaving] = useState(false);
-  async function save(value: "good" | "not_useful") {
-    setSaving(true);
-    try {
-      const response = await fetch("/api/autopilot/ratings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          targetKind: experiment ? "experiment" : "signal",
-          targetId: experiment?.id ?? signal.id,
-          rating: value,
-          ...(value === "not_useful" && reason.trim() ? { reason: reason.trim() } : {}),
-        }),
-      });
-      if (!response.ok) return;
-      const body = (await response.json()) as { rating: SuggestionRating };
-      setRating(body.rating);
-      setAskingReason(false);
-      onRated();
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <div className="flex flex-wrap items-center gap-1.5 border-l border-[#e1e4e8] pl-2">
-      <button type="button" aria-pressed={rating?.rating === "good"} disabled={saving} onClick={() => void save("good")} className={`rounded border px-2 py-1 text-xs ${rating?.rating === "good" ? "border-brand bg-[#eef4ff] text-brand" : "border-[#d5d8de] text-[#374151]"}`}>Good idea</button>
-      <button type="button" aria-pressed={rating?.rating === "not_useful"} disabled={saving} onClick={() => setAskingReason(true)} className={`rounded border px-2 py-1 text-xs ${rating?.rating === "not_useful" ? "border-brand bg-[#eef4ff] text-brand" : "border-[#d5d8de] text-[#374151]"}`}>Not useful</button>
-      {askingReason && (
-        <form className="flex items-center gap-1.5" onSubmit={(event) => { event.preventDefault(); void save("not_useful"); }}>
-          <label className="sr-only" htmlFor="rating-reason">Why is this not useful? (optional)</label>
-          <input id="rating-reason" autoFocus maxLength={200} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Why? (optional)" className="h-7 w-44 rounded border border-[#d5d8de] px-2 text-xs" />
-          <button type="submit" disabled={saving} className="rounded border border-[#d5d8de] px-2 py-1 text-xs">Save</button>
-        </form>
-      )}
     </div>
   );
 }
