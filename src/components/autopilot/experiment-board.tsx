@@ -166,7 +166,7 @@ export function ExperimentBoard({
   const suggested = selection?.kind === "signal" || (openExperiment != null && SUGGESTED_STATUS.has(openExperiment.status));
 
   return (
-    <div className="flex h-full min-h-0 bg-white">
+    <div className="flex h-full min-h-0 flex-col bg-white">
       <ExperimentSessions
         experiments={state.experiments}
         selectedId={selection?.kind === "experiment" ? selection.id : null}
@@ -176,7 +176,7 @@ export function ExperimentBoard({
         onStop={(experiment) => onAct(experiment, "cancel")}
         onRun={onRun}
       />
-      <div className="min-w-0 flex-1 overflow-hidden">
+      <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
         {open ? (
           <ExperimentDetail
             experiment={openExperiment}

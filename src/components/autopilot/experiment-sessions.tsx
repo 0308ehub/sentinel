@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Clock, ListFilter, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Plus, Trash2 } from "lucide-react";
+import { ListFilter, MoreHorizontal, PanelTopClose, PanelTopOpen, Plus, Trash2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,6 +57,12 @@ const TONE: Record<WorkTone, string> = {
   muted: "text-[#6b7280]",
 };
 
+const DOT: Record<WorkTone, string> = {
+  green: "bg-[#1f8a4c]",
+  orange: "bg-[#e08a32]",
+  muted: "bg-[#9aa0a8]",
+};
+
 export function ExperimentSessions({
   experiments,
   selectedId,
@@ -102,89 +108,85 @@ export function ExperimentSessions({
 
   if (collapsed) {
     return (
-      <aside className="flex w-11 shrink-0 flex-col items-center gap-1 border-r border-[#e7e7e7] bg-white pt-3">
+      <div className="flex shrink-0 items-center gap-2 border-b border-[#e7e7e7] bg-white px-3 py-1.5">
         <IconButton label="Show sessions" onClick={() => writeCollapsed(false)}>
-          <PanelLeftOpen className="h-4 w-4" />
+          <PanelTopOpen className="h-4 w-4" />
         </IconButton>
+        <span className="text-[13px] font-medium text-[#2c2c2c]">Sessions</span>
         {needsReview > 0 && (
           <span className="rounded-full bg-[#fdf1e4] px-1.5 text-[11px] font-medium text-[#e08a32]" title={`${needsReview} need review`}>
             {needsReview}
           </span>
         )}
-      </aside>
+      </div>
     );
   }
 
   return (
-    <aside className="flex w-[300px] shrink-0 flex-col border-r border-[#e7e7e7] bg-white">
-      <div className="flex items-center gap-1 px-3 pb-1 pt-3">
-        <h2 className="mr-auto text-[15px] font-medium tracking-tight text-[#2c2c2c]">Sessions</h2>
-        <IconButton label="New experiment" onClick={onCreate}>
-          <Plus className="h-4 w-4" />
-        </IconButton>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              aria-label="Filter sessions"
-              className={cn(
-                "rounded-md p-1.5 hover:bg-[#f3f3f4]",
-                filter === "active" ? "text-[#6b7280]" : "text-[#1c1c1c]",
-              )}
-            >
-              <ListFilter className="h-4 w-4" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {FILTERS.map((item) => (
-              <DropdownMenuItem key={item.id} onClick={() => setFilter(item.id)}>
-                <span className={filter === item.id ? "font-medium" : ""}>{item.label}</span>
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button type="button" aria-label="Session actions" className="rounded-md p-1.5 text-[#6b7280] hover:bg-[#f3f3f4]">
-              <MoreHorizontal className="h-4 w-4" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem disabled={running} onClick={onRun}>
-              Check for suggestions
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <IconButton label="Hide sessions" onClick={() => writeCollapsed(true)}>
-          <PanelLeftClose className="h-4 w-4" />
-        </IconButton>
-      </div>
-      <div className="min-h-0 flex-1 overflow-auto px-1.5 pb-3">
+    <div className="flex shrink-0 items-center gap-1 border-b border-[#e7e7e7] bg-white px-3">
+      <h2 className="shrink-0 pr-2 text-[14px] font-medium tracking-tight text-[#2c2c2c]">Sessions</h2>
+      <div role="tablist" aria-label="Sessions" className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto py-2 [scrollbar-width:none]">
         {rows.length === 0 ? (
-          <p className="px-2 py-6 text-[13px] leading-5 text-[#8b919a]">
+          <p className="truncate px-1 py-1 text-[13px] text-[#8b919a]">
             {filter === "active"
               ? "Sessions show up here while Kismet is writing an experiment, and when a pull request is ready for you."
               : "Nothing in this filter."}
           </p>
         ) : (
-          <ul>
-            {rows.map(({ experiment, session }) => (
-              <li key={session.id}>
-                <SessionRow
-                  session={session}
-                  selected={session.id === selectedId}
-                  onPrefetch={() => { void prefetchExperiment(queryClient, experiment); }}
-                  onOpen={() => onOpen(session.id)}
-                  onStop={() => {
-                    if (window.confirm(`Stop “${experiment.title}” and remove the unmerged change?`)) onStop(experiment);
-                  }}
-                />
-              </li>
-            ))}
-          </ul>
+          rows.map(({ experiment, session }) => (
+            <SessionTab
+              key={session.id}
+              session={session}
+              selected={session.id === selectedId}
+              onPrefetch={() => { void prefetchExperiment(queryClient, experiment); }}
+              onOpen={() => onOpen(session.id)}
+              onStop={() => {
+                if (window.confirm(`Stop “${experiment.title}” and remove the unmerged change?`)) onStop(experiment);
+              }}
+            />
+          ))
         )}
       </div>
-    </aside>
+      <IconButton label="New experiment" onClick={onCreate}>
+        <Plus className="h-4 w-4" />
+      </IconButton>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            aria-label="Filter sessions"
+            className={cn(
+              "rounded-md p-1.5 hover:bg-[#f3f3f4]",
+              filter === "active" ? "text-[#6b7280]" : "text-[#1c1c1c]",
+            )}
+          >
+            <ListFilter className="h-4 w-4" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {FILTERS.map((item) => (
+            <DropdownMenuItem key={item.id} onClick={() => setFilter(item.id)}>
+              <span className={filter === item.id ? "font-medium" : ""}>{item.label}</span>
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button type="button" aria-label="Session actions" className="rounded-md p-1.5 text-[#6b7280] hover:bg-[#f3f3f4]">
+            <MoreHorizontal className="h-4 w-4" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem disabled={running} onClick={onRun}>
+            Check for suggestions
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <IconButton label="Hide sessions" onClick={() => writeCollapsed(true)}>
+        <PanelTopClose className="h-4 w-4" />
+      </IconButton>
+    </div>
   );
 }
 
@@ -196,7 +198,7 @@ function matches(filter: SessionFilter, session: WorkSession): boolean {
   return session.bucket !== "quiet";
 }
 
-function SessionRow({
+function SessionTab({
   session,
   selected,
   onOpen,
@@ -214,20 +216,30 @@ function SessionRow({
       onPointerEnter={onPrefetch}
       onFocus={onPrefetch}
       className={cn(
-        "group flex items-start gap-2.5 rounded-md px-2 py-1.5",
-        selected ? "bg-[#f2f2f4]" : "hover:bg-[#f7f7f8]",
+        "group relative flex max-w-[280px] shrink-0 items-center rounded-full border transition-colors",
+        selected ? "border-[#dcdce0] bg-[#f2f2f4]" : "border-[#ececef] hover:bg-[#f7f7f8]",
       )}
     >
-      <button type="button" onClick={onOpen} title={session.hint} className="flex min-w-0 flex-1 items-start gap-2.5 text-left">
-        <StatusMark mark={session.mark} />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[13.5px] leading-5 text-[#1c1c1c]">{session.title}</span>
-          <span className="mt-0.5 flex items-center gap-1.5 text-[12px] leading-4 text-[#8b919a]">
-            {session.line ? <span className={TONE[session.line.tone]}>{session.line.text}</span> : <span>{session.age}</span>}
-            {session.pulls > 0 && <Count color="#1f8a4c" count={session.pulls} label={`${session.pulls} pull ${session.pulls === 1 ? "request" : "requests"}`} />}
-            {session.followUps > 0 && <Count color="#7c5cbf" count={session.followUps} label={`${session.followUps} follow-up pull ${session.followUps === 1 ? "request" : "requests"}`} />}
-            {session.clock && <Clock className="h-3 w-3 text-[#9aa0a8]" aria-hidden />}
-          </span>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={selected}
+        onClick={onOpen}
+        title={session.hint}
+        className={cn("flex min-w-0 items-center gap-2 py-1 pl-3 text-left", session.canStop ? "pr-1" : "pr-3")}
+      >
+        <span className="truncate text-[13px] leading-5 text-[#1c1c1c]">{session.title}</span>
+        <span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[12px] leading-4 text-[#8b919a]">
+          <span
+            className={cn(
+              "h-1.5 w-1.5 shrink-0 rounded-full",
+              DOT[session.line?.tone ?? "muted"],
+              session.mark === "dashed" && "animate-pulse",
+            )}
+          />
+          {session.line ? <span className={TONE[session.line.tone]}>{session.line.text}</span> : <span>{session.age}</span>}
+          {session.pulls > 0 && <Count color="#1f8a4c" count={session.pulls} label={`${session.pulls} pull ${session.pulls === 1 ? "request" : "requests"}`} />}
+          {session.followUps > 0 && <Count color="#7c5cbf" count={session.followUps} label={`${session.followUps} follow-up pull ${session.followUps === 1 ? "request" : "requests"}`} />}
         </span>
       </button>
       {session.canStop && (
@@ -236,21 +248,16 @@ function SessionRow({
           aria-label={`Stop ${session.title}`}
           onClick={onStop}
           className={cn(
-            "mt-1 shrink-0 rounded p-0.5 text-[#8b919a] hover:bg-white hover:text-[#1c1c1c]",
+            "mr-1.5 shrink-0 rounded-full p-0.5 text-[#8b919a] hover:bg-white hover:text-[#1c1c1c]",
             selected ? "opacity-100" : "opacity-0 group-hover:opacity-100",
           )}
         >
           <Trash2 className="h-3.5 w-3.5" />
         </button>
       )}
+      {selected && <span aria-hidden className="absolute inset-x-3 -bottom-2 h-0.5 rounded-full bg-[#1c1c1c]" />}
     </div>
   );
-}
-
-function StatusMark({ mark }: { mark: WorkSession["mark"] }) {
-  if (mark === "blue") return <span className="mt-[7px] h-2 w-2 shrink-0 rounded-full bg-[#3b82f6]" />;
-  if (mark === "dashed") return <span className="mt-1 h-3.5 w-3.5 shrink-0 rounded-full border-[1.5px] border-dashed border-[#c5c8ce]" />;
-  return <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#c5c8ce]" />;
 }
 
 function Count({ color, count, label }: { color: string; count: number; label: string }) {
