@@ -4,7 +4,8 @@ import { approve, reject } from "@/lib/autopilot/lifecycle";
 import { withAutopilotUser } from "@/lib/autopilot/scope";
 import { getExperiment, listSignals, log } from "@/lib/autopilot/store";
 import type { Experiment, Signal } from "@/lib/autopilot/types";
-import { getConnection, listUsersForSlackTeam } from "@/lib/connections/store";
+import { getConnection } from "@/lib/connections/store";
+import { slackTeamAccount } from "@/lib/connections/ownership";
 import { GitHubApiError } from "@/lib/github/client";
 import { handledActionBlocks, parseActionPayload, startedActionBlocks, type SlackActionPayload } from "@/lib/slack/actions-core";
 import { verifySlackSignature } from "@/lib/slack/events-core";
@@ -55,7 +56,8 @@ function readableError(error: unknown): string {
 }
 
 async function accountMatches(payload: SlackActionPayload): Promise<AccountMatch[]> {
-  const userIds = await listUsersForSlackTeam(payload.teamId);
+  const account = await slackTeamAccount(payload.teamId);
+  const userIds = account ? [account] : [];
   const matches: AccountMatch[] = [];
   for (const userId of userIds) {
     const [connection, experiment] = await Promise.all([
@@ -73,7 +75,8 @@ async function accountMatches(payload: SlackActionPayload): Promise<AccountMatch
 }
 
 async function signalAccountMatches(payload: SlackActionPayload): Promise<AccountMatch[]> {
-  const userIds = await listUsersForSlackTeam(payload.teamId);
+  const account = await slackTeamAccount(payload.teamId);
+  const userIds = account ? [account] : [];
   return Promise.all(userIds.map(async (userId) => {
     const signals = await withAutopilotUser(userId, () => listSignals());
     return { userId, signal: signals.find((signal) => signal.id === payload.experimentId) };

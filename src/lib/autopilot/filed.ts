@@ -3,6 +3,7 @@ import "server-only";
 import { addEvidence, knownEvidenceUrls, log, type NewEvidence } from "@/lib/autopilot/store";
 import { evidenceFromGraph, type FiledEvidence } from "@/lib/autopilot/workspace-evidence";
 import { actingUserId } from "@/lib/connections/current";
+import { slackActiveForAccount } from "@/lib/connections/ownership";
 import { listRecentIssues } from "@/lib/jira/client";
 import { listBotChannels, listRecentMessages, SlackApiError } from "@/lib/slack/client";
 import { isPersonMessage, slackMessageEvidence } from "@/lib/slack/events-core";
@@ -54,6 +55,7 @@ function slackReadFailure(error: unknown): string | null {
  */
 async function slackEvidence(): Promise<FiledEvidence[]> {
   try {
+    if (!(await slackActiveForAccount())) return [];
     const channels = [...(await listBotChannels())].sort((a, b) => a.id.localeCompare(b.id));
     if (!channels.length) return [];
     const channel = channels[Math.floor(Date.now() / 3_600_000) % channels.length];

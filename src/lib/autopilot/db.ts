@@ -265,8 +265,10 @@ end $$;
 create table if not exists kismet.autopilot_repo (
   user_id text primary key,
   repo text not null,
+  created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+alter table kismet.autopilot_repo add column if not exists created_at timestamptz not null default now();
 
 -- Which coding agent writes an account's experiments. No row means Kismet's own.
 create table if not exists kismet.autopilot_builder (

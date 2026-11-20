@@ -1,7 +1,7 @@
 import "server-only";
 
 import { autopilotConfigured } from "@/lib/autopilot/db";
-import { autopilotDryRun, NO_REPO_MESSAGE } from "@/lib/autopilot/repo";
+import { autopilotDryRun, chosenAutopilotRepoReason, NO_REPO_MESSAGE } from "@/lib/autopilot/repo";
 import { withAutopilotUser } from "@/lib/autopilot/scope";
 import { currentUserId } from "@/lib/connections/current";
 import { isLocalSource, sourceLabel } from "@/lib/autopilot/source";
@@ -101,7 +101,7 @@ async function runScopedTick(): Promise<TickResult> {
 
     // Steps that touch code need a repository; an account that has not chosen one stops at noticing.
     if (!(await sourceLabel())) {
-      await step("repo", result, async () => NO_REPO_MESSAGE);
+      await step("repo", result, async () => (await chosenAutopilotRepoReason()) ?? NO_REPO_MESSAGE);
       await step("learn", result, learnFromFinished);
     } else {
       // After the gate: follow PRs, measure live experiments, and act on results.

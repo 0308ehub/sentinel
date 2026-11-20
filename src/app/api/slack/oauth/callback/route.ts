@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { currentUserId } from "@/lib/connections/current";
 import { saveConnection } from "@/lib/connections/store";
+import { canConnectSlackTeam } from "@/lib/connections/ownership";
 import { validOAuthReturnPath } from "@/lib/slack/oauth-return";
 
 interface SlackOAuthResponse {
@@ -60,12 +61,15 @@ export async function GET(request: Request) {
     });
     const result = (await response.json()) as SlackOAuthResponse;
     if (!result.ok || !result.access_token) return finish(result.error || "connect_failed");
+    const teamId = result.team?.id;
+    if (!teamId) return finish("connect_failed");
+    if (!(await canConnectSlackTeam(userId, teamId))) return finish("slack_team_taken");
     await saveConnection(
       userId,
       "slack",
       { botToken: result.access_token },
       {
-        teamId: result.team?.id,
+        teamId,
         teamName: result.team?.name,
         botUserId: result.bot_user_id,
         installerUserId: result.authed_user?.id,

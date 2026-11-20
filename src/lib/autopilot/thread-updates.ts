@@ -7,6 +7,7 @@ import { listExperiments, listSignals, log } from "@/lib/autopilot/store";
 import { siteUrl } from "@/lib/site";
 import { reviewActionBlocks, tryActionBlocks } from "@/lib/slack/actions-core";
 import { postSlackBlocks, postSlackMessage, SlackApiError } from "@/lib/slack/client";
+import { slackActiveForAccount } from "@/lib/connections/ownership";
 
 // Retrying these never helps: the thread or channel is gone, or the bot is no longer in it.
 const FINAL_SLACK_ERRORS = new Set(["not_in_channel", "channel_not_found", "thread_not_found", "message_not_found", "is_archived", "cant_reply"]);
@@ -30,6 +31,7 @@ function recentMergedFix(experiment: Experiment | undefined, now: number): boole
 
 /** Posts newly reached state-derived updates to the Slack threads that reported each signal. */
 export async function postThreadUpdates(): Promise<number> {
+  if (!(await slackActiveForAccount())) return 0;
   const [signals, experiments] = await Promise.all([listSignals(), listExperiments()]);
   const updates = threadUpdates({ signals, experiments, appUrl: siteUrl(), now: new Date() });
   const firstCall = await claim("thread_updates_baseline");

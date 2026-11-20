@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 interface LiveState {
   connected: boolean;
   label?: string;
+  ownedElsewhere?: boolean;
 }
 
 type LiveProvider = NonNullable<ConnectorDefinition["live"]>;
@@ -39,7 +40,11 @@ async function fetchLiveState(provider: LiveProvider): Promise<LiveState> {
     const body = await responseJson(response);
     const connected = Boolean(body.connected);
     if (provider === "github") return { connected, label: connected ? textValue(body.login) : textValue(body.hint) };
-    if (provider === "slack") return { connected, label: connected ? textValue(body.team) : textValue(body.error) };
+    if (provider === "slack") return {
+      connected,
+      label: connected ? textValue(body.team) : textValue(body.error),
+      ownedElsewhere: Boolean(body.ownedElsewhere),
+    };
     if (provider === "jira") return { connected, label: connected ? textValue(body.siteName) : textValue(body.error) };
     if (provider === "databricks") {
       return { connected, label: connected ? textValue(body.warehouseName) || textValue(body.host) : textValue(body.error) };
@@ -424,6 +429,11 @@ function ConnectorForm({
       {live?.connected && (
         <p className="text-xs text-muted-foreground">The workspace is already connected{live.label ? ` · ${live.label}` : ""}.</p>
       )}
+      {isSlack && live?.ownedElsewhere && (
+        <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          Another Kismet account owns this Slack workspace, so Kismet doesn&apos;t read or post here for you.
+        </p>
+      )}
       {appFirst && (
         <div className="space-y-2">
           <Button type="button" size="sm" disabled={waiting} onClick={installGitHubApp}>
@@ -442,7 +452,7 @@ function ConnectorForm({
       {slackFirst && (
         <div className="space-y-2">
           <Button asChild size="sm">
-            <a href="/api/slack/oauth/start?return=/settings/connectors">Add to Slack</a>
+            <a href="/api/slack/oauth/start?return=/settings/connectors/slack">Add to Slack</a>
           </Button>
           <p className="text-xs text-muted-foreground">
             Slack asks which workspace to add Kismet to. Then invite the Kismet bot to the channels it should read.

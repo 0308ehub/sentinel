@@ -2,6 +2,7 @@ import "server-only";
 
 import { actingUserId } from "@/lib/connections/current";
 import { getConnection } from "@/lib/connections/store";
+import { slackTeamOwner } from "@/lib/connections/ownership";
 import type { SlackChannel, SlackMessage, SlackStatus } from "@/lib/slack/types";
 
 const SLACK_API = "https://slack.com/api";
@@ -127,6 +128,7 @@ export async function getBotUserId(): Promise<string> {
 }
 
 export async function getSlackStatus(): Promise<SlackStatus> {
+  const userId = await actingUserId();
   let token: string;
   try {
     token = await getToken();
@@ -143,7 +145,17 @@ export async function getSlackStatus(): Promise<SlackStatus> {
   );
   if (auth.url) teamUrlCache.set(token, auth.url);
   if (auth.user_id) botUserIdCache.set(token, auth.user_id);
-  return { connected: true, team: auth.team, teamName: auth.team, teamUrl: auth.url, botName: auth.user };
+  const connection = userId ? await getConnection(userId, "slack") : null;
+  const teamId = connection?.meta.teamId;
+  const owner = typeof teamId === "string" && teamId ? await slackTeamOwner(teamId) : null;
+  return {
+    connected: true,
+    ownedElsewhere: Boolean(userId && owner && owner !== userId),
+    team: auth.team,
+    teamName: auth.team,
+    teamUrl: auth.url,
+    botName: auth.user,
+  };
 }
 
 async function postSlack<T extends SlackResponse>(method: string, body: Record<string, unknown>): Promise<T> {

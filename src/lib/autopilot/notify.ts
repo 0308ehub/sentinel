@@ -6,6 +6,7 @@ import { autopilotUser } from "@/lib/autopilot/scope";
 import { listExperiments } from "@/lib/autopilot/store";
 import { siteUrl } from "@/lib/site";
 import { postSlackBlocks, postSlackMessage, SlackApiError } from "@/lib/slack/client";
+import { slackActiveForAccount } from "@/lib/connections/ownership";
 
 export interface NotifyPrefs {
   enabled: boolean;
@@ -107,6 +108,7 @@ export async function release(eventKey: string): Promise<void> {
 }
 
 export async function postAccountAlert(eventKey: string, text: string): Promise<boolean> {
+  if (!(await slackActiveForAccount())) return false;
   const prefs = await getNotifyPrefs();
   if (!prefs.enabled || !prefs.channelId || !(await claim(eventKey))) return false;
   try {
@@ -127,6 +129,7 @@ async function finish(eventKey: string, slackTs: string): Promise<void> {
 }
 
 export async function notifySlack(): Promise<string | null> {
+  if (!(await slackActiveForAccount())) return null;
   const { postThreadUpdates } = await import("@/lib/autopilot/thread-updates");
   const reporterPosted = await postThreadUpdates();
   const experiments = await listExperiments();

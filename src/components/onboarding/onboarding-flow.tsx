@@ -15,6 +15,7 @@ import {
 import { SIGN_IN_DESTINATION, isExistingAccount } from "@/lib/auth/destinations";
 import { useAccount } from "@/lib/auth/use-account";
 import { cn } from "@/lib/utils";
+import { slackOAuthErrorMessage } from "@/lib/slack/oauth-return";
 import { openGitHubInstall, type GitHubInstallStatus } from "@/components/settings/github-connect";
 import {
   GitHubImportList,
@@ -490,7 +491,7 @@ function SlackOption({
           <ConnectButton busy={busy} disabled={!token.trim()} onClick={() => void connect()}>Connect Slack</ConnectButton>
         </>
       )}
-      {oauthError ? <p role="alert" className="mt-2 text-sm text-red-600">Slack could not connect ({oauthError}).</p> : null}
+      {oauthError ? <p role="alert" className="mt-2 text-sm text-red-600">{slackOAuthErrorMessage(oauthError)}</p> : null}
       {error ? <p role="alert" className="mt-2 text-sm text-red-600">{error}</p> : null}
     </EvidenceCard>
   );

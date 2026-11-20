@@ -44,12 +44,9 @@ export async function listConnectionUsers(provider: Provider): Promise<string[]>
 }
 
 export async function listUsersForSlackTeam(teamId: string): Promise<string[]> {
-  const sql = await db();
-  const rows = await sql<{ user_id: string }[]>`
-    select user_id from kismet.connections
-    where provider = 'slack' and meta ->> 'teamId' = ${teamId}
-  `;
-  return rows.map((row) => row.user_id);
+  const { slackTeamAccount } = await import("@/lib/connections/ownership");
+  const owner = await slackTeamAccount(teamId);
+  return owner ? [owner] : [];
 }
 
 export async function deleteConnection(userId: string, provider: Provider): Promise<void> {

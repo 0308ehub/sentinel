@@ -4,6 +4,7 @@ import type postgres from "postgres";
 import { askForJson, readJson } from "@/lib/ai/respond";
 import { db } from "@/lib/autopilot/db";
 import { currentUserId } from "@/lib/connections/current";
+import { slackActiveForAccount } from "@/lib/connections/ownership";
 import { assignJiraIssue, createFeatureIssue, findJiraAccount, JiraApiError } from "@/lib/jira/client";
 import {
   getBotUserId,
@@ -85,6 +86,7 @@ async function mentionUserId(): Promise<string> {
 
 export async function pollSlackMentions(): Promise<SlackInboxItem[]> {
   const userId = await mentionUserId();
+  if (!(await slackActiveForAccount(userId))) return [];
   let active = scanning.get(userId);
   if (!active) {
     active = scan(userId).finally(() => {

@@ -22,6 +22,7 @@ import { useUIStore } from "@/stores/ui-store";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import type { SlackApiErrorBody, SlackChannel, SlackMessage, SlackStatus } from "@/lib/slack/types";
 import { SlackNotifyCard } from "@/components/settings/slack-notify-card";
+import { slackOAuthErrorMessage } from "@/lib/slack/oauth-return";
 
 const CHANNEL_STORAGE_KEY = "kismet-slack-channel";
 const REFRESH_INTERVAL_MS = 60_000;
@@ -61,6 +62,7 @@ export function SlackChannelView({ oauthError }: { oauthError?: string }) {
       if (cancelled) return;
       setStatus(s);
       if (!s.connected) return;
+      if (s.ownedElsewhere) return;
 
       try {
         const { channels } = await getJson<{ channels: SlackChannel[] }>("/api/slack/channels");
@@ -149,7 +151,7 @@ export function SlackChannelView({ oauthError }: { oauthError?: string }) {
 
       {oauthError && (
         <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-          {oauthError === "not_configured" ? "Slack sign-in isn't set up on this server yet." : oauthError}
+          {slackOAuthErrorMessage(oauthError)}
         </div>
       )}
 
@@ -162,6 +164,11 @@ export function SlackChannelView({ oauthError }: { oauthError?: string }) {
         <SetupCard error={status.error?.startsWith("Connect Slack in Settings") ? undefined : status.error} />
       ) : (
         <div className="space-y-4">
+          {status.ownedElsewhere && (
+            <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              Another Kismet account owns this Slack workspace, so Kismet doesn&apos;t read or post here for you.
+            </div>
+          )}
           <Card>
             <CardContent className="flex flex-wrap items-center gap-3 p-4">
               <Badge variant="success">Connected</Badge>
@@ -208,7 +215,7 @@ export function SlackChannelView({ oauthError }: { oauthError?: string }) {
             </CardContent>
           </Card>
 
-          {channels && channels.length === 0 && (
+          {!status.ownedElsewhere && channels && channels.length === 0 && (
             <Card>
               <CardContent className="p-4 text-sm text-muted-foreground">
                 The bot isn&apos;t in any channels yet. In Slack, open the channel you want and type{" "}
@@ -220,7 +227,7 @@ export function SlackChannelView({ oauthError }: { oauthError?: string }) {
             </Card>
           )}
 
-          {channels && <SlackNotifyCard channels={channels} />}
+          {!status.ownedElsewhere && channels && <SlackNotifyCard channels={channels} />}
 
           {error && (
             <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">

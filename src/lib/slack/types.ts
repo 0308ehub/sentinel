@@ -1,5 +1,6 @@
 export interface SlackStatus {
   connected: boolean;
+  ownedElsewhere?: boolean;
   team?: string;
   teamName?: string;
   teamUrl?: string;

@@ -71,12 +71,13 @@ export function GitHubView() {
           namespaces?: GitHubImportNamespace[];
           hint?: string;
         };
-        const targetBody = (await targetRes.json()) as { repo?: string };
+        const targetBody = (await targetRes.json()) as { repo?: string; reason?: string };
         if (!cancelled) {
           if (!reposRes.ok) setHint(reposBody.hint || "Could not list repositories.");
           else setRepos(reposBody.repos ?? []);
           setNamespaces(reposBody.namespaces ?? []);
           if (targetRes.ok && targetBody.repo) setTarget(targetBody.repo);
+          if (targetRes.ok && targetBody.reason) setHint(targetBody.reason);
         }
       })
       .catch(() => {
@@ -117,7 +118,8 @@ export function GitHubView() {
     });
     if (!res.ok) {
       setTarget(previous);
-      setHint("Could not save the repository Kismet ships to.");
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      setHint(body.error || "Could not save the repository Kismet ships to.");
     }
   }
 

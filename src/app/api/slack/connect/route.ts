@@ -1,6 +1,7 @@
 import { currentUserId } from "@/lib/connections/current";
 import { connectErrorMessage } from "@/lib/connections/errors";
 import { saveConnection } from "@/lib/connections/store";
+import { canConnectSlackTeam, SLACK_TEAM_TAKEN_MESSAGE } from "@/lib/connections/ownership";
 import { validateSlackToken } from "@/lib/slack/client";
 
 export async function POST(request: Request) {
@@ -13,6 +14,8 @@ export async function POST(request: Request) {
     if (!token.startsWith("xoxb-")) throw new Error("Enter a Slack bot token beginning with xoxb-.");
 
     const meta = await validateSlackToken(token);
+    if (!meta.teamId) throw new Error("Slack did not identify that workspace.");
+    if (!(await canConnectSlackTeam(userId, meta.teamId))) throw new Error(SLACK_TEAM_TAKEN_MESSAGE);
     await saveConnection(userId, "slack", { botToken: token }, meta);
     return Response.json({ connected: true, team: meta.teamName });
   } catch (error) {

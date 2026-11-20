@@ -6,7 +6,7 @@ import { addEvidence, knownEvidenceUrls, lastRunAt, log } from "@/lib/autopilot/
 import { listSignals } from "@/lib/autopilot/store";
 import { withAutopilotUser } from "@/lib/autopilot/scope";
 import { tickTriggerDue } from "@/lib/autopilot/tick-trigger-core";
-import { listUsersForSlackTeam } from "@/lib/connections/store";
+import { slackTeamAccount } from "@/lib/connections/ownership";
 import { postSlackMessage, slackChannelName } from "@/lib/slack/client";
 import { messageEvidence, tryReply, verifySlackSignature, type SlackTryReply } from "@/lib/slack/events-core";
 import { startSignalFromSlack } from "@/lib/slack/start-signal";
@@ -68,10 +68,10 @@ async function startTryReplyForUser(
 
 async function fileSlackEvent(teamId: string, event: SlackEnvelope["event"]): Promise<void> {
   try {
-    const userIds = await listUsersForSlackTeam(teamId);
+    const account = await slackTeamAccount(teamId);
+    const userIds = account ? [account] : [];
     const reply = tryReply(event);
     if (reply) {
-      // Several Kismet accounts can share a Slack workspace; one "yes" starts the idea in one account only.
       const threadKey = `slack_try:${reply.channel}:${reply.threadTs}`;
       if (!(await claimShared(threadKey))) return;
       let started = false;
