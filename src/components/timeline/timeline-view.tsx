@@ -60,7 +60,8 @@ export function TimelineView() {
 
   const rows = useMemo(() => {
     return experiments
-      .filter((experiment) => kind === "all" || experiment.kind === kind)
+      // Experiments are stored as kind "test" or "change"; everything that isn't a quick fix is an experiment.
+      .filter((experiment) => kind === "all" || (kind === "fix" ? experiment.kind === "fix" : experiment.kind !== "fix"))
       .filter((experiment) => page === "all" || experiment.page === page)
       .map((experiment) => ({ experiment, span: barSpan(experiment, rangeStart, totalDays) }))
       .filter((row): row is { experiment: Experiment; span: BarSpan } => row.span != null)
