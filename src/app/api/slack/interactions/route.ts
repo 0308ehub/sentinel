@@ -10,13 +10,14 @@ import { GitHubApiError } from "@/lib/github/client";
 import { handledActionBlocks, parseActionPayload, startedActionBlocks, type SlackActionPayload } from "@/lib/slack/actions-core";
 import { verifySlackSignature } from "@/lib/slack/events-core";
 import { startSignalFromSlack } from "@/lib/slack/start-signal";
+import { canApproveFromSlack, slackApprovalDenialMessage } from "@/lib/slack/approvers-core";
+import { eligibleApprovers, slackUserEmail } from "@/lib/slack/approvers";
 
 const ACTIONS = new Set(["kismet_approve", "kismet_decline", "kismet_try"]);
-const RECONNECT_MESSAGE = "To approve from Slack, reconnect Slack in Kismet (Settings → Connectors → Slack) once.";
-
 interface AccountMatch {
   userId: string;
   installerUserId?: string;
+  botToken?: string;
   experiment?: Experiment;
   signal?: Signal;
 }
@@ -65,9 +66,11 @@ async function accountMatches(payload: SlackActionPayload): Promise<AccountMatch
       withAutopilotUser(userId, () => getExperiment(payload.experimentId)),
     ]);
     const installer = connection?.meta.installerUserId;
+    const token = connection?.secret as { botToken?: unknown } | undefined;
     matches.push({
       userId,
       installerUserId: typeof installer === "string" && installer ? installer : undefined,
+      botToken: typeof token?.botToken === "string" ? token.botToken.trim() : undefined,
       experiment: experiment ?? undefined,
     });
   }
@@ -111,29 +114,44 @@ async function handleAction(payload: SlackActionPayload, originalText: string): 
   try {
     const accounts = await accountMatches(payload);
     const owner = accounts.find((account) => account.experiment);
-    const authorized = accounts.find(
-      (account) => account.experiment && account.installerUserId === payload.slackUserId,
-    );
-    if (!authorized?.experiment) {
-      const text = owner?.installerUserId
-        ? `Only <@${owner.installerUserId}> can approve from Slack.`
-        : RECONNECT_MESSAGE;
-      await ephemeral(payload, text);
+    if (!owner?.experiment) {
+      await ephemeral(payload, accounts.length
+        ? "Kismet can't find this experiment anymore."
+        : slackApprovalDenialMessage(null, undefined));
       return;
     }
-    if (authorized.experiment.status !== "awaiting_approval") {
+    let slackEmail: string | null = null;
+    let admins: Awaited<ReturnType<typeof eligibleApprovers>> = [];
+    if (owner.installerUserId !== payload.slackUserId) {
+      [slackEmail, admins] = await Promise.all([
+        owner.botToken ? slackUserEmail(payload.slackUserId, owner.botToken) : Promise.resolve(null),
+        eligibleApprovers(owner.userId),
+      ]);
+    }
+    const authorized = canApproveFromSlack({
+      slackUserId: payload.slackUserId,
+      installerUserId: owner.installerUserId,
+      slackEmail,
+      accountId: owner.userId,
+      admins,
+    });
+    if (!authorized) {
+      await ephemeral(payload, slackApprovalDenialMessage(slackEmail, owner.installerUserId));
+      return;
+    }
+    if (owner.experiment.status !== "awaiting_approval") {
       await ephemeral(payload, "This was already handled in Kismet.");
       return;
     }
 
     const action = payload.actionId === "kismet_approve" ? "approved" : "declined";
-    await withAutopilotUser(authorized.userId, async () => {
-      if (action === "approved") await approve(authorized.experiment!);
-      else await reject(authorized.experiment!);
+    await withAutopilotUser(owner.userId, async () => {
+      if (action === "approved") await approve(owner.experiment!);
+      else await reject(owner.experiment!);
       await log(
         "build",
-        `${action === "approved" ? "Approved" : "Declined"} “${authorized.experiment!.title}” from Slack.`,
-        authorized.experiment!.id,
+        `${action === "approved" ? "Approved" : "Declined"} “${owner.experiment!.title}” from Slack.`,
+        owner.experiment!.id,
       );
     });
     await respond(payload.responseUrl, {

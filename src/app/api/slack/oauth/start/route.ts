@@ -9,6 +9,7 @@ const SCOPES = [
   "groups:read",
   "groups:history",
   "users:read",
+  "users:read.email",
   "chat:write",
 ].join(",");
 

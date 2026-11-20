@@ -12,6 +12,11 @@ export function PrivacySettingsView() {
   const settings = useWorkspaceSettings();
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
+  const [clearing, setClearing] = useState(false);
+  const [clearConfirmation, setClearConfirmation] = useState("");
+  const [clearBusy, setClearBusy] = useState(false);
+  const [clearError, setClearError] = useState("");
+  const [clearSuccess, setClearSuccess] = useState("");
 
   function addRecipient(event: FormEvent) {
     event.preventDefault();
@@ -29,6 +34,35 @@ export function PrivacySettingsView() {
       privacy: [...settings.privacy, { email: next, created: true, completed: true }],
     });
     setEmail("");
+  }
+
+  async function clearPersonalData() {
+    setClearBusy(true);
+    setClearError("");
+    setClearSuccess("");
+    try {
+      const response = await fetch("/api/workspace/personal", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm: clearConfirmation }),
+      });
+      const body = await response.json() as {
+        error?: string;
+        counts?: Record<string, number>;
+      };
+      if (!response.ok) {
+        setClearError(body.error ?? "Could not clear personal data.");
+        return;
+      }
+      const total = Object.values(body.counts ?? {}).reduce((sum, count) => sum + count, 0);
+      setClearSuccess(`${total} ${total === 1 ? "row" : "rows"} removed from your personal space.`);
+      setClearing(false);
+      setClearConfirmation("");
+    } catch {
+      setClearError("Could not clear personal data.");
+    } finally {
+      setClearBusy(false);
+    }
   }
 
   return (
@@ -104,6 +138,68 @@ export function PrivacySettingsView() {
           {error && <p className="text-sm text-destructive">{error}</p>}
         </CardContent>
       </Card>
+      {process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Personal Kismet data</CardTitle>
+            <CardDescription>
+              Deletes the experiments, connections (Slack, GitHub…), settings and workspace data in your personal space. Shared organization workspaces are not touched. Your chats stay.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {clearing ? (
+              <div className="space-y-3 rounded-md border border-destructive/30 p-3">
+                <p className="text-sm">Type <span className="font-medium">clear</span> to confirm.</p>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Input
+                    value={clearConfirmation}
+                    onChange={(event) => setClearConfirmation(event.target.value)}
+                    placeholder="clear"
+                    aria-label="Type clear to confirm"
+                    className="h-8 sm:max-w-xs"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      disabled={clearBusy || clearConfirmation !== "clear"}
+                      onClick={() => void clearPersonalData()}
+                    >
+                      {clearBusy ? "Clearing…" : "Clear personal data"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={clearBusy}
+                      onClick={() => {
+                        setClearing(false);
+                        setClearConfirmation("");
+                        setClearError("");
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={() => {
+                  setClearing(true);
+                  setClearError("");
+                  setClearSuccess("");
+                }}
+              >
+                Clear personal data
+              </Button>
+            )}
+            {clearError && <p className="text-sm text-destructive">{clearError}</p>}
+            {clearSuccess && <p className="text-sm text-muted-foreground">{clearSuccess}</p>}
+          </CardContent>
+        </Card>
+      )}
     </SettingsShell>
   );
 }

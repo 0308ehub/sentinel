@@ -27,6 +27,11 @@ export function movableTables(): readonly MoveTable[] {
   return MOVE_TABLES.filter((entry) => !entry.excluded);
 }
 
+/** Personal clearing includes private sessions, but never shared Slack claim coordination. */
+export function clearableTables(): readonly MoveTable[] {
+  return MOVE_TABLES.filter((entry) => entry.excluded !== "shared-claim");
+}
+
 export function conflictPredicate(entry: MoveTable, sourceAlias = "source", targetAlias = "target"): string | null {
   if (!entry.conflictKeys) return null;
   if (entry.conflictKeys.length === 0) return "true";
