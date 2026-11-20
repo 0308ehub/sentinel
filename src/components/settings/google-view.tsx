@@ -130,7 +130,7 @@ export function GoogleView() {
           <CardHeader>
             <CardTitle className="text-sm">Sign in with Google</CardTitle>
             <CardDescription className="text-xs leading-relaxed">
-              Connect Google opens Google's sign-in. Type or choose the Berkeley email you use for Kismet, even if this browser is already signed into another Gmail.
+              Connect Google opens Google&apos;s sign-in. Type or choose the Berkeley email you use for Kismet, even if this browser is already signed into another Gmail.
             </CardDescription>
           </CardHeader>
           <CardContent>
