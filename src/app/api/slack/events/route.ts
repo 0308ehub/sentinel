@@ -1,7 +1,7 @@
 import { after } from "next/server";
 
 import { runTick } from "@/lib/autopilot/loop";
-import { hasClaim } from "@/lib/autopilot/notify";
+import { claimShared, hasClaim, releaseShared } from "@/lib/autopilot/notify";
 import { addEvidence, knownEvidenceUrls, lastRunAt, log } from "@/lib/autopilot/store";
 import { listSignals } from "@/lib/autopilot/store";
 import { withAutopilotUser } from "@/lib/autopilot/scope";
@@ -48,8 +48,8 @@ async function fileEventForUser(userId: string, event: SlackEnvelope["event"]): 
 async function startTryReplyForUser(
   userId: string,
   reply: SlackTryReply,
-): Promise<void> {
-  await withAutopilotUser(userId, async () => {
+): Promise<boolean> {
+  return withAutopilotUser(userId, async () => {
     const parentUrl = `slack://${reply.channel}/${reply.threadTs}`;
     const signals = await listSignals();
     for (const signal of signals) {
@@ -58,10 +58,11 @@ async function startTryReplyForUser(
       const receivedKey = `received:${signal.id}:${reply.channel}:${reply.threadTs}`;
       if (!(await hasClaim(receivedKey))) continue;
       const result = await startSignalFromSlack(signal.id, reply.slackUserId);
-      if (result.status !== "started") return;
+      if (result.status !== "started") return false;
       await postSlackMessage(reply.channel, "On it — Kismet is designing this now.", reply.threadTs);
-      return;
+      return true;
     }
+    return false;
   });
 }
 
@@ -70,7 +71,14 @@ async function fileSlackEvent(teamId: string, event: SlackEnvelope["event"]): Pr
     const userIds = await listUsersForSlackTeam(teamId);
     const reply = tryReply(event);
     if (reply) {
-      for (const userId of userIds) await startTryReplyForUser(userId, reply);
+      // Several Kismet accounts can share a Slack workspace; one "yes" starts the idea in one account only.
+      const threadKey = `slack_try:${reply.channel}:${reply.threadTs}`;
+      if (!(await claimShared(threadKey))) return;
+      let started = false;
+      for (const userId of userIds) {
+        if (await startTryReplyForUser(userId, reply)) { started = true; break; }
+      }
+      if (!started) await releaseShared(threadKey);
       return;
     }
     for (const userId of userIds) {

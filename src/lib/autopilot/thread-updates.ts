@@ -1,6 +1,6 @@
 import "server-only";
 
-import { claim, release } from "@/lib/autopilot/notify";
+import { claim, claimShared, release, releaseShared } from "@/lib/autopilot/notify";
 import { threadUpdates } from "@/lib/autopilot/thread-updates-core";
 import type { Experiment, Signal } from "@/lib/autopilot/types";
 import { listExperiments, listSignals, log } from "@/lib/autopilot/store";
@@ -58,6 +58,9 @@ export async function postThreadUpdates(): Promise<number> {
   for (const update of pending) {
     if (posted === 20) break;
     if (!(await claim(update.key))) continue;
+    // Per thread and stage across accounts, so two accounts on one Slack workspace never both reply.
+    const threadKey = `slack_thread:${update.channelId}:${update.threadTs}:${update.stage}`;
+    if (!(await claimShared(threadKey))) continue;
     try {
       if (update.actionsFor) {
         await postSlackBlocks(update.channelId, update.text, reviewActionBlocks(update.text, update.actionsFor), update.threadTs);
@@ -73,6 +76,7 @@ export async function postThreadUpdates(): Promise<number> {
         continue;
       }
       await release(update.key);
+      await releaseShared(threadKey);
       console.error("[autopilot] could not post Slack thread update", error);
       const detail = error instanceof Error ? error.message : String(error);
       await log("error", `Could not post a Slack reporter update: ${detail}`).catch(() => {});

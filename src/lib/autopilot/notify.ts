@@ -70,6 +70,27 @@ export async function claim(eventKey: string): Promise<boolean> {
   return rows.length > 0;
 }
 
+/**
+ * A claim shared by every Kismet account. Several accounts can be connected to one Slack workspace; a
+ * Slack thread must still get each update once, from whichever account gets there first.
+ */
+export async function claimShared(eventKey: string): Promise<boolean> {
+  const sql = await db();
+  const rows = await sql`
+    insert into kismet.autopilot_notifications (user_id, event_key)
+    values (${SHARED_SCOPE}, ${eventKey})
+    on conflict do nothing returning event_key
+  `;
+  return rows.length > 0;
+}
+
+export async function releaseShared(eventKey: string): Promise<void> {
+  const sql = await db();
+  await sql`delete from kismet.autopilot_notifications where user_id = ${SHARED_SCOPE} and event_key = ${eventKey}`;
+}
+
+const SHARED_SCOPE = "shared:slack";
+
 export async function hasClaim(eventKey: string): Promise<boolean> {
   const sql = await db();
   const rows = await sql`
