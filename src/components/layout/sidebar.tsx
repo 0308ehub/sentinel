@@ -133,7 +133,7 @@ export function Sidebar() {
       <div className={cn("flex items-center gap-1 px-2 py-2", sidebarCollapsed ? "flex-col" : "h-12 justify-between")}>
         <Link href="/experiments" className="min-w-0" aria-label="Kismet">
           {sidebarCollapsed ? (
-            <BrandLogo mark surface="app" priority className="h-7" />
+            <BrandLogo mark surface="app" tone="auto" priority className="h-[26px]" />
           ) : (
             <BrandLogo surface="app" tone="auto" priority className="h-7" />
           )}
