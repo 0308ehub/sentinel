@@ -539,6 +539,18 @@ where s.status = 'open'
     and not (e.source = 'slack' and not e.synthetic and e.author !~ '^[UW][A-Z0-9]+$'));
 delete from kismet.evidence
 where source = 'slack' and not synthetic and author !~ '^[UW][A-Z0-9]+$';
+
+-- Slack thread replies already sent by any account count as sent for every account, so a second account
+-- connected to the same workspace does not repeat them. Keys look like <stage>:<id>:<channel>:<thread ts>.
+insert into kismet.autopilot_notifications (user_id, event_key)
+select distinct 'shared:slack',
+  'slack_thread:' || split_part(event_key, ':', 3) || ':' || split_part(event_key, ':', 4) || ':' ||
+  case split_part(event_key, ':', 1) when 'reporter_reply' then 'merged' else split_part(event_key, ':', 1) end
+from kismet.autopilot_notifications
+where user_id <> 'shared:slack'
+  and split_part(event_key, ':', 1) in ('received', 'working', 'review', 'reporter_reply', 'no_change', 'declined', 'failed', 'fixed', 'not_fixed', 'result')
+  and split_part(event_key, ':', 4) <> ''
+on conflict do nothing;
 `;
 
 export async function db(): Promise<Sql> {
