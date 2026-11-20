@@ -43,7 +43,7 @@ export function fixTask(experiment: TaskExperiment, signal: TaskSignal | undefin
     personNotes(experiment.adjustments),
     "Reproduce or locate the bug by reading the code and cite the relevant path:line in your final response. Make the smallest correct fix of the root cause.",
     "Add or update a test when the repository has tests nearby. Run the project's relevant checks. Never add a feature flag, variant, experiment gate, or A/B test.",
-    "Work quickly. Read only the files you need. Check your work with the fastest relevant checks (type-check and lint the files you changed, run the tests that cover them). Do not run a full production build, do not reinstall dependencies unless a check fails because they are missing, and do not explore unrelated parts of the repo.",
+    "Work quickly. Read only the files you need. Check your work with the fastest relevant checks (type-check and lint the files you changed, run the tests that cover them). Do not run a full production build. Dependencies are already installed; never run npm ci, npm install, yarn, or pnpm. If a package does not resolve, link the global install once with ln -s \"$(npm root -g)\" node_modules and continue. Do not explore unrelated parts of the repo.",
     // Kismet pins the checkout to the default branch's latest commit, so fetching again only costs time (~30s).
     "The repository is already checked out at the latest commit of the default branch. Don't run git fetch or git pull; start from the current commit.",
     `Work on branch ${branch} from the default branch. Never touch unrelated code. Commit and push the change, but do not open or merge a pull request.`,
@@ -184,7 +184,7 @@ export function experimentTask(
     fix ? "" : trackRules(experiment.metricSpec, external),
     !fix && external ? serverRules(experiment.flag) : "",
     fix ? `Add data-kismet-fix="${experiment.flag}" on the changed element.` : `If the change adds a visible element, add data-track="${experiment.flag}" to it.`,
-    "Work quickly. Read only the files you need. Check your work with the fastest relevant checks (type-check and lint the files you changed, run the tests that cover them). Do not run a full production build, do not reinstall dependencies unless a check fails because they are missing, and do not explore unrelated parts of the repo.",
+    "Work quickly. Read only the files you need. Check your work with the fastest relevant checks (type-check and lint the files you changed, run the tests that cover them). Do not run a full production build. Dependencies are already installed; never run npm ci, npm install, yarn, or pnpm. If a package does not resolve, link the global install once with ln -s \"$(npm root -g)\" node_modules and continue. Do not explore unrelated parts of the repo.",
     "If the request does not actually need a code change (for example it asks you not to change anything, or nothing in the code is wrong), do not push a branch. End your final response with exactly: NO CHANGE NEEDED: <one sentence why>",
     "Never push a branch whose only change is a data-kismet-fix or data-track attribute.",
     checkout

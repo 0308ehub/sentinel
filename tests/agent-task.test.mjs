@@ -38,6 +38,8 @@ test("agent tasks forbid marker-only branches and define the no-change response"
   for (const task of [experimentTask(experiment, signal, false), fixTask({ ...experiment, kind: "fix" }, signal)]) {
     assert.match(task, /NO CHANGE NEEDED: <one sentence why>/);
     assert.match(task, /only change is a data-kismet-fix or data-track attribute/);
+    assert.match(task, /never run npm ci/);
+    assert.doesNotMatch(task, /unless a check fails because they are missing/);
   }
 });
 

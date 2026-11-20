@@ -6,6 +6,9 @@
 // KISMET_CODER_AGENT_ID and KISMET_CODER_ENVIRONMENT_ID (locally and in Vercel). Run it again with those
 // set and it updates the agent in place: running sessions keep their version, new sessions get the new one.
 // Never call this from a request path.
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import Anthropic from "@anthropic-ai/sdk";
 
 const SYSTEM = `You are Kismet's engineer. Kismet is a product tool; the person talking to you is a product
@@ -19,6 +22,10 @@ How you work:
   exist and finish in a few minutes (look at package.json scripts or the equivalent: tests, lint, build).
   Commit with a clear message and push the branch with git. Never push to the default branch, never
   force-push, never rewrite history.
+- Dependencies for this repository are already installed globally. Never run npm ci, npm install, yarn, pnpm,
+  or bun install, and never spend a turn downloading packages. If a command cannot resolve a package from
+  /workspace/repo, link the global install once with ln -s "$(npm root -g)" /workspace/repo/node_modules
+  and continue. That link is not an install.
 - When you have pushed a branch, end your final message with a line exactly like:
   BRANCH: kismet/<short-slug>
   Kismet uses that line to offer a pull request.
@@ -48,7 +55,9 @@ Render the requested control and treatment page states faithfully and quickly us
 repository's own CSS toolchain. Never commit, push, or open pull requests. Never print, copy, or use secrets.
 Never install or use browsers, Puppeteer, Playwright, or Chromium, and never make screenshots or other images.
 Do not run a development server or production build. Write only the requested files under /mnt/session/outputs.
-Do not try to reach the internet beyond package registries.`;
+Dependencies are already installed globally. Never run npm ci, npm install, yarn, or pnpm. If /workspace/repo
+has no node_modules, link the global install once with ln -s "$(npm root -g)" /workspace/repo/node_modules
+and render. Do not try to reach the internet beyond package registries.`;
 
 const RENDERER = {
   name: "Kismet renderer",
@@ -58,25 +67,18 @@ const RENDERER = {
   tools: AGENT.tools,
 };
 
-// Preinstalled so sample renders and agent builds can skip most dependency installs (63-89s per render).
-// Versions track this repo's package.json; keep them in step when React/Tailwind majors change.
-const RENDER_PACKAGES = [
-  "react@19.2.4",
-  "react-dom@19.2.4",
-  "typescript@5",
-  "tsx@4",
-  "esbuild@0.25",
-  "tailwindcss@4",
-  "@tailwindcss/postcss@4",
-  "@tailwindcss/cli@4",
-  "postcss@8",
-  "lucide-react@1",
-  "clsx@2",
-  "tailwind-merge@3",
-  "class-variance-authority@0.7",
-];
+// Installed into the environment image so a session never downloads them. Versions come from package.json.
+// The git checkout replaces /workspace/repo, so the agent links this global root to node_modules instead of npm ci.
+const pkg = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../package.json"), "utf8"));
 
-const PACKAGES = { type: "packages", apt: ["git"], npm: RENDER_PACKAGES };
+function specs(deps) {
+  return Object.entries(deps ?? {}).map(([name, version]) => `${name}@${String(version).replace(/^[\^~]/, "")}`);
+}
+
+const EXTRA = ["tsx@4", "esbuild@0.25", "@tailwindcss/cli@4", "postcss@8"];
+const NPM_PACKAGES = [...new Set([...specs(pkg.dependencies), ...specs(pkg.devDependencies), ...EXTRA])].sort();
+
+const PACKAGES = { type: "packages", apt: ["git"], npm: NPM_PACKAGES };
 
 const ENVIRONMENT = {
   name: "kismet-coder",
