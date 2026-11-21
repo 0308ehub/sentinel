@@ -92,7 +92,7 @@ export function snapshotQueryOptions(experiment: Experiment) {
     queryFn: ({ signal }: { signal: AbortSignal }) => jsonRequest<ExperimentSnapshot>(`/api/autopilot/experiments/${experiment.id}/snapshot`, "Could not load the sample preview.", signal),
     staleTime: 10_000,
     gcTime: GC_TIME,
-    refetchInterval: (query) => snapshotRefreshInterval(query.state.data?.status),
+    refetchInterval: (query: { state: { data?: ExperimentSnapshot } }) => snapshotRefreshInterval(query.state.data?.status),
   };
 }
 
