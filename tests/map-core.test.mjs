@@ -45,6 +45,19 @@ test("caps nodes by recency and removes dangling edges", () => {
   assert.ok(map.edges.every((edge) => map.nodes.some((node) => node.id === edge.source) && map.nodes.some((node) => node.id === edge.target)));
 });
 
+test("gives every node a kind label of its own", async () => {
+  const { mapNodeMark } = await import("../src/lib/autopilot/map-core.ts");
+  assert.deepEqual(mapNodeMark({ nodeKind: "page" }), { tone: "page", kind: "Page", detail: "" });
+  assert.deepEqual(mapNodeMark({ nodeKind: "area" }), { tone: "area", kind: "Area", detail: "" });
+  assert.deepEqual(mapNodeMark({ nodeKind: "goal" }), { tone: "goal", kind: "Goal", detail: "" });
+  assert.deepEqual(mapNodeMark({ nodeKind: "problem", metaKind: "bug", evidence: 2 }), { tone: "bug", kind: "Bug", detail: "2 reports" });
+  assert.deepEqual(mapNodeMark({ nodeKind: "problem", metaKind: "idea", evidence: 1 }), { tone: "idea", kind: "Idea", detail: "1 report" });
+  assert.deepEqual(mapNodeMark({ nodeKind: "problem" }), { tone: "problem", kind: "Problem", detail: "0 reports" });
+  assert.deepEqual(mapNodeMark({ nodeKind: "change", metaKind: "fix", status: "rolled_out", outcome: "fixed" }), { tone: "fix", kind: "Fix", detail: "fixed" });
+  assert.deepEqual(mapNodeMark({ nodeKind: "change", metaKind: "test", status: "running" }), { tone: "test", kind: "A/B test", detail: "running" });
+  assert.deepEqual(mapNodeMark({ nodeKind: "change" }), { tone: "change", kind: "Change", detail: "planned" });
+});
+
 test("layout keeps edges left to right and problems beside their page", async () => {
   const { layoutMap, orientEdges } = await import("../src/lib/autopilot/map-core.ts");
   const nodes = [

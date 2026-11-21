@@ -162,6 +162,36 @@ export function buildAutopilotMap(
   };
 }
 
+export type MapNodeTone = "page" | "area" | "bug" | "idea" | "problem" | "fix" | "test" | "change" | "goal";
+
+/** The word and color family for a node, separate from its title. */
+export function mapNodeMark(input: {
+  nodeKind: AutopilotMapNodeKind;
+  metaKind?: AutopilotMapNode["meta"]["kind"];
+  evidence?: number;
+  status?: string;
+  outcome?: string;
+}): { tone: MapNodeTone; kind: string; detail: string } {
+  if (input.nodeKind === "page") return { tone: "page", kind: "Page", detail: "" };
+  if (input.nodeKind === "area") return { tone: "area", kind: "Area", detail: "" };
+  if (input.nodeKind === "goal") return { tone: "goal", kind: "Goal", detail: "" };
+  if (input.nodeKind === "problem") {
+    const tone: MapNodeTone = input.metaKind === "bug" ? "bug" : input.metaKind === "idea" ? "idea" : "problem";
+    const count = input.evidence ?? 0;
+    return {
+      tone,
+      kind: tone === "bug" ? "Bug" : tone === "idea" ? "Idea" : "Problem",
+      detail: `${count} ${count === 1 ? "report" : "reports"}`,
+    };
+  }
+  const tone: MapNodeTone = input.metaKind === "test" ? "test" : input.metaKind === "fix" ? "fix" : "change";
+  return {
+    tone,
+    kind: tone === "test" ? "A/B test" : tone === "fix" ? "Fix" : "Change",
+    detail: (input.outcome ?? input.status ?? "planned").replaceAll("_", " "),
+  };
+}
+
 const COLUMN: Record<AutopilotMapNodeKind, number> = { page: 0, area: 0, problem: 1, change: 2, goal: 3 };
 export const MAP_COLUMN_WIDTH = 290;
 export const MAP_ROW_HEIGHT = 74;

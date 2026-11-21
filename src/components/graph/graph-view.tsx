@@ -27,7 +27,7 @@ import { Filter, Loader2 } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
 import { useAgents, type FleetAgent } from "@/lib/agents/fleet";
-import { layoutMap, MAP_COLUMN_WIDTH, orientEdges, type AutopilotMap, type AutopilotMapNode } from "@/lib/autopilot/map-core";
+import { layoutMap, mapNodeMark, MAP_COLUMN_WIDTH, orientEdges, type AutopilotMap, type AutopilotMapNode, type MapNodeTone } from "@/lib/autopilot/map-core";
 
 type MapNodeData = Omit<AutopilotMapNode["meta"], "kind"> & {
   label: string;
@@ -35,36 +35,57 @@ type MapNodeData = Omit<AutopilotMapNode["meta"], "kind"> & {
   metaKind?: AutopilotMapNode["meta"]["kind"];
 };
 
-function mapNodeSubtitle(data: MapNodeData): string {
-  if (data.nodeKind === "page") return "Page";
-  if (data.nodeKind === "area") return "Area";
-  if (data.nodeKind === "goal") return "Goal";
-  if (data.nodeKind === "problem") {
-    const kind = data.metaKind;
-    const count = data.evidence ?? 0;
-    return `${kind === "bug" ? "Bug" : kind === "idea" ? "Idea" : "Problem"} · ${count} ${count === 1 ? "report" : "reports"}`;
-  }
-  const kind = data.metaKind === "test" ? "A/B test" : data.metaKind === "fix" ? "Fix" : "Change";
-  return `${kind} · ${data.outcome ?? data.status ?? "planned"}`.replaceAll("_", " ");
-}
+const MARK_COLOR: Record<MapNodeTone, { bg: string; fg: string }> = {
+  page: { bg: "var(--tag-5-bg)", fg: "var(--tag-5-fg)" },
+  area: { bg: "var(--tag-1-bg)", fg: "var(--tag-1-fg)" },
+  bug: { bg: "var(--tag-4-bg)", fg: "var(--tag-4-fg)" },
+  idea: { bg: "var(--tag-2-bg)", fg: "var(--tag-2-fg)" },
+  problem: { bg: "var(--tag-3-bg)", fg: "var(--tag-3-fg)" },
+  fix: { bg: "var(--tag-0-bg)", fg: "var(--tag-0-fg)" },
+  test: { bg: "var(--timeline-plan)", fg: "var(--timeline-plan-fg)" },
+  change: { bg: "var(--muted)", fg: "var(--muted-foreground)" },
+  goal: { bg: "color-mix(in srgb, var(--brand) 14%, transparent)", fg: "var(--brand)" },
+};
+
+const MAP_COLUMNS: { label: string; tone: MapNodeTone }[] = [
+  { label: "Where it was reported", tone: "area" },
+  { label: "Problem", tone: "problem" },
+  { label: "What Kismet tried", tone: "fix" },
+  { label: "Goal", tone: "goal" },
+];
 
 function MapNodeComponent({ data }: { data: MapNodeData }) {
+  const mark = mapNodeMark(data);
+  const color = MARK_COLOR[mark.tone];
   const positive = data.outcome === "won" || data.outcome === "fixed" || data.status === "merged" || data.status === "rolled_out";
   const negative = data.outcome === "lost" || data.outcome === "not fixed" || data.status === "failed";
   return (
-    <div className="min-w-[164px] max-w-[210px] rounded-lg border border-border bg-background px-3 py-2 shadow-sm">
+    <div className="min-w-[164px] max-w-[210px] rounded-lg border border-border border-l-[3px] bg-background px-2.5 py-2 shadow-sm" style={{ borderLeftColor: color.fg }} title={data.label}>
       <Handle type="target" position={Position.Left} className="!h-1.5 !w-1.5 !border-0 !bg-border" />
-      <div className="truncate text-xs font-medium text-foreground">{data.label}</div>
-      <div className={`mt-0.5 text-[10px] capitalize ${positive ? "text-emerald-700" : negative ? "text-red-700/70" : "text-muted-foreground"}`}>
-        {mapNodeSubtitle(data)}
+      <div className="flex items-center gap-1.5">
+        <span className="shrink-0 rounded px-1.5 py-px text-[10px] font-semibold leading-4" style={{ backgroundColor: color.bg, color: color.fg }}>
+          {mark.kind}
+        </span>
+        {mark.detail ? (
+          <span className={`truncate text-[10px] capitalize ${positive ? "text-[var(--success)]" : negative ? "text-destructive" : "text-muted-foreground"}`}>
+            {mark.detail}
+          </span>
+        ) : null}
       </div>
+      <div className="mt-1 truncate text-xs font-medium text-foreground">{data.label}</div>
       <Handle type="source" position={Position.Right} className="!h-1.5 !w-1.5 !border-0 !bg-border" />
     </div>
   );
 }
 
-function MapHeaderComponent({ data }: { data: { label: string } }) {
-  return <p className="w-[240px] text-[11px] font-medium uppercase tracking-wide text-[#9aa0a8]">{data.label}</p>;
+function MapHeaderComponent({ data }: { data: { label: string; tone: MapNodeTone } }) {
+  const color = MARK_COLOR[data.tone];
+  return (
+    <p className="flex w-[240px] items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide" style={{ color: color.fg }}>
+      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color.fg }} />
+      {data.label}
+    </p>
+  );
 }
 
 const mapNodeTypes = { mapNode: MapNodeComponent, mapHeader: MapHeaderComponent };
@@ -197,11 +218,11 @@ function MapGraphView() {
     const mapNodes = (query.data?.nodes ?? []).filter((node) => (node.kind !== "page" && node.kind !== "area") || linked.has(node.id));
     const positions = layoutMap(mapNodes, query.data?.edges ?? []);
     const headers: Node[] = mapNodes.length
-      ? ["Where it was reported", "Problem", "What Kismet tried", "Goal"].map((label, column) => ({
-          id: `header:${column}`,
+      ? MAP_COLUMNS.map((column, index) => ({
+          id: `header:${index}`,
           type: "mapHeader",
-          position: { x: column * MAP_COLUMN_WIDTH + 40, y: 40 },
-          data: { label },
+          position: { x: index * MAP_COLUMN_WIDTH + 40, y: 40 },
+          data: { label: column.label, tone: column.tone },
           draggable: false,
           selectable: false,
         }))
