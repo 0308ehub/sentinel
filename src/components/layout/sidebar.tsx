@@ -90,10 +90,10 @@ export function Sidebar() {
     <aside
       className={cn(
         "flex h-full shrink-0 flex-col border-r border-sidebar-border bg-sidebar transition-[width] duration-200",
-        sidebarCollapsed ? "w-12" : "w-[300px]",
+        sidebarCollapsed ? "w-36" : "w-[300px]",
       )}
     >
-      <div className={cn("flex items-center gap-0.5 px-1.5", sidebarCollapsed ? "flex-col py-2" : "h-12")}>
+      <div className={cn("flex gap-0.5 px-1.5", sidebarCollapsed ? "flex-col items-stretch py-2" : "h-12 items-center")}>
         <Link href="/experiments" aria-label="Kismet" title="Experiments" className="grid h-8 w-8 shrink-0 place-items-center rounded-md hover:bg-sidebar-accent">
           <BrandLogo mark priority className="h-5 w-5" />
         </Link>
@@ -105,11 +105,13 @@ export function Sidebar() {
             aria-label={item.label}
             title={item.label}
             className={cn(
-              "grid h-8 w-8 shrink-0 place-items-center rounded-md",
+              "shrink-0 rounded-md",
+              sidebarCollapsed ? "flex h-8 w-full items-center gap-2 px-2" : "grid h-8 w-8 place-items-center",
               isActive(item, pathname) ? "bg-accent text-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent",
             )}
           >
-            <item.icon className="h-4 w-4" />
+            <item.icon className="h-4 w-4 shrink-0" />
+            {sidebarCollapsed ? <span className="min-w-0 truncate text-xs font-medium">{item.label}</span> : null}
           </Link>
         ))}
         <button
