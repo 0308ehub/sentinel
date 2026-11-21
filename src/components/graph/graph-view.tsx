@@ -36,21 +36,16 @@ type MapNodeData = Omit<AutopilotMapNode["meta"], "kind"> & {
 };
 
 const MARK_COLOR: Record<MapNodeTone, { bg: string; fg: string }> = {
-  page: { bg: "var(--tag-5-bg)", fg: "var(--tag-5-fg)" },
-  area: { bg: "var(--tag-1-bg)", fg: "var(--tag-1-fg)" },
-  bug: { bg: "var(--tag-4-bg)", fg: "var(--tag-4-fg)" },
-  idea: { bg: "var(--tag-2-bg)", fg: "var(--tag-2-fg)" },
-  problem: { bg: "var(--tag-3-bg)", fg: "var(--tag-3-fg)" },
-  fix: { bg: "var(--tag-0-bg)", fg: "var(--tag-0-fg)" },
-  test: { bg: "var(--timeline-plan)", fg: "var(--timeline-plan-fg)" },
-  change: { bg: "var(--muted)", fg: "var(--muted-foreground)" },
+  reported: { bg: "var(--tag-1-bg)", fg: "var(--tag-1-fg)" },
+  problem: { bg: "var(--tag-4-bg)", fg: "var(--tag-4-fg)" },
+  tried: { bg: "var(--tag-5-bg)", fg: "var(--tag-5-fg)" },
   goal: { bg: "color-mix(in srgb, var(--brand) 14%, transparent)", fg: "var(--brand)" },
 };
 
 const MAP_COLUMNS: { label: string; tone: MapNodeTone }[] = [
-  { label: "Where it was reported", tone: "area" },
+  { label: "Where it was reported", tone: "reported" },
   { label: "Problem", tone: "problem" },
-  { label: "What Kismet tried", tone: "fix" },
+  { label: "What Kismet tried", tone: "tried" },
   { label: "Goal", tone: "goal" },
 ];
 
