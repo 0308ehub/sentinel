@@ -159,7 +159,6 @@ function VisualPreview({ experiment, changes, siteUrl, when, where, before, afte
   const queryClient = useQueryClient();
   const snapshotQuery = useExperimentSnapshot(experiment);
   const snapshot = snapshotQuery.data ?? null;
-  const refetchSnapshot = snapshotQuery.refetch;
   const [snapshotMessage, setSnapshotMessage] = useState("");
   const snapshotLoadMessage = snapshotQuery.error instanceof Error
     ? snapshotQuery.error.message || "Could not load the sample preview."
@@ -184,7 +183,6 @@ function VisualPreview({ experiment, changes, siteUrl, when, where, before, afte
 
   useEffect(() => {
     if (!snapshot) return;
-    let timer: number | undefined;
     const advance = async () => {
       if (snapshot.status === "none" && hasSource && shouldAutoRender && !startAttempted.current) {
         startAttempted.current = true;
@@ -194,17 +192,12 @@ function VisualPreview({ experiment, changes, siteUrl, when, where, before, afte
           return;
         }
         queryClient.setQueryData(experimentQueryKeys.snapshot(experiment), (await started.json()) as SnapshotResponse);
-      } else if (snapshot.status === "rendering") {
-        timer = window.setTimeout(() => { void refetchSnapshot(); }, 10_000);
       }
     };
     advance().catch((reason: unknown) => {
       setSnapshotMessage(reason instanceof Error ? reason.message : "Could not load the sample preview.");
     });
-    return () => {
-      if (timer) window.clearTimeout(timer);
-    };
-  }, [experiment, hasSource, queryClient, refetchSnapshot, shouldAutoRender, snapshot]);
+  }, [experiment, hasSource, queryClient, shouldAutoRender, snapshot]);
 
   if (snapshotQuery.isPending) return <LoadingBlock className="mt-4 min-h-72" label="Loading sample preview…" />;
 

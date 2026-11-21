@@ -29,6 +29,13 @@ export function snapshotStageLabel(stage: SnapshotStage): string {
   }[stage];
 }
 
+export const SNAPSHOT_REFRESH_MS = 4_000;
+
+/** Keep asking while a sample is rendering, including when the stage has not changed yet. */
+export function snapshotRefreshInterval(status: string | undefined): number | false {
+  return status === "rendering" ? SNAPSHOT_REFRESH_MS : false;
+}
+
 export function elapsedMinutes(startedAt: string, now: string | number | Date = Date.now()): number {
   const elapsed = new Date(now).getTime() - Date.parse(startedAt);
   return Number.isFinite(elapsed) ? Math.max(0, Math.floor(elapsed / 60_000)) : 0;

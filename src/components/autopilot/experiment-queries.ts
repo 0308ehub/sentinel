@@ -2,6 +2,7 @@
 
 import { useQuery, type QueryClient } from "@tanstack/react-query";
 import type { ExperimentActivity } from "@/lib/autopilot/activity-core";
+import { snapshotRefreshInterval } from "../../lib/autopilot/snapshot-stage-core.ts";
 import type { ChangeSummary } from "@/lib/autopilot/change-summary";
 import type { Experiment } from "@/lib/autopilot/types";
 
@@ -91,6 +92,7 @@ export function snapshotQueryOptions(experiment: Experiment) {
     queryFn: ({ signal }: { signal: AbortSignal }) => jsonRequest<ExperimentSnapshot>(`/api/autopilot/experiments/${experiment.id}/snapshot`, "Could not load the sample preview.", signal),
     staleTime: 10_000,
     gcTime: GC_TIME,
+    refetchInterval: (query) => snapshotRefreshInterval(query.state.data?.status),
   };
 }
 

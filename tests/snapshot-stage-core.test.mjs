@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { elapsedMinutes, snapshotStage, snapshotStageLabel } from "../src/lib/autopilot/snapshot-stage-core.ts";
+import { elapsedMinutes, snapshotRefreshInterval, snapshotStage, snapshotStageLabel } from "../src/lib/autopilot/snapshot-stage-core.ts";
 
 const step = (command, tool = "bash") => ({ kind: "step", tool, summary: command, command, isError: false });
 
@@ -14,6 +14,13 @@ test("snapshot stages advance from setup through both renders and checks", () =>
 
 test("snapshot stage labels are concise", () => {
   assert.equal(snapshotStageLabel("rendering_new"), "Rendering new version");
+});
+
+test("a sample keeps refreshing while it is rendering and stops when it finishes", () => {
+  assert.equal(snapshotRefreshInterval("rendering"), 4_000);
+  assert.equal(snapshotRefreshInterval("ready"), false);
+  assert.equal(snapshotRefreshInterval("failed"), false);
+  assert.equal(snapshotRefreshInterval(undefined), false);
 });
 
 test("elapsed minutes are floored and never negative", () => {
